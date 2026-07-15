@@ -8,13 +8,14 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Pedidos">
   <meta name="description" content="Pedidos por proveedor con PDF independiente">
-  <link rel="manifest" href="./manifest.webmanifest?v=7">
-  <link rel="apple-touch-icon" href="./assets/icon.svg?v=7">
+  <link rel="manifest" href="./manifest.webmanifest?v=8">
+  <link rel="apple-touch-icon" href="./assets/icon.svg?v=8">
   <title>Pedidos Proveedores</title>
-  <link rel="stylesheet" href="./styles.css?v=7">
-  <link rel="stylesheet" href="./ios-nav-fix.css?v=7">
-  <link rel="stylesheet" href="./pro-features.css?v=7">
-  <link rel="stylesheet" href="./v6-professional.css?v=7">
+  <link rel="stylesheet" href="./styles.css?v=8">
+  <link rel="stylesheet" href="./ios-nav-fix.css?v=8">
+  <link rel="stylesheet" href="./pro-features.css?v=8">
+  <link rel="stylesheet" href="./v6-professional.css?v=8">
+  <link rel="stylesheet" href="./provider-logos-v8.css?v=8">
 </head>
 <body>
   <header class="top"><div class="toprow"><div class="title"><small id="eyebrow">PEDIDO ACTUAL <span class="build" id="buildVersion"></span></small><h1 id="pageTitle">Preparar pedido</h1></div><div class="actions"><button class="btn danger" id="clear" type="button">Limpiar</button><button class="btn primary" id="generate" type="button">PDFs</button></div></div></header>
@@ -29,5 +30,5 @@
   <dialog id="itemDialog"><form class="modal" id="itemForm"><h2 id="itemTitle">Nuevo ítem</h2><input type="hidden" id="itemId"><label><span class="label">Descripción</span><input id="itemDesc" required></label><label><span class="label">Categoría</span><select id="itemCategory"></select></label><label><span class="label">Proveedor</span><input id="itemProv" required list="providers"></label><label><span class="label">Unidad predeterminada</span><select id="itemUnit"></select></label><label class="check"><input id="itemEnabled" type="checkbox" checked> Habilitado</label><div class="modalactions"><button type="button" class="btn" data-close>Cancelar</button><button class="btn primary">Guardar</button></div></form></dialog>
   <dialog id="installDialog"><div class="modal"><h2>Instalar en iPhone</h2><p>Abre este enlace en Safari, toca <b>Compartir</b> y luego <b>Agregar a inicio</b>.</p><div class="modalactions"><button class="btn primary" data-close type="button">Entendido</button></div></div></dialog>
   <datalist id="providers"></datalist><div class="toast" id="toast"></div>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script><script src="./seed-1.js?v=7"></script><script src="./seed-2.js?v=7"></script><script src="./seed-3.js?v=7"></script><script src="./seed-4.js?v=7"></script><script src="./app.js?v=7"></script><script src="./ios-nav-fix.js?v=7"></script><script src="./pro-features.js?v=7"></script><script src="./v6-invoice-ai.js?v=7"></script><script src="./v6-management.js?v=7"></script><script src="./v6-ios-input.js?v=7"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script><script src="./seed-1.js?v=8"></script><script src="./seed-2.js?v=8"></script><script src="./seed-3.js?v=8"></script><script src="./seed-4.js?v=8"></script><script src="./app.js?v=8"></script><script src="./ios-nav-fix.js?v=8"></script><script src="./event-guard-v8.js?v=8"></script><script src="./db-compat-v8.js?v=8"></script><script src="./pro-features.js?v=8"></script><script src="./v6-invoice-ai.js?v=8"></script><script src="./v6-management.js?v=8"></script><script src="./input-nav-v8.js?v=8"></script><script src="./provider-logos-v8.js?v=8"></script>
 </body></html>
