@@ -44,7 +44,7 @@
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)deferredRecover()});
   new MutationObserver(pinBottomNav).observe(document.body,{attributes:true,attributeFilter:['class']});
 
-  const version=document.querySelector('#buildVersion');
-  if(version)version.textContent='v4.0.1';
+  const css=document.createElement('link');css.rel='stylesheet';css.href='./pro-features.css?v=6';document.head.appendChild(css);
+  const script=document.createElement('script');script.src='./pro-features.js?v=6';script.onload=()=>{const version=document.querySelector('#buildVersion');if(version)version.textContent='v5.0.0'};document.body.appendChild(script);
   deferredRecover();
 })();
