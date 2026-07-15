@@ -1,0 +1,33 @@
+/* Corrección específica para iOS/PWA: mantiene la barra inferior anclada al borde real de la pantalla. */
+.bottom{
+  position:fixed!important;
+  inset:auto 0 0 0!important;
+  top:auto!important;
+  bottom:0!important;
+  width:100%!important;
+  max-width:none!important;
+  transform:translate3d(0,0,0)!important;
+  -webkit-transform:translate3d(0,0,0)!important;
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
+  will-change:transform;
+}
+
+/* No usar display:none mientras aparece el teclado: iOS puede restaurar el elemento en una posición antigua. */
+body.qty-editing .bottom{
+  display:flex!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+body:not(.qty-editing) .bottom{
+  display:flex!important;
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+}
+
+@supports (padding:max(0px)){
+  .bottom{padding-bottom:max(8px,env(safe-area-inset-bottom))!important}
+}
