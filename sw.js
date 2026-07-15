@@ -1,5 +1,5 @@
-const CACHE='pedidos-proveedores-v7';
-const SHELL=['./','./index.html','./styles.css?v=7','./ios-nav-fix.css?v=7','./pro-features.css?v=7','./v6-professional.css?v=7','./app.js?v=7','./ios-nav-fix.js?v=7','./pro-features.js?v=7','./v6-invoice-ai.js?v=7','./v6-management.js?v=7','./v6-ios-input.js?v=7','./manifest.webmanifest?v=7','./assets/icon.svg?v=7','./seed-1.js?v=7','./seed-2.js?v=7','./seed-3.js?v=7','./seed-4.js?v=7'];
+const CACHE='pedidos-proveedores-v8';
+const SHELL=['./','./index.html','./styles.css?v=8','./ios-nav-fix.css?v=8','./pro-features.css?v=8','./v6-professional.css?v=8','./provider-logos-v8.css?v=8','./app.js?v=8','./ios-nav-fix.js?v=8','./event-guard-v8.js?v=8','./db-compat-v8.js?v=8','./pro-features.js?v=8','./v6-invoice-ai.js?v=8','./v6-management.js?v=8','./input-nav-v8.js?v=8','./provider-logos-v8.js?v=8','./manifest.webmanifest?v=8','./assets/icon.svg?v=8','./seed-1.js?v=8','./seed-2.js?v=8','./seed-3.js?v=8','./seed-4.js?v=8'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',event=>{
