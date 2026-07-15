@@ -1,4 +1,4 @@
--- Pedidos Proveedores PWA - esquema inicial Supabase
+-- Pedidos Proveedores PWA - esquema Supabase preparado para pedidos, recepciones y OCR
 create table if not exists public.orders (
   folio text primary key,
   created_at timestamptz not null default now(),
@@ -13,29 +13,35 @@ create table if not exists public.orders (
 create table if not exists public.invoice_files (
   id bigint generated always as identity primary key,
   folio text not null references public.orders(folio) on delete cascade,
+  provider text not null default '',
   file_path text not null,
   file_name text,
   mime_type text,
+  file_size bigint,
+  ocr_status text not null default 'pending',
+  ocr_text text,
+  matches jsonb not null default '[]'::jsonb,
+  extracted_data jsonb,
   created_at timestamptz not null default now(),
-  extracted_data jsonb
+  processed_at timestamptz
 );
+
+alter table public.invoice_files add column if not exists provider text not null default '';
+alter table public.invoice_files add column if not exists file_size bigint;
+alter table public.invoice_files add column if not exists ocr_status text not null default 'pending';
+alter table public.invoice_files add column if not exists ocr_text text;
+alter table public.invoice_files add column if not exists matches jsonb not null default '[]'::jsonb;
+alter table public.invoice_files add column if not exists processed_at timestamptz;
 
 create index if not exists orders_created_at_idx on public.orders(created_at desc);
 create index if not exists invoice_files_folio_idx on public.invoice_files(folio);
+create index if not exists invoice_files_folio_provider_idx on public.invoice_files(folio,provider);
 
 alter table public.orders enable row level security;
 alter table public.invoice_files enable row level security;
 
--- Para la primera etapa privada de un solo usuario. Antes de uso multiusuario,
--- reemplazar estas políticas por autenticación Supabase Auth.
-create policy "orders anon access" on public.orders for all to anon using (true) with check (true);
-create policy "invoice anon access" on public.invoice_files for all to anon using (true) with check (true);
-
+-- Estas políticas son solo una plantilla de desarrollo. Para publicar la nube,
+-- reemplazarlas por Supabase Auth y acceso por usuario/empresa.
 insert into storage.buckets (id,name,public)
 values ('invoices','invoices',false)
 on conflict (id) do nothing;
-
-create policy "invoice storage anon insert" on storage.objects
-for insert to anon with check (bucket_id='invoices');
-create policy "invoice storage anon read" on storage.objects
-for select to anon using (bucket_id='invoices');
