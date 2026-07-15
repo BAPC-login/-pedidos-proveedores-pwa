@@ -1,5 +1,5 @@
-const CACHE='pedidos-proveedores-v5';
-const SHELL=['./','./index.html','./styles.css?v=5','./ios-nav-fix.css?v=5','./app.js?v=5','./ios-nav-fix.js?v=5','./manifest.webmanifest?v=5','./assets/icon.svg?v=5','./seed-1.js?v=5','./seed-2.js?v=5','./seed-3.js?v=5','./seed-4.js?v=5'];
+const CACHE='pedidos-proveedores-v6';
+const SHELL=['./','./index.html','./styles.css?v=5','./ios-nav-fix.css?v=5','./app.js?v=5','./ios-nav-fix.js?v=5','./pro-features.css?v=6','./pro-features.js?v=6','./manifest.webmanifest?v=5','./assets/icon.svg?v=5','./seed-1.js?v=5','./seed-2.js?v=5','./seed-3.js?v=5','./seed-4.js?v=5'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',event=>{
