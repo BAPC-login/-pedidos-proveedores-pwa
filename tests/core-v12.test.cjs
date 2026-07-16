@@ -8,7 +8,7 @@ assert.equal(core.parseLine('MISTRAL35-1000CCX12=1 120.000',1.19).grossUnitPrice
 const totals=core.extractTotals('TOTAL NETO 100.000\nIVA 19% 19.000\nTOTAL 119.000');
 assert.equal(totals.taxFactor,1.19,'calcula factor de impuesto');
 
-const summary=core.matchInvoice('FACTURA ELECTRONICA N° 445566\nMISTRAL35-1000CCX12=1 120.000\nTOTAL NETO 120.000\nIVA 22.800\nTOTAL 142.800',[{productId:'p1',description:'PISCO MISTRAL 35',unit:'CAJA (12)'}]);
+const summary=core.matchInvoice('FACTURA ELECTRONICA N 445566\nMISTRAL35-1000CCX12=1 120.000\nTOTAL NETO 120.000\nIVA 22.800\nTOTAL 142.800',[{productId:'p1',description:'PISCO MISTRAL 35',unit:'CAJA (12)'}]);
 assert.equal(summary.invoiceNumber,'445566');
 assert.equal(summary.lines.length,1,'coteja el producto de la factura');
 assert.equal(summary.lines[0].productId,'p1');
