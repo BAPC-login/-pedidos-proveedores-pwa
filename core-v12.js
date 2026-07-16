@@ -45,7 +45,7 @@
   function parsePackFromText(value){
     const text=normalizeText(value);
     const patterns=[
-      /(?:^|\s)X\s*(\d{1,3})(?:\s|$|=)/,
+      /X\s*(\d{1,3})(?:\s|$|=)/,
       /(?:CAJA|PACK|DISPLAY)\s*(?:DE\s*)?(\d{1,3})/,
       /(\d{1,3})\s*(?:UN|UND|UNIDADES|BOTELLAS)(?:\s|$)/
     ];
