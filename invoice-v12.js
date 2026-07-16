@@ -3,7 +3,7 @@
   const core=()=>root.PedidosCore;
   const SOURCES={tesseract:['./vendor/tesseract/tesseract.min.js','https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'],pdf:['./vendor/pdfjs/pdf.min.js','https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js']};
   const loaders=new Map();let tesseractSource='',pdfSource='',workerPromise=null,currentProgress=null;
-  function progress(callback,label,percent){if(typeof callback==='function')callback({label,percent:Math.max(0,Math.min(100,Number(percent)||0)})}
+  function progress(callback,label,percent){if(typeof callback==='function')callback({label,percent:Math.max(0,Math.min(100,Number(percent)||0))})}
   function loadScript(url,test){if(test())return Promise.resolve(url);if(loaders.has(url))return loaders.get(url);const promise=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=url;script.crossOrigin='anonymous';script.onload=()=>test()?resolve(url):reject(new Error('La biblioteca no se inició'));script.onerror=()=>reject(new Error(`No se pudo cargar ${url}`));document.head.appendChild(script)}).catch(error=>{loaders.delete(url);throw error});loaders.set(url,promise);return promise}
   async function loadFirst(urls,test){let last;for(const url of urls){try{return await loadScript(url,test)}catch(error){last=error}}throw last||new Error('No se pudo iniciar el lector')}
   async function ensureTesseract(){if(root.Tesseract)return root.Tesseract;tesseractSource=await loadFirst(SOURCES.tesseract,()=>!!root.Tesseract);return root.Tesseract}
