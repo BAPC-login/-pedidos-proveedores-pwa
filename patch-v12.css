@@ -2,9 +2,18 @@
 .management-panel.active,.data-panel.active{display:block}
 #providerDatabase .provider-logo-preview.empty{padding:4px;display:flex;align-items:center;justify-content:center;font-size:10px}
 #newProduct.hidden{display:none!important}
+.build-version{margin-left:5px;letter-spacing:0;color:var(--primary);font-size:10px}
+.invoice-item-summary{margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:13px;background:var(--input-bg)}
+.invoice-summary-total,.invoice-summary-line{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.invoice-summary-total{padding-bottom:7px;margin-bottom:5px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
+.invoice-summary-line{padding:4px 0;font-size:12px}
+.invoice-summary-line span{font-weight:700;min-width:0}
+.invoice-summary-line small{text-align:right;color:var(--muted)}
 @media(max-width:760px){
   .topbar-inner{align-items:flex-end}
   .page-title{min-width:0}
   .page-title h1{white-space:normal}
   .invoice-review-row[style]{display:none}
+  .invoice-summary-line{display:block}
+  .invoice-summary-line small{display:block;text-align:left;margin-top:2px}
 }
