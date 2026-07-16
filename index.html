@@ -14,123 +14,31 @@
       if(location.hostname==='raw.githack.com'){location.replace(stable+location.search);return}
       let theme='light';
       try{const saved=JSON.parse(localStorage.getItem('pedidos-proveedores:v1')||'null');theme=saved?.settings?.theme==='dark'?'dark':'light'}catch{}
-      document.documentElement.dataset.theme=theme;
-      document.documentElement.style.background=theme==='dark'?'#090e16':'#f3f6fb';
-      document.querySelector('meta[name="theme-color"]').content=theme==='dark'?'#090e16':'#f3f6fb';
+      const color=theme==='dark'?'#090e16':'#f3f6fb';document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme;document.documentElement.style.background=color;document.querySelector('meta[name="theme-color"]').content=color;
     })();
   </script>
-  <link rel="manifest" href="./manifest.webmanifest?v=12">
-  <link rel="apple-touch-icon" href="./assets/icon.svg?v=12">
-  <link rel="stylesheet" href="./styles-v12.css?v=12">
+  <link rel="manifest" href="./manifest.webmanifest?v=13">
+  <link rel="apple-touch-icon" href="./assets/icon.svg?v=13">
+  <link rel="stylesheet" href="./styles-v12.css?v=13">
+  <link rel="stylesheet" href="./patch-v12.css?v=13">
   <title>Pedidos Pro</title>
 </head>
 <body>
   <div id="offlineBadge" class="offline-badge hidden">Modo offline</div>
-  <header class="topbar">
-    <div class="topbar-inner">
-      <div class="page-title"><small id="eyebrow">PEDIDO ACTUAL</small><h1 id="pageHeading">Preparar pedido</h1></div>
-      <div class="top-actions"><button class="btn danger" id="clearDraft" type="button">Limpiar</button><button class="btn primary" id="generateOrder" type="button">PDFs</button></div>
-    </div>
-  </header>
-
+  <header class="topbar"><div class="topbar-inner"><div class="page-title"><small id="eyebrow">PEDIDO ACTUAL</small><h1 id="pageHeading">Preparar pedido</h1></div><div class="top-actions"><button class="btn danger" id="clearDraft" type="button">Limpiar</button><button class="btn primary" id="generateOrder" type="button">PDFs</button></div></div></header>
   <main class="app-main">
-    <section class="view active" id="view-order">
-      <div class="summary-strip" id="orderSummary">
-        <div class="summary-cell"><b id="summaryItems">0</b><span>ítems</span></div>
-        <div class="summary-cell"><b id="summaryProviders">0</b><span>proveedores</span></div>
-        <div class="summary-cell"><b id="summaryUnits">0</b><span>unidades estimadas</span></div>
-      </div>
-      <div class="card filters">
-        <label class="search-wrap"><input id="orderSearch" placeholder="Buscar producto o proveedor" autocomplete="off"></label>
-        <select id="orderCategoryFilter" aria-label="Filtrar categoría"></select>
-        <select id="orderProviderFilter" aria-label="Filtrar proveedor"></select>
-      </div>
-      <div id="orderList"></div>
-    </section>
-
-    <section class="view" id="view-files">
-      <div class="section-head"><div><h2>Archivos por proveedor</h2><span class="muted">Folio actual: <b id="filesFolio">—</b></span></div></div>
-      <div id="filesList"></div>
-    </section>
-
-    <section class="view" id="view-management">
-      <div class="section-head"><div><h2>Gestión de compras</h2><span class="muted">Pedidos, recepción, facturas y precios históricos.</span></div></div>
-      <div class="tabs">
-        <button class="tab active" data-management-tab="dashboard" type="button">Dashboard</button>
-        <button class="tab" data-management-tab="history" type="button">Historial</button>
-        <button class="tab" data-management-tab="reception" type="button">Recepción</button>
-        <button class="tab" data-management-tab="prices" type="button">Precios</button>
-      </div>
-      <div class="management-panel active" id="management-dashboard">
-        <div class="card filters"><select id="dashboardPeriod"><option value="7">Últimos 7 días</option><option value="30" selected>Últimos 30 días</option><option value="90">Últimos 90 días</option><option value="3650">Todo el historial</option></select></div>
-        <div class="dashboard-grid" id="dashboardMetrics"></div>
-        <div class="card"><div class="section-head"><div><h3>Consumo por producto</h3><span class="muted">Unidades recepcionadas</span></div></div><div id="dashboardProducts"></div></div>
-        <div class="card"><div class="section-head"><div><h3>Gasto por proveedor</h3><span class="muted" id="dashboardPriceCount"></span></div></div><div id="dashboardProviders"></div></div>
-      </div>
-      <div class="management-panel" id="management-history">
-        <div class="card filters"><label class="search-wrap"><input id="historySearch" placeholder="Buscar folio, proveedor o producto"></label><select id="historyStatus"><option value="">Todos los estados</option><option value="pending">Pendientes</option><option value="partial">Parciales</option><option value="complete">Completos</option></select></div>
-        <div id="historyList"></div>
-      </div>
-      <div class="management-panel" id="management-reception"><div id="receptionContent"></div></div>
-      <div class="management-panel" id="management-prices"><div id="priceHistoryList"></div></div>
-    </section>
-
-    <section class="view" id="view-data">
-      <div class="section-head"><div><h2>Base de datos</h2><span class="muted">Productos, categorías y proveedores.</span></div><button class="btn primary" id="newProduct" type="button">+ Ítem</button></div>
-      <div class="tabs"><button class="tab active" data-data-tab="products" type="button">Productos</button><button class="tab" data-data-tab="categories" type="button">Categorías</button><button class="tab" data-data-tab="providers" type="button">Proveedores</button></div>
-      <div class="data-panel active" id="data-products"><div class="card filters"><label class="search-wrap"><input id="dataSearch" placeholder="Buscar en la base"></label><select id="dataCategoryFilter"></select><select id="dataProviderFilter"></select></div><div id="productDatabase"></div></div>
-      <div class="data-panel" id="data-categories"><div id="categoryDatabase"></div></div>
-      <div class="data-panel" id="data-providers"><div id="providerDatabase"></div></div>
-    </section>
-
-    <section class="view" id="view-profile">
-      <div class="section-head"><div><h2>Perfil y documentos</h2><span class="muted">Toda la configuración se guarda automáticamente.</span></div></div>
-      <form class="card form-grid" id="profileForm">
-        <div class="autosave full"><span>Guardado automático</span><strong>Los cambios se aplican al instante</strong></div>
-        <label class="field"><span>Razón social</span><input id="companyName" required></label>
-        <label class="field"><span>RUT</span><input id="companyRut" required></label>
-        <label class="field full"><span>Dirección</span><input id="companyAddress" required></label>
-        <label class="field"><span>Local</span><input id="companyLocation" required></label>
-        <label class="field"><span>Prefijo de folio</span><input id="folioPrefix" maxlength="5" placeholder="MDR"></label>
-        <div class="logo-editor full">
-          <div class="logo-box"><b>Logo principal</b><img id="companyLogo1Preview" class="hidden" alt="Logo principal"><input type="file" id="companyLogo1" accept="image/*" hidden><div class="logo-actions"><label class="btn small" for="companyLogo1">Elegir o reemplazar</label><button class="btn small danger hidden" id="removeCompanyLogo1" type="button">Eliminar</button></div></div>
-          <div class="logo-box"><b>Logo secundario</b><img id="companyLogo2Preview" class="hidden" alt="Logo secundario"><input type="file" id="companyLogo2" accept="image/*" hidden><div class="logo-actions"><label class="btn small" for="companyLogo2">Elegir o reemplazar</label><button class="btn small danger hidden" id="removeCompanyLogo2" type="button">Eliminar</button></div></div>
-        </div>
-        <label class="field"><span>Posición de logos</span><select id="logoPosition"><option value="left">Izquierda</option><option value="right">Derecha</option><option value="top">Arriba</option><option value="bottom">Abajo</option></select></label>
-        <label class="field"><span>Tema de la app</span><select id="themeSelect"><option value="light">Claro</option><option value="dark">Oscuro</option></select></label>
-        <label class="field"><span>Tamaño logo principal: <b id="companyLogoSizeValue">42</b> mm</span><input id="companyLogoSize" type="range" min="18" max="62"></label>
-        <label class="field"><span>Tamaño logo secundario: <b id="companyLogo2SizeValue">28</b> mm</span><input id="companyLogo2Size" type="range" min="14" max="52"></label>
-        <label class="field full"><span>Color de encabezados PDF</span><input id="headerColor" type="color"><div class="color-palette" id="colorPalette"><button type="button" class="swatch" data-header-color="#48484c" style="background:#48484c"></button><button type="button" class="swatch" data-header-color="#1267f5" style="background:#1267f5"></button><button type="button" class="swatch" data-header-color="#123a63" style="background:#123a63"></button><button type="button" class="swatch" data-header-color="#126b50" style="background:#126b50"></button><button type="button" class="swatch" data-header-color="#7a263a" style="background:#7a263a"></button><button type="button" class="swatch" data-header-color="#111111" style="background:#111"></button></div></label>
-      </form>
-      <div class="card"><div class="section-head"><div><h3>Vista previa del encabezado</h3><span class="muted">Representación del documento final</span></div></div><div id="headerPreview"></div></div>
-    </section>
+    <section class="view active" id="view-order"><div class="summary-strip" id="orderSummary"><div class="summary-cell"><b id="summaryItems">0</b><span>ítems</span></div><div class="summary-cell"><b id="summaryProviders">0</b><span>proveedores</span></div><div class="summary-cell"><b id="summaryUnits">0</b><span>unidades estimadas</span></div></div><div class="card filters"><label class="search-wrap"><input id="orderSearch" placeholder="Buscar producto o proveedor" autocomplete="off"></label><select id="orderCategoryFilter" aria-label="Filtrar categoría"></select><select id="orderProviderFilter" aria-label="Filtrar proveedor"></select></div><div id="orderList"></div></section>
+    <section class="view" id="view-files"><div class="section-head"><div><h2>Archivos por proveedor</h2><span class="muted">Folio actual: <b id="filesFolio">—</b></span></div></div><div id="filesList"></div></section>
+    <section class="view" id="view-management"><div class="section-head"><div><h2>Gestión de compras</h2><span class="muted">Pedidos, recepción, facturas y precios históricos.</span></div></div><div class="tabs"><button class="tab active" data-management-tab="dashboard" type="button">Dashboard</button><button class="tab" data-management-tab="history" type="button">Historial</button><button class="tab" data-management-tab="reception" type="button">Recepción</button><button class="tab" data-management-tab="prices" type="button">Precios</button></div><div class="management-panel active" id="management-dashboard"><div class="card filters"><select id="dashboardPeriod"><option value="7">Últimos 7 días</option><option value="30" selected>Últimos 30 días</option><option value="90">Últimos 90 días</option><option value="3650">Todo el historial</option></select></div><div class="dashboard-grid" id="dashboardMetrics"></div><div class="card"><div class="section-head"><div><h3>Consumo por producto</h3><span class="muted">Unidades recepcionadas</span></div></div><div id="dashboardProducts"></div></div><div class="card"><div class="section-head"><div><h3>Gasto por proveedor</h3><span class="muted" id="dashboardPriceCount"></span></div></div><div id="dashboardProviders"></div></div></div><div class="management-panel" id="management-history"><div class="card filters"><label class="search-wrap"><input id="historySearch" placeholder="Buscar folio, proveedor o producto"></label><select id="historyStatus"><option value="">Todos los estados</option><option value="pending">Pendientes</option><option value="partial">Parciales</option><option value="complete">Completos</option></select></div><div id="historyList"></div></div><div class="management-panel" id="management-reception"><div id="receptionContent"></div></div><div class="management-panel" id="management-prices"><div id="priceHistoryList"></div></div></section>
+    <section class="view" id="view-data"><div class="section-head"><div><h2>Base de datos</h2><span class="muted">Productos, categorías y proveedores.</span></div><button class="btn primary" id="newProduct" type="button">+ Ítem</button></div><div class="tabs"><button class="tab active" data-data-tab="products" type="button">Productos</button><button class="tab" data-data-tab="categories" type="button">Categorías</button><button class="tab" data-data-tab="providers" type="button">Proveedores</button></div><div class="data-panel active" id="data-products"><div class="card filters"><label class="search-wrap"><input id="dataSearch" placeholder="Buscar en la base"></label><select id="dataCategoryFilter"></select><select id="dataProviderFilter"></select></div><div id="productDatabase"></div></div><div class="data-panel" id="data-categories"><div id="categoryDatabase"></div></div><div class="data-panel" id="data-providers"><div id="providerDatabase"></div></div></section>
+    <section class="view" id="view-profile"><div class="section-head"><div><h2>Perfil y documentos</h2><span class="muted">Toda la configuración se guarda automáticamente.</span></div></div><form class="card form-grid" id="profileForm"><div class="autosave full"><span>Guardado automático</span><strong>Los cambios se aplican al instante</strong></div><label class="field"><span>Razón social</span><input id="companyName" required></label><label class="field"><span>RUT</span><input id="companyRut" required></label><label class="field full"><span>Dirección</span><input id="companyAddress" required></label><label class="field"><span>Local</span><input id="companyLocation" required></label><label class="field"><span>Prefijo de folio</span><input id="folioPrefix" maxlength="5" placeholder="MDR"></label><div class="logo-editor full"><div class="logo-box"><b>Logo principal</b><img id="companyLogo1Preview" class="hidden" alt="Logo principal"><input type="file" id="companyLogo1" accept="image/*" hidden><div class="logo-actions"><label class="btn small" for="companyLogo1">Elegir o reemplazar</label><button class="btn small danger hidden" id="removeCompanyLogo1" type="button">Eliminar</button></div></div><div class="logo-box"><b>Logo secundario</b><img id="companyLogo2Preview" class="hidden" alt="Logo secundario"><input type="file" id="companyLogo2" accept="image/*" hidden><div class="logo-actions"><label class="btn small" for="companyLogo2">Elegir o reemplazar</label><button class="btn small danger hidden" id="removeCompanyLogo2" type="button">Eliminar</button></div></div></div><label class="field"><span>Posición de logos</span><select id="logoPosition"><option value="left">Izquierda</option><option value="right">Derecha</option><option value="top">Arriba</option><option value="bottom">Abajo</option></select></label><label class="field"><span>Tema de la app</span><select id="themeSelect"><option value="light">Claro</option><option value="dark">Oscuro</option></select></label><label class="field"><span>Tamaño logo principal: <b id="companyLogoSizeValue">42</b> mm</span><input id="companyLogoSize" type="range" min="18" max="62"></label><label class="field"><span>Tamaño logo secundario: <b id="companyLogo2SizeValue">28</b> mm</span><input id="companyLogo2Size" type="range" min="14" max="52"></label><label class="field full"><span>Color de encabezados PDF</span><input id="headerColor" type="color"><div class="color-palette" id="colorPalette"><button type="button" class="swatch" data-header-color="#48484c" style="background:#48484c"></button><button type="button" class="swatch" data-header-color="#1267f5" style="background:#1267f5"></button><button type="button" class="swatch" data-header-color="#123a63" style="background:#123a63"></button><button type="button" class="swatch" data-header-color="#126b50" style="background:#126b50"></button><button type="button" class="swatch" data-header-color="#7a263a" style="background:#7a263a"></button><button type="button" class="swatch" data-header-color="#111111" style="background:#111"></button></div></label></form><div class="card"><div class="section-head"><div><h3>Vista previa del encabezado</h3><span class="muted">Representación del documento final</span></div></div><div id="headerPreview"></div></div></section>
   </main>
-
-  <nav class="bottom-nav"><div class="bottom-nav-inner"><button class="nav-btn active" data-view="order"><b>⌁</b>Pedido</button><button class="nav-btn" data-view="files"><b>⇩</b>Archivos</button><button class="nav-btn" data-view="management"><b>▤</b>Gestión</button><button class="nav-btn" data-view="data"><b>▦</b>Datos</button><button class="nav-btn" data-view="profile"><b>◉</b>Perfil</button></div></nav>
-  <div class="keyboard-bar hidden" id="keyboardBar"><button class="previous" id="keyboardPrev" type="button">↑</button><button class="next" id="keyboardNext" type="button">Siguiente ↵</button><button class="done" id="keyboardDone" type="button">Listo</button></div>
-  <div class="toast" id="toast"></div>
-
+  <nav class="bottom-nav"><div class="bottom-nav-inner"><button class="nav-btn active" data-view="order"><b>⌁</b>Pedido</button><button class="nav-btn" data-view="files"><b>⇩</b>Archivos</button><button class="nav-btn" data-view="management"><b>▤</b>Gestión</button><button class="nav-btn" data-view="data"><b>▦</b>Datos</button><button class="nav-btn" data-view="profile"><b>◉</b>Perfil</button></div></nav><div class="keyboard-bar hidden" id="keyboardBar"><button class="previous" id="keyboardPrev" type="button">↑</button><button class="next" id="keyboardNext" type="button">Siguiente ↵</button><button class="done" id="keyboardDone" type="button">Listo</button></div><div class="toast" id="toast"></div>
   <dialog id="providerEditorDialog"><div class="modal"><div class="modal-head"><div><h2 id="providerEditorTitle">Editar proveedor</h2><span class="muted">Modifica cantidades, unidades, agrega o elimina ítems.</span></div><button class="icon-btn" data-close-dialog type="button">×</button></div><div id="providerEditorRows"></div><div class="card"><h3>Agregar producto del proveedor</h3><label class="search-wrap"><input id="providerProductSearch" placeholder="Buscar producto"></label><div class="add-results" id="providerProductResults"></div></div><div class="modal-foot"><button class="btn" data-close-dialog type="button">Cancelar</button><button class="btn" id="saveProviderChanges" type="button">Guardar cambios</button><button class="btn primary" id="saveAndExportProvider" type="button">Guardar y exportar PDF</button></div></div></dialog>
-
   <dialog id="addProviderDialog"><div class="modal narrow"><div class="modal-head"><div><h2>Agregar proveedor al pedido</h2><span class="muted">Luego podrás seleccionar sus productos.</span></div><button class="icon-btn" data-close-dialog type="button">×</button></div><label class="field"><span>Proveedor</span><select id="addProviderSelect"></select></label><div class="modal-foot"><button class="btn" data-close-dialog type="button">Cancelar</button><button class="btn primary" id="confirmAddProvider" type="button">Continuar</button></div></div></dialog>
-
   <dialog id="invoiceReviewDialog"><div class="modal"><div class="modal-head"><div><h2 id="invoiceReviewTitle">Revisar factura</h2><span class="muted" id="invoiceTaxInfo"></span></div><button class="icon-btn" data-close-dialog type="button">×</button></div><label class="field"><span>Número de factura</span><input id="invoiceReviewName" placeholder="Ej: 123456"></label><div class="invoice-review-row" style="font-size:11px;color:var(--muted);font-weight:800"><span>Texto leído</span><span>Producto vinculado</span><span>Cajas</span><span>Unidades/caja</span><span>Total con IVA</span><span>Precio por botella/unidad</span></div><div id="invoiceReviewRows"></div><button class="btn" id="addInvoiceLine" type="button">+ Agregar línea</button><div class="modal-foot"><button class="btn" data-close-dialog type="button">Cancelar</button><button class="btn primary" id="saveInvoiceReview" type="button">Confirmar factura y recepción</button></div></div></dialog>
-
   <dialog id="productDialog"><div class="modal narrow"><div class="modal-head"><div><h2 id="productModalTitle">Nuevo ítem</h2><span class="muted">Datos usados en pedidos y facturas.</span></div><button class="icon-btn" data-close-dialog type="button">×</button></div><input type="hidden" id="productId"><label class="field"><span>Descripción</span><input id="productDescription"></label><label class="field"><span>Categoría</span><select id="productCategory"></select></label><label class="field"><span>Proveedor</span><select id="productProvider"></select></label><label class="field"><span>Unidad predeterminada</span><select id="productUnit"></select></label><label><input type="checkbox" id="productEnabled"> Habilitado</label><div class="modal-foot"><button class="btn" data-close-dialog type="button">Cancelar</button><button class="btn primary" id="saveProduct" type="button">Guardar ítem</button></div></div></dialog>
-
-  <dialog id="pdfDialog"><div class="pdf-modal"><div class="pdf-toolbar"><b id="pdfTitle">Vista previa</b><button class="icon-btn" data-close-dialog type="button">×</button></div><iframe class="pdf-frame" id="pdfFrame" title="Vista previa PDF"></iframe></div></dialog>
-  <dialog id="filePreviewDialog"><div class="file-preview"><div class="pdf-toolbar"><b id="filePreviewTitle">Factura</b><button class="icon-btn" data-close-dialog type="button">×</button></div><div class="file-preview-content" id="filePreviewContent"></div></div></dialog>
-
-  <script src="./vendor/jspdf/jspdf.umd.min.js"></script>
-  <script src="./vendor/pdfjs/pdf.min.js"></script>
-  <script src="./vendor/tesseract/tesseract.min.js"></script>
-  <script src="./seed-1.js?v=12"></script><script src="./seed-2.js?v=12"></script><script src="./seed-3.js?v=12"></script><script src="./seed-4.js?v=12"></script>
-  <script src="./core-v12.js?v=12"></script>
-  <script src="./db-v12.js?v=12"></script>
-  <script src="./state-v12.js?v=12"></script>
-  <script src="./orders-v12.js?v=12"></script>
-  <script src="./invoice-v12.js?v=12"></script>
-  <script src="./pdf-v12.js?v=12"></script>
-  <script src="./app-v12.js?v=12"></script>
+  <dialog id="pdfDialog"><div class="pdf-modal"><div class="pdf-toolbar"><b id="pdfTitle">Vista previa</b><button class="icon-btn" data-close-dialog type="button">×</button></div><iframe class="pdf-frame" id="pdfFrame" title="Vista previa PDF"></iframe></div></dialog><dialog id="filePreviewDialog"><div class="file-preview"><div class="pdf-toolbar"><b id="filePreviewTitle">Factura</b><button class="icon-btn" data-close-dialog type="button">×</button></div><div class="file-preview-content" id="filePreviewContent"></div></div></dialog>
+  <script src="./seed-1.js?v=13"></script><script src="./seed-2.js?v=13"></script><script src="./seed-3.js?v=13"></script><script src="./seed-4.js?v=13"></script><script src="./core-v12.js?v=13"></script><script src="./db-v12.js?v=13"></script><script src="./state-v12.js?v=13"></script><script src="./orders-v12.js?v=13"></script><script src="./invoice-v12.js?v=13"></script><script src="./pdf-v12.js?v=13"></script><script src="./app-v12.js?v=13"></script>
 </body>
 </html>
