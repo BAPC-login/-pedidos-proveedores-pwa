@@ -1,26 +1,80 @@
-name: Publicar PWA
+name: Test and deploy Pedidos Pro
+
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
 permissions:
   contents: read
   pages: write
   id-token: write
+
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
+
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate JavaScript and business rules
+        run: |
+          node --check core-v12.js
+          node --check db-v12.js
+          node --check state-v12.js
+          node --check orders-v12.js
+          node --check invoice-v12.js
+          node --check pdf-v12.js
+          node --check app-v12.js
+          node tests/core-v12.test.cjs
+
+      - name: Download pinned local dependencies
+        run: |
+          npm install --prefix .deps --no-save jspdf@4.2.1 pdfjs-dist@3.11.174 tesseract.js@5.1.1 tesseract.js-core@5.1.1
+          mkdir -p dist/vendor/jspdf dist/vendor/pdfjs dist/vendor/tesseract dist/vendor/tesseract-core dist/vendor/tessdata
+          cp .deps/node_modules/jspdf/dist/jspdf.umd.min.js dist/vendor/jspdf/
+          cp .deps/node_modules/pdfjs-dist/build/pdf.min.js dist/vendor/pdfjs/
+          cp .deps/node_modules/pdfjs-dist/build/pdf.worker.min.js dist/vendor/pdfjs/
+          cp .deps/node_modules/tesseract.js/dist/tesseract.min.js dist/vendor/tesseract/
+          cp .deps/node_modules/tesseract.js/dist/worker.min.js dist/vendor/tesseract/
+          cp .deps/node_modules/tesseract.js-core/tesseract-core* dist/vendor/tesseract-core/
+          curl --fail --location --retry 3 https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/spa.traineddata -o dist/vendor/tessdata/spa.traineddata
+          gzip -9 dist/vendor/tessdata/spa.traineddata
+
+      - name: Build static application
+        run: |
+          cp index.html manifest.webmanifest sw.js styles-v12.css patch-v12.css dist/
+          cp core-v12.js db-v12.js state-v12.js orders-v12.js invoice-v12.js pdf-v12.js app-v12.js dist/
+          cp seed-1.js seed-2.js seed-3.js seed-4.js dist/
+          cp -R assets dist/assets
+          touch dist/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
   deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    needs: build
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
-      - id: deployment
+      - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
