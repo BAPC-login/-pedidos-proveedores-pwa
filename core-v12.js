@@ -92,7 +92,7 @@
     const coverage=hits/left.length;
     const weight=weighted/Math.max(1,left.reduce((sum,token)=>sum+token.length,0));
     const compactA=cleanDescription(a).replace(/\s/g,''),compactB=cleanDescription(b).replace(/\s/g,'');
-    const contains=compactA.length>4&&(compactB.includes(compactA)||compactA.includes(compactB))?.25:0;
+    const contains=compactA.length>4&&(compactB.includes(compactA)||compactA.includes(compactB)) ? .25 : 0;
     return Math.min(1,coverage*.62+weight*.38+contains);
   }
 
