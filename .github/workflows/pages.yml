@@ -2,7 +2,7 @@ name: Test and deploy Pedidos Pro
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, gh-pages]
   workflow_dispatch:
 
 permissions:
@@ -34,8 +34,8 @@ jobs:
           node --check orders-v12.js
           node --check invoice-v12.js
           node --check pdf-v12.js
-          node --check app-v12.js
           node --check runtime-v14.js
+          node --check app-v12.js
           node tests/core-v12.test.cjs
 
       - name: Download pinned local dependencies
@@ -54,26 +54,25 @@ jobs:
       - name: Build static application
         run: |
           cp index.html manifest.webmanifest sw.js styles-v12.css patch-v12.css dist/
-          cp core-v12.js db-v12.js state-v12.js orders-v12.js invoice-v12.js pdf-v12.js app-v12.js runtime-v14.js dist/
+          cp core-v12.js db-v12.js state-v12.js orders-v12.js invoice-v12.js pdf-v12.js runtime-v14.js app-v12.js dist/
           cp seed-1.js seed-2.js seed-3.js seed-4.js dist/
           cp -R assets dist/assets
-          sed -i 's#<script src="./app-v12.js?v=13"></script>#<script src="./app-v12.js?v=13"></script><script src="./runtime-v14.js?v=14"></script>#' dist/index.html
           touch dist/.nojekyll
 
       - name: Configure Pages
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/gh-pages'
         uses: actions/configure-pages@v5
         with:
           enablement: true
 
       - name: Upload Pages artifact
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/gh-pages'
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/gh-pages'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
