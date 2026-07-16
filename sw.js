@@ -1,10 +1,10 @@
-const VERSION='pedidos-pro-v13-1';
+const VERSION='pedidos-pro-v14';
 const CORE_CACHE=`${VERSION}-core`;
 const RUNTIME_CACHE=`${VERSION}-runtime`;
 const CORE=[
   './','./index.html','./styles-v12.css?v=13','./patch-v12.css?v=13','./manifest.webmanifest?v=13','./assets/icon.svg?v=13',
   './seed-1.js?v=13','./seed-2.js?v=13','./seed-3.js?v=13','./seed-4.js?v=13',
-  './core-v12.js?v=13','./db-v12.js?v=13','./state-v12.js?v=13','./orders-v12.js?v=13','./invoice-v12.js?v=13','./pdf-v12.js?v=13','./app-v12.js?v=13'
+  './core-v12.js?v=13','./db-v12.js?v=13','./state-v12.js?v=13','./orders-v12.js?v=13','./invoice-v12.js?v=13','./pdf-v12.js?v=13','./app-v12.js?v=13','./runtime-v14.js?v=14'
 ];
 const OCR=[
   './vendor/pdfjs/pdf.min.js','./vendor/pdfjs/pdf.worker.min.js','./vendor/tesseract/tesseract.min.js','./vendor/tesseract/worker.min.js','./vendor/tessdata/spa.traineddata.gz',
