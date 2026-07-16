@@ -1,0 +1,10 @@
+.management-panel,.data-panel{display:none}
+.management-panel.active,.data-panel.active{display:block}
+#providerDatabase .provider-logo-preview.empty{padding:4px;display:flex;align-items:center;justify-content:center;font-size:10px}
+#newProduct.hidden{display:none!important}
+@media(max-width:760px){
+  .topbar-inner{align-items:flex-end}
+  .page-title{min-width:0}
+  .page-title h1{white-space:normal}
+  .invoice-review-row[style]{display:none}
+}
