@@ -1,4 +1,4 @@
-const VERSION='pedidos-pro-v14';
+const VERSION='pedidos-pro-v15';
 const CORE_CACHE=`${VERSION}-core`;
 const RUNTIME_CACHE=`${VERSION}-runtime`;
 const CORE=[
@@ -18,10 +18,12 @@ self.addEventListener('fetch',event=>{
   if(event.request.method!=='GET')return;
   const url=new URL(event.request.url);
   if(event.request.mode==='navigate'){
-    event.respondWith(fetch(event.request).then(response=>{const copy=response.clone();caches.open(CORE_CACHE).then(cache=>cache.put('./index.html',copy));return response}).catch(()=>caches.match('./index.html')));return;
+    event.respondWith(fetch(event.request).then(response=>{if(response.ok){const copy=response.clone();caches.open(CORE_CACHE).then(cache=>cache.put('./index.html',copy))}return response}).catch(()=>caches.match('./index.html')));
+    return;
   }
   if(url.origin===self.location.origin){
-    event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(response.ok){const copy=response.clone();caches.open(url.pathname.includes('/vendor/')?RUNTIME_CACHE:CORE_CACHE).then(cache=>cache.put(event.request,copy))}return response})));return;
+    event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(response.ok){const copy=response.clone();caches.open(url.pathname.includes('/vendor/')?RUNTIME_CACHE:CORE_CACHE).then(cache=>cache.put(event.request,copy))}return response})));
+    return;
   }
   event.respondWith(caches.open(RUNTIME_CACHE).then(async cache=>{const cached=await cache.match(event.request);if(cached)return cached;const response=await fetch(event.request);if(response.ok||response.type==='opaque')cache.put(event.request,response.clone());return response}));
 });
