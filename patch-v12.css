@@ -3,10 +3,13 @@
 #providerDatabase .provider-logo-preview.empty{padding:4px;display:flex;align-items:center;justify-content:center;font-size:10px}
 #newProduct.hidden{display:none!important}
 .build-version{margin-left:5px;letter-spacing:0;color:var(--primary);font-size:10px}
-.invoice-item-summary{margin-top:10px;padding:11px 12px;border:1px solid var(--border);border-radius:14px;background:var(--input-bg)}
+#view-management>.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));overflow:visible;width:100%}
+#view-data>.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));overflow:visible;width:100%}
+#view-management>.tabs .tab,#view-data>.tabs .tab{min-width:0;text-align:center;padding-left:8px;padding-right:8px}
+.invoice-item-summary{margin-top:10px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:var(--input)}
 .invoice-summary-total,.invoice-summary-line{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
-.invoice-summary-total{padding-bottom:8px;margin-bottom:5px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
-.invoice-summary-line{padding:6px 0;font-size:12px;border-bottom:1px solid color-mix(in srgb,var(--border) 65%,transparent)}
+.invoice-summary-total{padding-bottom:8px;margin-bottom:5px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}
+.invoice-summary-line{padding:6px 0;font-size:12px;border-bottom:1px solid color-mix(in srgb,var(--line) 65%,transparent)}
 .invoice-summary-line:last-child{border-bottom:0}
 .invoice-summary-line span{font-weight:800;min-width:0;max-width:55%}
 .invoice-summary-line small{text-align:right;color:var(--muted);line-height:1.45}
@@ -14,20 +17,25 @@
 .invoice-summary-warning{display:grid;gap:4px;padding:2px;color:var(--warning,#f5a524)}
 .invoice-summary-warning span{font-size:12px;color:var(--muted);line-height:1.4}
 .provider-order-list{display:grid;gap:9px;margin-top:13px}
-.provider-order-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--border);border-radius:14px;background:var(--input-bg)}
+.provider-order-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--line);border-radius:14px;background:var(--input)}
 .provider-order-row small{display:block;margin-top:3px;color:var(--muted)}
 .provider-order-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}
 #providerEditorDialog .modal{display:flex;flex-direction:column;max-height:min(90dvh,860px);overflow:hidden}
 #providerEditorRows{overflow:auto;overscroll-behavior:contain;padding-right:2px}
-#providerEditorDialog .modal-foot{position:sticky;bottom:0;z-index:3;margin-top:auto;background:var(--card);border-top:1px solid var(--border);padding-top:12px;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+#providerEditorDialog .modal-foot{position:sticky;bottom:0;z-index:3;margin-top:auto;background:var(--surface);border-top:1px solid var(--line);padding-top:12px;padding-bottom:max(12px,env(safe-area-inset-bottom))}
 #providerEditorDialog .add-results{max-height:310px;overflow:auto;overscroll-behavior:contain}
 .invoice-row{align-items:flex-start}
 .invoice-row>div:first-child{min-width:0;flex:1}
 .invoice-actions{flex-shrink:0}
+.preview-logo-area img{display:block;max-width:100%}
+#logoAlignX,#logoAlignY{font-weight:700}
 @media(max-width:760px){
   .topbar-inner{align-items:flex-end}
   .page-title{min-width:0}
   .page-title h1{white-space:normal}
+  #view-management>.tabs{gap:6px}
+  #view-management>.tabs .tab{font-size:12px;padding:10px 4px;white-space:normal;line-height:1.12}
+  #view-data>.tabs .tab{font-size:13px;padding:10px 5px}
   .invoice-review-row[style]{display:none}
   .invoice-summary-line{display:block}
   .invoice-summary-line span{display:block;max-width:none}
@@ -39,4 +47,7 @@
   #providerEditorDialog .card{padding:14px}
   #providerEditorDialog .modal-foot{display:grid;grid-template-columns:1fr 1fr}
   #providerEditorDialog .modal-foot .primary{grid-column:1/-1}
+}
+@media(max-width:390px){
+  #view-management>.tabs .tab{font-size:11px;letter-spacing:-.02em}
 }
