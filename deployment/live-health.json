@@ -1,7 +1,7 @@
 {
   "status": "healthy",
   "application_shell": true,
-  "checked_at": "2026-07-21T22:17:29.686Z",
+  "checked_at": "2026-07-21T22:20:33.096553+00:00",
   "url": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/",
   "release": "2026.07.21.10",
   "ai_health": {
@@ -20,16 +20,12 @@
     "schemaVersion": "6",
     "storageConfigured": false,
     "aiEndpoint": true,
-    "environment": "production"
-  },
-  "authentication": {
-    "valid_disposable_login_http": 200,
-    "session_issued": true,
-    "temporary_user_removed": true,
-    "invalid_login_http": 401
+    "environment": "production",
+    "timestamp": "2026-07-21T22:20:31.314Z"
   },
   "security_checks": {
     "unauthenticated_me_http": 401,
+    "invalid_login_http": 401,
     "bootstrap_without_token_http": 403,
     "temporary_selftest_route_http": 401
   }
