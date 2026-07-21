@@ -28,10 +28,11 @@ CREATE TABLE IF NOT EXISTS entity_snapshots (
 );
 
 CREATE TABLE IF NOT EXISTS invoice_location_links (
-  invoice_id TEXT PRIMARY KEY REFERENCES invoices(id) ON DELETE CASCADE,
+  invoice_id TEXT NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
   org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE RESTRICT,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (invoice_id, location_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_document_links_entity ON document_links(org_id, entity_type, entity_id, created_at DESC);
