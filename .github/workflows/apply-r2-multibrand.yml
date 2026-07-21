@@ -17,111 +17,74 @@ jobs:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
 
-      - name: Patch identity schema and platform routes
-        shell: bash
+      - name: Patch schema v7
         run: |
           python - <<'PY'
           from pathlib import Path
           import re
-          def rw(path, fn):
-              p=Path(path);p.write_text(fn(p.read_text(encoding='utf-8')),encoding='utf-8')
-          def one(text, old, new, label):
-              if old not in text: raise SystemExit(f'Missing marker: {label}')
-              return text.replace(old,new,1)
-
-          def patch_schema(text):
-              text=one(text,"import invoiceSchemaModule from '../../migrations/0003_invoices.sql';\n","import invoiceSchemaModule from '../../migrations/0003_invoices.sql';\nimport platformSchemaModule from '../../migrations/0004_multibrand_r2_history.sql';\n",'schema import')
-              text=re.sub(r"const SCHEMA_VERSION = '\d+';","const SCHEMA_VERSION = '7';",text,count=1)
-              text=one(text,"const invoiceSchema = normalizeSql(invoiceSchemaModule, 'invoices');\n","const invoiceSchema = normalizeSql(invoiceSchemaModule, 'invoices');\nconst platformSchema = normalizeSql(platformSchemaModule, 'platform-r2-history');\n",'schema normalize')
-              text=one(text,"    const invoiceStatements = await executeSchema(env.DB, invoiceSchema, 'invoices');\n    const seeded","    const invoiceStatements = await executeSchema(env.DB, invoiceSchema, 'invoices');\n    const platformStatements = await executeSchema(env.DB, platformSchema, 'platform-r2-history');\n    const seeded",'schema execute')
-              return one(text,"statements: identityStatements + procurementStatements + invoiceStatements","statements: identityStatements + procurementStatements + invoiceStatements + platformStatements",'schema count')
-          rw('professional/worker/src/schema.js',patch_schema)
-
-          def patch_auth(text):
-              helper="""\nasync function validateLocationScope(env, actor, requested, role) {\n  if (role === ROLES.OWNER) return ['*'];\n  const values = [...new Set((Array.isArray(requested) ? requested : []).map(String).filter(Boolean))];\n  if (values.includes('*')) throw new HttpError(403, 'Solo el owner puede acceder a todos los locales', 'owner_scope_required');\n  if (!values.length) throw new HttpError(400, 'Selecciona al menos un local para este usuario', 'location_scope_required');\n  for (const locationId of values) {\n    const location = await env.DB.prepare('SELECT id FROM locations WHERE id = ? AND org_id = ? AND active = 1').bind(locationId, actor.orgId).first();\n    if (!location) throw new HttpError(400, 'Uno de los locales seleccionados no es válido', 'invalid_location_scope');\n  }\n  return values;\n}\n"""
-              text=one(text,"function safeJson(value, fallback) {\n  try { return JSON.parse(value || ''); } catch { return fallback; }\n}\n","function safeJson(value, fallback) {\n  try { return JSON.parse(value || ''); } catch { return fallback; }\n}\n"+helper,'auth helper')
-              text=one(text,"  env.DB.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?')\n    .bind(nowIso(), row.session_id).run().catch(() => {});\n  return {","  env.DB.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?')\n    .bind(nowIso(), row.session_id).run().catch(() => {});\n  const platformOwner = await env.DB.prepare('SELECT user_id FROM platform_owners WHERE user_id = ?').bind(row.user_id).first();\n  return {",'owner query')
-              text=one(text,"    organization: {id: row.org_id, name: row.org_name, slug: row.org_slug, plan: row.plan}\n","    organization: {id: row.org_id, name: row.org_name, slug: row.org_slug, plan: row.plan},\n    isPlatformOwner: Boolean(platformOwner)\n",'owner actor')
-              text=one(text,"      .bind(membershipId, orgId, userId, ROLES.OWNER, JSON.stringify(['*']), timestamp, timestamp)\n  ];","      .bind(membershipId, orgId, userId, ROLES.OWNER, JSON.stringify(['*']), timestamp, timestamp),\n    env.DB.prepare('INSERT INTO platform_owners (user_id, created_at) VALUES (?, ?)').bind(userId, timestamp)\n  ];",'bootstrap owner')
-              text=one(text,"      locationScope: actor.locationScope\n","      locationScope: actor.locationScope,\n      isPlatformOwner: Boolean(actor.isPlatformOwner)\n",'me owner')
-              marker="const locationScope = Array.isArray(body.locationScope) && body.locationScope.length ? body.locationScope : ['*'];"
-              if text.count(marker)!=2: raise SystemExit(f'Expected 2 location markers, found {text.count(marker)}')
-              return text.replace(marker,"const locationScope = await validateLocationScope(env, actor, body.locationScope, role);")
-          rw('professional/worker/src/auth.js',patch_auth)
-
-          def patch_index(text):
-              text=one(text,"} from './api/documents.js';\n","} from './api/documents.js';\nimport {createBrand, listBrands, switchBrand} from './platform.js';\nimport {listDocuments} from './storage.js';\n",'index imports')
-              text=one(text,"      storageConfigured: Boolean(env.FILES),\n","      storageConfigured: Boolean(env.FILES),\n      storageBackend: env.FILES ? 'r2' : 'unavailable',\n",'health')
-              text=one(text,"  if (method === 'GET' && path === '/api/dashboard') return ok(await dashboard(env, actor), request, env);\n","  if (method === 'GET' && path === '/api/dashboard') return ok(await dashboard(env, actor), request, env);\n\n  if (method === 'GET' && path === '/api/brands') return ok({brands: await listBrands(env, actor)}, request, env);\n  if (method === 'POST' && path === '/api/brands') return ok({brand: await createBrand(request, env, actor)}, request, env);\n  const brandParams = routeMatch(path, '/api/brands/:id/switch');\n  if (brandParams && method === 'POST') return ok(await switchBrand(request, env, actor, brandParams.id), request, env);\n",'brands routes')
-              return one(text,"  if (method === 'POST' && path === '/api/files') return ok({file: await uploadFile(request, env, actor, url)}, request, env);\n","  if (method === 'GET' && path === '/api/documents') return ok({documents: await listDocuments(env, actor, {entityType: String(url.searchParams.get('entityType') || ''), entityId: String(url.searchParams.get('entityId') || ''), kind: String(url.searchParams.get('kind') || '')})}, request, env);\n  if (method === 'POST' && path === '/api/files') return ok({file: await uploadFile(request, env, actor, url)}, request, env);\n",'documents route')
-          rw('professional/worker/src/index.js',patch_index)
+          p=Path('professional/worker/src/schema.js');t=p.read_text(encoding='utf-8')
+          t=t.replace("import invoiceSchemaModule from '../../migrations/0003_invoices.sql';\n","import invoiceSchemaModule from '../../migrations/0003_invoices.sql';\nimport platformSchemaModule from '../../migrations/0004_multibrand_r2_history.sql';\n",1)
+          t=re.sub(r"const SCHEMA_VERSION = '\d+';","const SCHEMA_VERSION = '7';",t,count=1)
+          t=t.replace("const invoiceSchema = normalizeSql(invoiceSchemaModule, 'invoices');\n","const invoiceSchema = normalizeSql(invoiceSchemaModule, 'invoices');\nconst platformSchema = normalizeSql(platformSchemaModule, 'platform-r2-history');\n",1)
+          t=t.replace("    const invoiceStatements = await executeSchema(env.DB, invoiceSchema, 'invoices');\n    const seeded","    const invoiceStatements = await executeSchema(env.DB, invoiceSchema, 'invoices');\n    const platformStatements = await executeSchema(env.DB, platformSchema, 'platform-r2-history');\n    const seeded",1)
+          t=t.replace("statements: identityStatements + procurementStatements + invoiceStatements","statements: identityStatements + procurementStatements + invoiceStatements + platformStatements",1)
+          for marker in ['platformSchemaModule','platformSchema =','platformStatements','SCHEMA_VERSION = \'7\'']:
+              assert marker in t, marker
+          p.write_text(t,encoding='utf-8')
           PY
           node --check professional/worker/src/schema.js
+
+      - name: Patch authentication ownership and local scopes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('professional/worker/src/auth.js');t=p.read_text(encoding='utf-8')
+          safe="function safeJson(value, fallback) {\n  try { return JSON.parse(value || ''); } catch { return fallback; }\n}\n"
+          helper="""\nasync function validateLocationScope(env, actor, requested, role) {\n  if (role === ROLES.OWNER) return ['*'];\n  const values = [...new Set((Array.isArray(requested) ? requested : []).map(String).filter(Boolean))];\n  if (values.includes('*')) throw new HttpError(403, 'Solo el owner puede acceder a todos los locales', 'owner_scope_required');\n  if (!values.length) throw new HttpError(400, 'Selecciona al menos un local para este usuario', 'location_scope_required');\n  for (const locationId of values) {\n    const location = await env.DB.prepare('SELECT id FROM locations WHERE id = ? AND org_id = ? AND active = 1').bind(locationId, actor.orgId).first();\n    if (!location) throw new HttpError(400, 'Uno de los locales seleccionados no es válido', 'invalid_location_scope');\n  }\n  return values;\n}\n"""
+          assert safe in t
+          t=t.replace(safe,safe+helper,1)
+          old="  env.DB.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?')\n    .bind(nowIso(), row.session_id).run().catch(() => {});\n  return {"
+          assert old in t
+          t=t.replace(old,"  env.DB.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?')\n    .bind(nowIso(), row.session_id).run().catch(() => {});\n  const platformOwner = await env.DB.prepare('SELECT user_id FROM platform_owners WHERE user_id = ?').bind(row.user_id).first();\n  return {",1)
+          old="    organization: {id: row.org_id, name: row.org_name, slug: row.org_slug, plan: row.plan}\n"
+          assert old in t
+          t=t.replace(old,"    organization: {id: row.org_id, name: row.org_name, slug: row.org_slug, plan: row.plan},\n    isPlatformOwner: Boolean(platformOwner)\n",1)
+          old="      .bind(membershipId, orgId, userId, ROLES.OWNER, JSON.stringify(['*']), timestamp, timestamp)\n  ];"
+          assert old in t
+          t=t.replace(old,"      .bind(membershipId, orgId, userId, ROLES.OWNER, JSON.stringify(['*']), timestamp, timestamp),\n    env.DB.prepare('INSERT INTO platform_owners (user_id, created_at) VALUES (?, ?)').bind(userId, timestamp)\n  ];",1)
+          old="      locationScope: actor.locationScope\n"
+          assert old in t
+          t=t.replace(old,"      locationScope: actor.locationScope,\n      isPlatformOwner: Boolean(actor.isPlatformOwner)\n",1)
+          marker="const locationScope = Array.isArray(body.locationScope) && body.locationScope.length ? body.locationScope : ['*'];"
+          assert t.count(marker)==2,t.count(marker)
+          t=t.replace(marker,"const locationScope = await validateLocationScope(env, actor, body.locationScope, role);")
+          p.write_text(t,encoding='utf-8')
+          PY
           node --check professional/worker/src/auth.js
+
+      - name: Patch brand and document routes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('professional/worker/src/index.js');t=p.read_text(encoding='utf-8')
+          old="} from './api/documents.js';\n";assert old in t
+          t=t.replace(old,"} from './api/documents.js';\nimport {createBrand, listBrands, switchBrand} from './platform.js';\nimport {listDocuments} from './storage.js';\n",1)
+          old="      storageConfigured: Boolean(env.FILES),\n";assert old in t
+          t=t.replace(old,"      storageConfigured: Boolean(env.FILES),\n      storageBackend: env.FILES ? 'r2' : 'unavailable',\n",1)
+          old="  if (method === 'GET' && path === '/api/dashboard') return ok(await dashboard(env, actor), request, env);\n";assert old in t
+          t=t.replace(old,old+"\n  if (method === 'GET' && path === '/api/brands') return ok({brands: await listBrands(env, actor)}, request, env);\n  if (method === 'POST' && path === '/api/brands') return ok({brand: await createBrand(request, env, actor)}, request, env);\n  const brandParams = routeMatch(path, '/api/brands/:id/switch');\n  if (brandParams && method === 'POST') return ok(await switchBrand(request, env, actor, brandParams.id), request, env);\n",1)
+          old="  if (method === 'POST' && path === '/api/files') return ok({file: await uploadFile(request, env, actor, url)}, request, env);\n";assert old in t
+          t=t.replace(old,"  if (method === 'GET' && path === '/api/documents') return ok({documents: await listDocuments(env, actor, {entityType: String(url.searchParams.get('entityType') || ''), entityId: String(url.searchParams.get('entityId') || ''), kind: String(url.searchParams.get('kind') || '')})}, request, env);\n"+old,1)
+          p.write_text(t,encoding='utf-8')
+          PY
           node --check professional/worker/src/platform.js
+          node --check professional/worker/src/storage.js
           node --check professional/worker/src/index.js
 
-      - name: Patch orders and invoices for R2 history
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
-          def one(text,old,new,label):
-              if old not in text: raise SystemExit(f'Missing marker: {label}')
-              return text.replace(old,new,1)
-          p=Path('professional/worker/src/api/orders.js');text=p.read_text(encoding='utf-8')
-          text=one(text,"import {writeAudit} from '../auth.js';\n","import {writeAudit} from '../auth.js';\nimport {archiveOrderPdf} from '../storage.js';\n",'orders import')
-          text=one(text,"  const created = await getOrder(env, actor, id);\n  if (idempotencyKey)","  const created = await getOrder(env, actor, id);\n  created.pdfDocument = await archiveOrderPdf(env, actor, created);\n  if (idempotencyKey)",'create pdf')
-          text=one(text,"  await writeAudit(env, actor, request, 'order.update', 'order', orderId, {revision: Number(current.revision || 1) + 1});\n  return await getOrder(env, actor, orderId);","  await writeAudit(env, actor, request, 'order.update', 'order', orderId, {revision: Number(current.revision || 1) + 1});\n  const updated = await getOrder(env, actor, orderId);\n  updated.pdfDocument = await archiveOrderPdf(env, actor, updated);\n  return updated;",'update pdf')
-          text=one(text,"UPDATE orders SET status = ?, approved_by = ?, sent_at = ?, cancelled_at = ?, updated_at = ?","UPDATE orders SET status = ?, approved_by = ?, sent_at = ?, cancelled_at = ?, revision = revision + 1, updated_at = ?",'transition revision')
-          text=one(text,"  await writeAudit(env, actor, request, 'order.transition', 'order', orderId, {from: order.status, to, reason});\n  return await getOrder(env, actor, orderId);","  await writeAudit(env, actor, request, 'order.transition', 'order', orderId, {from: order.status, to, reason});\n  const transitioned = await getOrder(env, actor, orderId);\n  transitioned.pdfDocument = await archiveOrderPdf(env, actor, transitioned);\n  return transitioned;",'transition pdf')
-          text=one(text,"UPDATE orders SET status = ?, updated_at = ? WHERE id = ?","UPDATE orders SET status = ?, revision = revision + 1, updated_at = ? WHERE id = ?",'reception revision')
-          text=one(text,"  await writeAudit(env, actor, request, 'reception.create', 'reception', receptionId, {orderId, status: nextStatus});\n  return {id: receptionId, orderId, status: 'completed', orderStatus: nextStatus};","  await writeAudit(env, actor, request, 'reception.create', 'reception', receptionId, {orderId, status: nextStatus});\n  const receivedOrder = await getOrder(env, actor, orderId);\n  const pdfDocument = await archiveOrderPdf(env, actor, receivedOrder);\n  return {id: receptionId, orderId, status: 'completed', orderStatus: nextStatus, pdfDocument};",'reception pdf')
-          p.write_text(text,encoding='utf-8')
-
-          p=Path('professional/worker/src/api/documents.js');text=p.read_text(encoding='utf-8')
-          text=one(text,"import {writeAudit} from '../auth.js';\n","import {writeAudit} from '../auth.js';\nimport {getStoredFile, linkExistingFile, recordSnapshot, storeFile} from '../storage.js';\n",'documents import')
-          text=one(text,"    createdAt: invoice.created_at\n","    createdAt: invoice.created_at,\n    pdfFileId: invoice.pdf_file_id || null\n",'invoice file')
-          text=one(text,"  await env.DB.batch(statements);\n  await writeAudit(env, actor, request, 'invoice.create',","  await env.DB.batch(statements);\n  if (body.sourceFileId) {\n    await env.DB.prepare('UPDATE invoices SET pdf_file_id = ?, updated_at = ? WHERE id = ? AND org_id = ?').bind(String(body.sourceFileId), nowIso(), invoiceId, actor.orgId).run();\n    await linkExistingFile(env, actor, {fileId: String(body.sourceFileId), entityType: 'invoice', entityId: invoiceId, documentKind: 'invoice_original', revision: 1, metadata: {invoiceNumber}});\n  }\n  await recordSnapshot(env, actor, {entityType: 'invoice', entityId: invoiceId, revision: 1, snapshot: {...body, id: invoiceId, supplierName: supplier.name}});\n  await writeAudit(env, actor, request, 'invoice.create',",'invoice link')
-          text=one(text,"  if (file.size > 12 * 1024 * 1024) throw new HttpError(413, 'La factura supera 12 MB', 'file_too_large');\n  const upstream","  if (file.size > 12 * 1024 * 1024) throw new HttpError(413, 'La factura supera 12 MB', 'file_too_large');\n  const sourceFile = await storeFile(env, actor, file, {purpose: 'invoice-source'});\n  const upstream",'invoice archive')
-          text=one(text,"  return payload;\n}\n\nexport async function uploadFile","  return {...payload, sourceFile};\n}\n\nexport async function uploadFile",'analysis response')
-          pattern=re.compile(r"export async function uploadFile\(request, env, actor, url\) \{.*?\n\}\n\nexport async function getFile\(env, actor, key\) \{.*?\n\}\n",re.S)
-          replacement="""export async function uploadFile(request, env, actor, url) {\n  const form = await request.formData();\n  const file = form.get('file');\n  if (!(file instanceof File)) throw new HttpError(400, 'Adjunta un archivo', 'missing_file');\n  if (file.size > 20 * 1024 * 1024) throw new HttpError(413, 'El archivo supera 20 MB', 'file_too_large');\n  const purpose = String(url.searchParams.get('purpose') || 'general').replace(/[^a-z0-9_-]/gi, '').slice(0, 40) || 'general';\n  const stored = await storeFile(env, actor, file, {purpose});\n  await incrementUsage(env, actor.orgId, 'file_bytes', file.size);\n  await writeAudit(env, actor, request, 'file.upload', 'file', stored.id, {purpose, size: file.size, key: stored.key});\n  return stored;\n}\n\nexport async function getFile(env, actor, key) {\n  return getStoredFile(env, actor, key);\n}\n"""
-          text,count=pattern.subn(replacement,text,count=1)
-          if count!=1: raise SystemExit('Could not replace file API')
-          p.write_text(text,encoding='utf-8')
-          PY
-          node --check professional/worker/src/storage.js
-          node --check professional/worker/src/api/orders.js
-          node --check professional/worker/src/api/documents.js
-
-      - name: Patch Gemini and R2 binding
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import json,re
-          p=Path('worker/src/index.js');text=p.read_text(encoding='utf-8')
-          pattern=re.compile(r"function buildPrompt\(context\) \{.*?\n\}\n\nasync function parseGeminiResponse",re.S)
-          replacement="""function buildPrompt(context) {\n  const products = (context.products || []).map(product => ({id: String(product.productId), d: String(product.description), u: String(product.unit || 'UNIDAD'), q: numeric(product.orderedQty), pack: orderPackSize(product.unit, product.description)}));\n  return `<task>Extrae y coteja factura A contra pedido B y CAT. Responde solo según JSON Schema.</task>\n<CAT>${JSON.stringify(products)}</CAT>\n<context>proveedor=${String(context.providerName || '')};folio=${String(context.folio || '')}</context>\n<rules>\n- Una salida por producto. Excluye flete, impuestos, descuentos, depósitos, garantías y totales.\n- quantityCellRaw copia Cantidad; invoiceQuantity sale solo de esa celda.\n- packSize sale de X06/X6/1000CCX6/6X350CC. units=invoiceQuantity*packSize.\n- Match por marca, familia, variante y volumen. Volumen distinto invalida. ESP=ESPECIAL; TRANS=TRANSPARENTE; ZERO=SIN AZUCAR.\n- matchedOrderProductId es un id exacto de CAT o vacío. Nunca inventes.\n- DISPLAY=24; 1.5L=6, salvo pack explícito.\n- Lee neto, descuento, flete, IVA, impuesto adicional, otros y total final por línea.\n- Números sin símbolos. Ilegible=0 y warning breve.\n</rules>`;\n}\n\nasync function parseGeminiResponse"""
-          text,count=pattern.subn(replacement,text,count=1)
-          if count!=1: raise SystemExit('Could not patch Gemini prompt')
-          text=text.replace('maxOutputTokens: 16384','maxOutputTokens: 8192',1)
-          p.write_text(text,encoding='utf-8')
-          p=Path('worker/wrangler.jsonc');config=json.loads(p.read_text(encoding='utf-8'));config['r2_buckets']=[{'binding':'FILES'}];p.write_text(json.dumps(config,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-          PY
-          node --check worker/src/index.js
-
-      - name: Run professional tests
-        working-directory: professional
-        run: npm run verify
-
-      - name: Commit backend upgrade
-        shell: bash
+      - name: Commit identity upgrade
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add professional worker
-          git commit -m "feat(platform): enable R2 history and owner multibrand backend"
+          git add professional
+          git commit -m "feat(platform): add owner multibrand identity model"
           git push origin HEAD:${{ github.head_ref }}
