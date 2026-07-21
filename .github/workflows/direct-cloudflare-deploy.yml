@@ -9,26 +9,51 @@ permissions:
   contents: read
 
 jobs:
-  verify-release:
+  verify-production:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify release 2026.07.21.5 D1 and owner
+      - name: Verify clean production deployment
         shell: bash
         run: |
           set -u
           BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
-          for attempt in $(seq 1 18); do
-            code=$(curl --silent --show-error --max-time 30 \
-              --output /tmp/diagnostic.json --write-out '%{http_code}' \
-              "$BASE/api/platform-diagnostics" || echo CURL_ERROR)
-            echo "attempt=${attempt} http=${code}"
-            cat /tmp/diagnostic.json 2>/dev/null || true
+          for attempt in $(seq 1 24); do
+            app_code=$(curl --silent --show-error --max-time 30 --output /tmp/app.html --write-out '%{http_code}' "$BASE/" || true)
+            app_js_code=$(curl --silent --show-error --max-time 30 --output /tmp/app.js --write-out '%{http_code}' "$BASE/app.js" || true)
+            ai_code=$(curl --silent --show-error --max-time 30 --output /tmp/ai.json --write-out '%{http_code}' "$BASE/health" || true)
+            platform_code=$(curl --silent --show-error --max-time 30 --output /tmp/platform.json --write-out '%{http_code}' "$BASE/platform/health" || true)
+            me_code=$(curl --silent --show-error --max-time 30 --output /tmp/me.json --write-out '%{http_code}' "$BASE/api/me" || true)
+            login_code=$(curl --silent --show-error --max-time 30 --output /tmp/login.json --write-out '%{http_code}' \
+              -H 'Content-Type: application/json' \
+              --data '{"email":"admin@pedidospro.local","password":"contraseña-incorrecta","organizationSlug":"pedidos-pro"}' \
+              "$BASE/api/auth/login" || true)
+            bootstrap_code=$(curl --silent --show-error --max-time 30 --output /tmp/bootstrap.json --write-out '%{http_code}' \
+              -H 'Content-Type: application/json' \
+              --data '{"organizationName":"Blocked","locationName":"Blocked","displayName":"Blocked","email":"blocked@example.com","password":"blocked-password"}' \
+              "$BASE/api/bootstrap" || true)
+            diagnostics_code=$(curl --silent --show-error --max-time 30 --output /tmp/diagnostics.json --write-out '%{http_code}' "$BASE/api/platform-diagnostics" || true)
+
+            echo "attempt=${attempt} app=${app_code} app_js=${app_js_code} ai=${ai_code} platform=${platform_code} me=${me_code} login=${login_code} bootstrap=${bootstrap_code} diagnostics=${diagnostics_code}"
+            cat /tmp/ai.json 2>/dev/null || true
             echo
-            if [ "$code" = "200" ] \
-              && grep -q '"release":"2026.07.21.5"' /tmp/diagnostic.json \
-              && grep -q '"ok":true' /tmp/diagnostic.json \
-              && grep -q '"users":1' /tmp/diagnostic.json \
-              && grep -q '"organizations":1' /tmp/diagnostic.json; then
+            cat /tmp/platform.json 2>/dev/null || true
+            echo
+
+            if [ "$app_code" = "200" ] \
+              && [ "$app_js_code" = "200" ] \
+              && grep -q 'Pedidos Pro Platform' /tmp/app.html \
+              && grep -q 'admin@pedidospro.local' /tmp/app.js \
+              && [ "$ai_code" = "200" ] \
+              && grep -q '"service":"pedidos-pro-ai"' /tmp/ai.json \
+              && grep -q '"geminiConfigured":true' /tmp/ai.json \
+              && [ "$platform_code" = "200" ] \
+              && grep -q '"service":"pedidos-pro-platform"' /tmp/platform.json \
+              && grep -q '"databaseInitialized":true' /tmp/platform.json \
+              && grep -q '"schemaVersion":"5"' /tmp/platform.json \
+              && [ "$me_code" = "401" ] \
+              && [ "$login_code" = "401" ] \
+              && [ "$bootstrap_code" = "403" ] \
+              && [ "$diagnostics_code" = "404" ]; then
               exit 0
             fi
             sleep 10
