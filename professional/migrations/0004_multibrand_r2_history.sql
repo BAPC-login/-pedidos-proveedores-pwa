@@ -27,10 +27,18 @@ CREATE TABLE IF NOT EXISTS entity_snapshots (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS invoice_location_links (
+  invoice_id TEXT PRIMARY KEY REFERENCES invoices(id) ON DELETE CASCADE,
+  org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE RESTRICT,
+  created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_document_links_entity ON document_links(org_id, entity_type, entity_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_document_links_kind ON document_links(org_id, document_kind, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_snapshots_entity ON entity_snapshots(org_id, entity_type, entity_id, revision DESC);
 CREATE INDEX IF NOT EXISTS idx_snapshots_location_time ON entity_snapshots(org_id, location_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_invoice_locations_org_local ON invoice_location_links(org_id, location_id, created_at DESC);
 
 INSERT OR IGNORE INTO platform_owners (user_id, created_at)
 SELECT user_id, created_at
