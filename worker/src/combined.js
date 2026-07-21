@@ -1,7 +1,7 @@
 import aiWorker from './index.js';
 import platformWorker from '../../professional/worker/src/index.js';
 
-const PLATFORM_RELEASE = '2026.07.21.13';
+const PLATFORM_RELEASE = '2026.07.21.14';
 
 function rewritePath(request, pathname) {
   const url = new URL(request.url);
