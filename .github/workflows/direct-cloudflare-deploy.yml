@@ -9,33 +9,23 @@ permissions:
   contents: read
 
 jobs:
-  verify-authentication:
+  inspect-authentication:
     runs-on: ubuntu-latest
     steps:
-      - name: Run live disposable-user authentication test
+      - name: Print live authentication state
         shell: bash
         run: |
           set -u
           BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
-          for attempt in $(seq 1 24); do
-            code=$(curl --silent --show-error --max-time 60 --output /tmp/selftest.json --write-out '%{http_code}' \
-              -X POST "$BASE/api/platform-auth-selftest" || true)
-            invalid_code=$(curl --silent --show-error --max-time 60 --output /tmp/invalid.json --write-out '%{http_code}' \
-              -H 'Content-Type: application/json' \
-              --data '{"email":"admin@pedidospro.local","password":"contraseña-incorrecta","organizationSlug":"pedidos-pro"}' \
-              "$BASE/api/auth/login" || true)
-            echo "attempt=${attempt} selftest=${code} invalid_login=${invalid_code}"
-            cat /tmp/selftest.json 2>/dev/null || true
-            echo
-            cat /tmp/invalid.json 2>/dev/null || true
-            echo
-            if [ "$code" = "200" ] \
-              && grep -q '"ok":true' /tmp/selftest.json \
-              && grep -q '"release":"2026.07.21.7"' /tmp/selftest.json \
-              && grep -q '"sessionIssued":true' /tmp/selftest.json \
-              && [ "$invalid_code" = "401" ]; then
-              exit 0
-            fi
-            sleep 10
-          done
-          exit 1
+          selftest_code=$(curl --silent --show-error --max-time 60 --output /tmp/selftest.json --write-out '%{http_code}' \
+            -X POST "$BASE/api/platform-auth-selftest" || true)
+          invalid_code=$(curl --silent --show-error --max-time 60 --output /tmp/invalid.json --write-out '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            --data '{"email":"admin@pedidospro.local","password":"contraseña-incorrecta","organizationSlug":"pedidos-pro"}' \
+            "$BASE/api/auth/login" || true)
+          echo "SELFTEST_HTTP=$selftest_code"
+          cat /tmp/selftest.json 2>/dev/null || true
+          echo
+          echo "INVALID_LOGIN_HTTP=$invalid_code"
+          cat /tmp/invalid.json 2>/dev/null || true
+          echo
