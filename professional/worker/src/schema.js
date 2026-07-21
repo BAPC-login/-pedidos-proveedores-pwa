@@ -2,11 +2,15 @@ import identitySchemaModule from '../../migrations/0001_identity.sql';
 import procurementSchemaModule from '../../migrations/0002_procurement.sql';
 import invoiceSchemaModule from '../../migrations/0003_invoices.sql';
 
-const SCHEMA_VERSION = '5';
+const SCHEMA_VERSION = '6';
 const DEFAULT_ORG_ID = 'e73d2d6e-dae8-46c6-87df-43ae05ca81fa';
 const DEFAULT_LOCATION_ID = 'e263b119-d0bb-484e-b65c-abe2c57f9e86';
 const DEFAULT_USER_ID = '80a9afe9-4751-4181-b816-eb78c94619ef';
 const DEFAULT_MEMBERSHIP_ID = '128cf0b2-c298-412a-8aad-10bf921bfd37';
+const DEFAULT_PASSWORD_SALT = 'g5L6Isfimtho-mkugDnCKHTg';
+const DEFAULT_PASSWORD_HASH = '92e9ea256a2b2d89e54b2e7b6a7098917110fbb7a771d6cdd3000d0117295dc0';
+const DEFAULT_PASSWORD_ALGORITHM = 'pbkdf2-sha256-100000';
+const LEGACY_PASSWORD_HASH = '83dbb59cdd6371ebb84b7d2271ebc8ade3eaeaa05d85fe50439030e606e4c1f1';
 let initializationPromise = null;
 
 function normalizeSql(moduleValue, label) {
@@ -35,7 +39,6 @@ function prepareSchemaStatements(db, sql, label) {
 
 async function executeSchema(db, sql, label) {
   const statements = prepareSchemaStatements(db, sql, label);
-  // D1 batch receives complete SQL statements; unlike exec(), it does not split multiline DDL by line.
   await db.batch(statements);
   return statements.length;
 }
@@ -68,11 +71,12 @@ async function seedDefaultWorkspace(db) {
     db.prepare(`
       INSERT OR IGNORE INTO users
         (id, email, display_name, password_salt, password_hash, password_algorithm, active, created_at, updated_at)
-      VALUES (?, 'admin@pedidospro.local', 'Benjamín Palma', ?, ?, 'pbkdf2-sha256-210000', 1, ?, ?)
+      VALUES (?, 'admin@pedidospro.local', 'Benjamín Palma', ?, ?, ?, 1, ?, ?)
     `).bind(
       DEFAULT_USER_ID,
-      'g5L6Isfimtho-mkugDnCKHTg',
-      '83dbb59cdd6371ebb84b7d2271ebc8ade3eaeaa05d85fe50439030e606e4c1f1',
+      DEFAULT_PASSWORD_SALT,
+      DEFAULT_PASSWORD_HASH,
+      DEFAULT_PASSWORD_ALGORITHM,
       timestamp,
       timestamp
     ),
@@ -95,6 +99,25 @@ async function seedDefaultWorkspace(db) {
   return true;
 }
 
+async function migrateSeededOwnerPassword(db) {
+  const result = await db.prepare(`
+    UPDATE users
+    SET password_salt = ?, password_hash = ?, password_algorithm = ?, updated_at = ?
+    WHERE id = ?
+      AND email = 'admin@pedidospro.local'
+      AND password_algorithm = 'pbkdf2-sha256-210000'
+      AND password_hash = ?
+  `).bind(
+    DEFAULT_PASSWORD_SALT,
+    DEFAULT_PASSWORD_HASH,
+    DEFAULT_PASSWORD_ALGORITHM,
+    new Date().toISOString(),
+    DEFAULT_USER_ID,
+    LEGACY_PASSWORD_HASH
+  ).run();
+  return Number(result?.meta?.changes || 0) > 0;
+}
+
 export async function ensureSchema(env) {
   if (!env.DB) throw new Error('D1 binding DB is not available');
   if (initializationPromise) return initializationPromise;
@@ -104,10 +127,12 @@ export async function ensureSchema(env) {
     const procurementStatements = await executeSchema(env.DB, procurementSchema, 'procurement');
     const invoiceStatements = await executeSchema(env.DB, invoiceSchema, 'invoices');
     const seeded = await seedDefaultWorkspace(env.DB);
+    const ownerPasswordMigrated = await migrateSeededOwnerPassword(env.DB);
 
     return {
       initialized: true,
       seeded,
+      ownerPasswordMigrated,
       version: SCHEMA_VERSION,
       statements: identityStatements + procurementStatements + invoiceStatements
     };
