@@ -44,6 +44,7 @@ import {
 } from './api/orders.js';
 import {
   analyzeInvoice,
+  createInvoice,
   auditLog,
   getFile,
   listInvoices,
@@ -128,6 +129,7 @@ async function apiRouter(request, env) {
   if (params && method === 'POST') return ok({reception: await createReception(request, env, actor, params.id)}, request, env);
 
   if (method === 'GET' && path === '/api/invoices') return ok({invoices: await listInvoices(env, actor, url)}, request, env);
+  if (method === 'POST' && path === '/api/invoices') return ok({invoice: await createInvoice(request, env, actor)}, request, env);
   if (method === 'POST' && path === '/api/invoices/analyze') return ok({analysis: await analyzeInvoice(request, env, actor)}, request, env);
 
   if (method === 'POST' && path === '/api/files') return ok({file: await uploadFile(request, env, actor, url)}, request, env);
