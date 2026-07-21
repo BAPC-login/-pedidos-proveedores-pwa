@@ -23,6 +23,9 @@ function openProduct(){
 function openUser(){
   openModal({eyebrow:'SEGURIDAD',title:'Nuevo usuario',subtitle:'La cuenta permanecerá activa hasta que sea revocada.',body:`<div class="form-grid"><label class="field"><span>Nombre</span><input name="displayName" required></label><label class="field"><span>Correo</span><input name="email" type="email" required></label><label class="field"><span>Contraseña inicial</span><input name="password" type="password" minlength="10" required></label><label class="field"><span>Rol</span><select name="role"><option value="readonly">Solo lectura</option><option value="purchaser">Compras</option><option value="receiver">Recepción</option><option value="approver">Aprobador</option><option value="finance">Finanzas</option><option value="admin">Administrador</option></select></label></div>`,onSubmit:async form=>{await api('/api/users',{method:'POST',json:{...Object.fromEntries(form),locationScope:['*']}});toast('Usuario creado');await navigate('team')}});
 }
+function openChangePassword(){
+  openModal({eyebrow:'SEGURIDAD',title:'Cambiar contraseña',subtitle:'Al guardar se cerrarán todas tus sesiones, incluida esta.',body:`<div class="form-grid"><label class="field full"><span>Nueva contraseña</span><input name="password" type="password" minlength="10" autocomplete="new-password" required placeholder="Mínimo 10 caracteres"></label><label class="field full"><span>Repite la contraseña</span><input name="confirmation" type="password" minlength="10" autocomplete="new-password" required></label></div>`,submitLabel:'Cambiar contraseña',onSubmit:async form=>{const password=String(form.get('password')||''),confirmation=String(form.get('confirmation')||'');if(password!==confirmation)throw new Error('Las contraseñas no coinciden');await api(`/api/users/${state.me.user.id}/password`,{method:'POST',json:{password}});toast('Contraseña actualizada. Ingresa nuevamente.');setTimeout(()=>logoutLocal(),500)}});
+}
 async function ensureOrderSources(){
   if(!state.cache.locations.length)state.cache.locations=(await api('/api/locations')).locations;
   if(!state.cache.suppliers.length)state.cache.suppliers=(await api('/api/suppliers')).suppliers;
@@ -46,6 +49,7 @@ function bindDynamic(){
   $$('[data-link-supplier]').forEach(node=>node.onclick=()=>linkSupplier(node.dataset.linkSupplier));
   $$('[data-toggle-user]').forEach(node=>node.onclick=async()=>{const active=node.dataset.active==='1';await api(`/api/users/${node.dataset.toggleUser}`,{method:'PATCH',json:{active:!active,locationScope:['*']}});toast(active?'Usuario revocado':'Usuario reactivado');await navigate('team')});
   $$('[data-revoke-session]').forEach(node=>node.onclick=async()=>{await api(`/api/sessions/${node.dataset.revokeSession}/revoke`,{method:'POST',json:{}});toast('Sesión revocada');if(node.dataset.revokeSession===state.me?.sessionId)logoutLocal();else await navigate('settings')});
+  if(state.view==='settings'&&!$('#changePasswordButton')){const target=$('.panel-grid .panel');if(target){const button=document.createElement('button');button.id='changePasswordButton';button.type='button';button.className='btn primary';button.style.marginTop='14px';button.textContent='Cambiar contraseña';button.onclick=openChangePassword;target.append(button)}}
 }
 function handleAction(action){
   if(action==='new-order')return openOrder();
@@ -53,6 +57,7 @@ function handleAction(action){
   if(action==='new-product')return openProduct();
   if(action==='new-user')return openUser();
   if(action==='analyze-invoice')return openInvoiceAnalysis();
+  if(action==='change-password')return openChangePassword();
 }
 
 export {openBootstrap,openOrder,handleAction,bindDynamic};
