@@ -6,40 +6,36 @@ on:
       - '.github/workflows/direct-cloudflare-deploy.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  patch-auth:
+  verify-authentication:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-      - name: Switch authentication to native PBKDF2 module
+      - name: Run live disposable-user authentication test
         shell: bash
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('professional/worker/src/auth.js')
-          text = path.read_text(encoding='utf-8')
-          original = text
-          text = text.replace('  hashPassword,\n', '')
-          text = text.replace('  uuid,\n  verifyPassword\n', '  uuid\n')
-          marker = "} from './core.js';\n"
-          import_line = "import {hashPassword, verifyPassword} from './password.js';\n"
-          if import_line not in text:
-              text = text.replace(marker, marker + import_line, 1)
-          if text == original:
-              raise SystemExit('Authentication import was not changed')
-          path.write_text(text, encoding='utf-8')
-          PY
-          node --check professional/worker/src/auth.js
-          node --check professional/worker/src/password.js
-      - name: Commit authentication compatibility fix
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add professional/worker/src/auth.js professional/worker/src/password.js
-          git commit -m "fix(auth): use native PBKDF2 in Cloudflare Workers"
-          git push origin HEAD:main
+          set -u
+          BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
+          for attempt in $(seq 1 24); do
+            code=$(curl --silent --show-error --max-time 60 --output /tmp/selftest.json --write-out '%{http_code}' \
+              -X POST "$BASE/api/platform-auth-selftest" || true)
+            invalid_code=$(curl --silent --show-error --max-time 60 --output /tmp/invalid.json --write-out '%{http_code}' \
+              -H 'Content-Type: application/json' \
+              --data '{"email":"admin@pedidospro.local","password":"contraseña-incorrecta","organizationSlug":"pedidos-pro"}' \
+              "$BASE/api/auth/login" || true)
+            echo "attempt=${attempt} selftest=${code} invalid_login=${invalid_code}"
+            cat /tmp/selftest.json 2>/dev/null || true
+            echo
+            cat /tmp/invalid.json 2>/dev/null || true
+            echo
+            if [ "$code" = "200" ] \
+              && grep -q '"ok":true' /tmp/selftest.json \
+              && grep -q '"release":"2026.07.21.7"' /tmp/selftest.json \
+              && grep -q '"sessionIssued":true' /tmp/selftest.json \
+              && [ "$invalid_code" = "401" ]; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
