@@ -36,6 +36,18 @@ function safeJson(value, fallback) {
   try { return JSON.parse(value || ''); } catch { return fallback; }
 }
 
+async function validateLocationScope(env, actor, requested, role) {
+  if (role === ROLES.OWNER) return ['*'];
+  const values = [...new Set((Array.isArray(requested) ? requested : []).map(String).filter(Boolean))];
+  if (values.includes('*')) throw new HttpError(403, 'Solo el owner puede acceder a todos los locales', 'owner_scope_required');
+  if (!values.length) throw new HttpError(400, 'Selecciona al menos un local para este usuario', 'location_scope_required');
+  for (const locationId of values) {
+    const location = await env.DB.prepare('SELECT id FROM locations WHERE id = ? AND org_id = ? AND active = 1').bind(locationId, actor.orgId).first();
+    if (!location) throw new HttpError(400, 'Uno de los locales seleccionados no es válido', 'invalid_location_scope');
+  }
+  return values;
+}
+
 async function createSession(env, request, {userId, orgId}) {
   const token = randomToken(36);
   const tokenHash = await sha256(token);
@@ -101,6 +113,7 @@ export async function authenticate(request, env, {optional = false} = {}) {
   if (!row) throw new HttpError(401, 'La sesión fue revocada o no es válida', 'session_revoked');
   env.DB.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?')
     .bind(nowIso(), row.session_id).run().catch(() => {});
+  const platformOwner = await env.DB.prepare('SELECT user_id FROM platform_owners WHERE user_id = ?').bind(row.user_id).first();
   return {
     sessionId: row.session_id,
     userId: row.user_id,
@@ -109,7 +122,8 @@ export async function authenticate(request, env, {optional = false} = {}) {
     displayName: row.display_name,
     role: row.role,
     locationScope: safeJson(row.location_scope, []),
-    organization: {id: row.org_id, name: row.org_name, slug: row.org_slug, plan: row.plan}
+    organization: {id: row.org_id, name: row.org_name, slug: row.org_slug, plan: row.plan},
+    isPlatformOwner: Boolean(platformOwner)
   };
 }
 
@@ -145,7 +159,8 @@ export async function bootstrap(request, env) {
     env.DB.prepare(`INSERT INTO users (id, email, display_name, password_salt, password_hash, password_algorithm, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`) 
       .bind(userId, email, displayName, passwordData.salt, passwordData.hash, passwordData.algorithm, timestamp, timestamp),
     env.DB.prepare(`INSERT INTO memberships (id, org_id, user_id, role, location_scope, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)`) 
-      .bind(membershipId, orgId, userId, ROLES.OWNER, JSON.stringify(['*']), timestamp, timestamp)
+      .bind(membershipId, orgId, userId, ROLES.OWNER, JSON.stringify(['*']), timestamp, timestamp),
+    env.DB.prepare('INSERT INTO platform_owners (user_id, created_at) VALUES (?, ?)').bind(userId, timestamp)
   ];
   ['Bebidas sin alcohol','Cervezas','Vinos','Espumantes','Pisco','Ron','Vodka','Gin','Whisky','Tequila','Licores','Insumos','Abarrotes','Otros'].forEach((name, index) => {
     statements.push(env.DB.prepare(`INSERT INTO categories (id, org_id, name, sort_order, active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)`) 
@@ -215,7 +230,8 @@ export async function me(env, actor) {
       email: actor.email,
       displayName: actor.displayName,
       role: actor.role,
-      locationScope: actor.locationScope
+      locationScope: actor.locationScope,
+      isPlatformOwner: Boolean(actor.isPlatformOwner)
     },
     organization: actor.organization,
     plan: {name: actor.organization.plan, limits, usage}
@@ -262,7 +278,7 @@ export async function createUser(request, env, actor) {
   const role = String(body.role || ROLES.READONLY);
   if (!Object.values(ROLES).includes(role)) throw new HttpError(400, 'Rol inválido', 'invalid_role');
   if (role === ROLES.OWNER && actor.role !== ROLES.OWNER) throw new HttpError(403, 'Solo el propietario puede crear otro propietario', 'forbidden');
-  const locationScope = Array.isArray(body.locationScope) && body.locationScope.length ? body.locationScope : ['*'];
+  const locationScope = await validateLocationScope(env, actor, body.locationScope, role);
   const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
   const timestamp = nowIso();
   let userId = existing?.id;
@@ -300,7 +316,7 @@ export async function updateUser(request, env, actor, userId) {
   if (!Object.values(ROLES).includes(role)) throw new HttpError(400, 'Rol inválido', 'invalid_role');
   if (role === ROLES.OWNER && actor.role !== ROLES.OWNER) throw new HttpError(403, 'Solo el propietario puede asignar ese rol', 'forbidden');
   const active = body.active === undefined ? Number(membership.active) : (body.active ? 1 : 0);
-  const locationScope = Array.isArray(body.locationScope) && body.locationScope.length ? body.locationScope : ['*'];
+  const locationScope = await validateLocationScope(env, actor, body.locationScope, role);
   await env.DB.prepare(`UPDATE memberships SET role = ?, location_scope = ?, active = ?, updated_at = ? WHERE org_id = ? AND user_id = ?`)
     .bind(role, JSON.stringify(locationScope), active, nowIso(), actor.orgId, userId).run();
   if (!active) {

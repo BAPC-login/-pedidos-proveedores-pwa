@@ -50,6 +50,8 @@ import {
   listInvoices,
   uploadFile
 } from './api/documents.js';
+import {createBrand, listBrands, switchBrand} from './platform.js';
+import {listDocuments} from './storage.js';
 
 async function applyOptionalRateLimit(env, key) {
   if (!env.RATE_LIMITER?.limit) return;
@@ -71,6 +73,7 @@ async function apiRouter(request, env) {
       databaseInitialized: true,
       schemaVersion: schema.version,
       storageConfigured: Boolean(env.FILES),
+      storageBackend: env.FILES ? 'r2' : 'unavailable',
       aiEndpoint: Boolean(env.AI_ENDPOINT),
       environment: env.ENVIRONMENT || 'development',
       timestamp: new Date().toISOString()
@@ -93,6 +96,11 @@ async function apiRouter(request, env) {
   if (method === 'POST' && path === '/api/auth/logout') return ok(await logout(request, env, actor), request, env);
   if (method === 'GET' && path === '/api/me') return ok(await me(env, actor), request, env);
   if (method === 'GET' && path === '/api/dashboard') return ok(await dashboard(env, actor), request, env);
+
+  if (method === 'GET' && path === '/api/brands') return ok({brands: await listBrands(env, actor)}, request, env);
+  if (method === 'POST' && path === '/api/brands') return ok({brand: await createBrand(request, env, actor)}, request, env);
+  const brandParams = routeMatch(path, '/api/brands/:id/switch');
+  if (brandParams && method === 'POST') return ok(await switchBrand(request, env, actor, brandParams.id), request, env);
 
   if (method === 'GET' && path === '/api/users') return ok({users: await listUsers(env, actor)}, request, env);
   if (method === 'POST' && path === '/api/users') return ok({user: await createUser(request, env, actor)}, request, env);
@@ -135,6 +143,7 @@ async function apiRouter(request, env) {
   if (method === 'POST' && path === '/api/invoices') return ok({invoice: await createInvoice(request, env, actor)}, request, env);
   if (method === 'POST' && path === '/api/invoices/analyze') return ok({analysis: await analyzeInvoice(request, env, actor)}, request, env);
 
+  if (method === 'GET' && path === '/api/documents') return ok({documents: await listDocuments(env, actor, {entityType: String(url.searchParams.get('entityType') || ''), entityId: String(url.searchParams.get('entityId') || ''), kind: String(url.searchParams.get('kind') || '')})}, request, env);
   if (method === 'POST' && path === '/api/files') return ok({file: await uploadFile(request, env, actor, url)}, request, env);
   if (method === 'GET' && path.startsWith('/api/files/')) {
     const key = decodeURIComponent(path.slice('/api/files/'.length));
