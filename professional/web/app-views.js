@@ -1,6 +1,6 @@
 import {$,$$,esc,money,date,state,api,isAdmin,initials,roleNames,setTheme} from './app-core.js';
 import {bindDynamic} from './app-actions.js';
-const viewMeta={dashboard:['OPERACIÓN','Resumen'],orders:['COMPRAS','Pedidos'],catalog:['DATOS','Catálogo'],suppliers:['ABASTECIMIENTO','Proveedores'],team:['SEGURIDAD','Equipo'],audit:['CONTROL','Auditoría'],settings:['CUENTA','Configuración']};
+const viewMeta={dashboard:['OPERACIÓN','Resumen'],orders:['COMPRAS','Pedidos'],invoices:['DOCUMENTOS','Facturas'],catalog:['DATOS','Catálogo'],suppliers:['ABASTECIMIENTO','Proveedores'],team:['SEGURIDAD','Equipo'],audit:['CONTROL','Auditoría'],settings:['CUENTA','Configuración']};
 async function navigate(view){
   if(['team','audit'].includes(view)&&!isAdmin())return;
   state.view=view;
@@ -8,12 +8,13 @@ async function navigate(view){
   const [eyebrow,title]=viewMeta[view]||viewMeta.dashboard;
   $('#pageEyebrow').textContent=eyebrow;$('#pageTitle').textContent=title;
   const action=$('#primaryAction');
-  action.classList.toggle('hidden',!['dashboard','orders','catalog','suppliers','team'].includes(view));
-  action.innerHTML=view==='catalog'?'<span>＋</span><span>Nuevo producto</span>':view==='suppliers'?'<span>＋</span><span>Nuevo proveedor</span>':view==='team'?'<span>＋</span><span>Nuevo usuario</span>':'<span>＋</span><span>Nuevo pedido</span>';
+  action.classList.toggle('hidden',!['dashboard','orders','invoices','catalog','suppliers','team'].includes(view));
+  action.innerHTML=view==='invoices'?'<span>⌁</span><span>Analizar factura</span>':view==='catalog'?'<span>＋</span><span>Nuevo producto</span>':view==='suppliers'?'<span>＋</span><span>Nuevo proveedor</span>':view==='team'?'<span>＋</span><span>Nuevo usuario</span>':'<span>＋</span><span>Nuevo pedido</span>';
   $('#mainContent').innerHTML='<div class="panel"><div class="empty-state">Cargando información…</div></div>';
   try{
     if(view==='dashboard')await renderDashboard();
     if(view==='orders')await renderOrders();
+    if(view==='invoices')await renderInvoices();
     if(view==='catalog')await renderCatalog();
     if(view==='suppliers')await renderSuppliers();
     if(view==='team')await renderTeam();
@@ -58,6 +59,17 @@ function filterOrders(){
   const q=$('#orderSearch').value.toLowerCase(),status=$('#orderStatus').value;
   const filtered=state.cache.orders.filter(o=>(!status||o.status===status)&&(!q||`${o.folio} ${o.supplierName}`.toLowerCase().includes(q)));
   $('#ordersContainer').innerHTML=ordersTable(filtered);bindDynamic();
+}
+
+async function renderInvoices(){
+  const [invoicePayload,supplierPayload,orderPayload]=await Promise.all([api('/api/invoices'),api('/api/suppliers'),api('/api/orders')]);
+  state.cache.invoices=invoicePayload.invoices;state.cache.suppliers=supplierPayload.suppliers;state.cache.orders=orderPayload.orders;
+  $('#mainContent').innerHTML=`<div class="view-header"><div><span class="eyebrow">COTEJO Y PRECIOS</span><h2>Facturas</h2><p>Analiza documentos, revisa líneas y conserva el precio final por unidad.</p></div><button class="btn primary" data-action="analyze-invoice">⌁ Analizar factura</button></div><div class="toolbar"><label class="field toolbar-search"><input id="invoiceSearch" placeholder="Buscar número o proveedor"></label></div><section class="table-card" id="invoiceContainer">${invoiceTable(invoicePayload.invoices)}</section>`;
+  $('#invoiceSearch').addEventListener('input',()=>{const q=$('#invoiceSearch').value.toLowerCase();$('#invoiceContainer').innerHTML=invoiceTable(state.cache.invoices.filter(i=>`${i.invoiceNumber} ${i.supplierName}`.toLowerCase().includes(q)))});bindDynamic();
+}
+function invoiceTable(invoices){
+  if(!invoices?.length)return '<div class="empty-state"><h3>Aún no hay facturas</h3><p>Sube una imagen o PDF y revisa el cotejo antes de guardarla.</p><button class="btn primary" data-action="analyze-invoice">Analizar primera factura</button></div>';
+  return `<table class="data-table"><thead><tr><th>Documento</th><th>Proveedor</th><th>Fecha</th><th>Estado</th><th>Neto</th><th>Impuestos</th><th>Total</th></tr></thead><tbody>${invoices.map(i=>`<tr><td><strong>${esc(i.invoiceNumber)}</strong><br><small>Tipo ${esc(i.documentType)}</small></td><td>${esc(i.supplierName)}</td><td>${date(i.invoiceDate)}</td><td><span class="status ${esc(i.status)}">${esc(i.status)}</span></td><td>${money(i.netTotal)}</td><td>${money(i.taxTotal)}</td><td><strong>${money(i.grossTotal)}</strong></td></tr>`).join('')}</tbody></table>`;
 }
 
 async function renderCatalog(){
