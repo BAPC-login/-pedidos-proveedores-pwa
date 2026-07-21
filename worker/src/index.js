@@ -3,12 +3,19 @@ const FALLBACK_MODELS = ['gemini-3.1-flash-lite', 'gemini-2.5-flash'];
 const MAX_INVOICE_BYTES = 12 * 1024 * 1024;
 const MAX_ORDER_BYTES = 3 * 1024 * 1024;
 const MAX_COMBINED_BYTES = 16 * 1024 * 1024;
+const GEMINI_TIMEOUT_MS = 72000;
 
 const STOP_WORDS = new Set([
   'DE','DEL','LA','LAS','EL','LOS','Y','CON','SIN','UN','UNA','UND','UNID','UNIDAD','UNIDADES',
   'CAJA','CAJAS','BOT','BOTELLA','BOTELLAS','BEB','BEBIDA','BEBIDAS','PROD','PRODUCTO','PACK',
-  'FORMATO','VID','PET','DISPLAY','WHIS','WHISKY','WALKER'
+  'FORMATO','VID','VIDRIO','VNR','PET','DISPLAY','RETORNABLE','RET','TR','TAPA','ROSCA',
+  'LICOR','PISCO','WHIS','WHISKY','GIN','TEQUILA','VODKA','RON','CERVEZA','BEBESTIBLE'
 ]);
+
+const CHARGE_WORDS = [
+  'FLETE','FLETES','DESPACHO','TRANSPORTE','MERCADERIAS','RECARGO','SUBTOTAL','TOTAL','NETO',
+  'IVA','I V A','IABA','I B A','IMPUESTO','ADICIONAL','DESCUENTO','DEPOSITO','GARANTIA','CUOTA'
+];
 
 const corsHeaders = origin => ({
   'Access-Control-Allow-Origin': origin,
@@ -49,14 +56,27 @@ function numeric(value) {
 function normalize(value) {
   return String(value || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase().replace(/[^A-Z0-9.,%×X]+/g, ' ')
+    .toUpperCase().replace(/×/g, 'X').replace(/[^A-Z0-9.,%°X]+/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function expandAbbreviations(value) {
+  return normalize(value)
+    .replace(/\bS\s*[/.-]?\s*AZ(?:UCAR)?\b/g, ' SIN AZUCAR ')
+    .replace(/\bZERO\b|\bLIGHT\b|\bSUGAR FREE\b/g, ' SIN AZUCAR ')
+    .replace(/\bESP(?:EC)?\.?\b/g, ' ESPECIAL ')
+    .replace(/\bTRANSP(?:ARENTE)?\.?\b|\bTRANS\.?\b/g, ' TRANSPARENTE ')
+    .replace(/\bNOB\.?\b/g, ' NOBEL ')
+    .replace(/\bJW\b|\bJOHNNIE\b/g, ' JOHNNIE WALKER ')
+    .replace(/\bCOCA\s+COLA\s+SIN\s+AZUCAR\b/g, ' COCA COLA ZERO ')
     .replace(/\s+/g, ' ').trim();
 }
 
 function contentMl(value) {
-  const text = normalize(value);
-  const match = text.match(/(\d+(?:[.,]\d+)?)\s*(ML|CC|LTS?|LT|LITROS?)/);
-  if (match) {
+  const text = expandAbbreviations(value);
+  const matches = [...text.matchAll(/(\d+(?:[.,]\d+)?)\s*(ML|CC|LTS?|LT|LITROS?)/g)];
+  if (matches.length) {
+    const match = matches[matches.length - 1];
     const amount = Number(match[1].replace(',', '.')) || 0;
     if (/^(L|LT|LTS|LITRO)/.test(match[2])) {
       if (amount >= 20 && amount <= 60 && /\bLITRO\b/.test(text)) return 1000;
@@ -71,13 +91,15 @@ function contentMl(value) {
 }
 
 function alcoholDegree(value) {
-  const text = normalize(value)
+  const text = expandAbbreviations(value)
     .replace(/\d+(?:[.,]\d+)?\s*(?:ML|CC|LTS?|LT|LITROS?)/g, ' ')
-    .replace(/(?:^|\s)\d{1,2}\s*[X×]\s*\d{2,4}(?=\s*(?:ML|CC))/g, ' ')
-    .replace(/[X×]\s*0?\d{1,2}(?=\s*(?:VID|BOT|UN|UND|$))/g, ' ');
+    .replace(/(?:^|\s)\d{1,3}\s*X\s*\d{2,4}(?=\s*(?:ML|CC))/g, ' ')
+    .replace(/(?:ML|CC)\s*X\s*0?\d{1,3}/g, ' ');
+  const explicit = text.match(/(?:^|\s)(\d{2}(?:[.,]\d)?)\s*(?:GL|GRADOS?|°)(?=\s|$)/);
+  if (explicit) return Number(explicit[1].replace(',', '.')) || 0;
   const values = [...text.matchAll(/(?:^|\s)(\d{2}(?:[.,]\d)?)(?=\s|$)/g)]
     .map(match => Number(match[1].replace(',', '.')))
-    .filter(number => number >= 20 && number <= 60);
+    .filter(number => number >= 15 && number <= 60);
   return values[0] || 0;
 }
 
@@ -95,12 +117,14 @@ function orderPackSize(unit, description = '') {
 }
 
 function explicitPackFromDescription(value) {
-  const text = normalize(value);
-  let match = text.match(/(?:^|\s)(\d{1,3})\s*[X×]\s*\d{2,4}\s*(?:ML|CC)/);
+  const text = expandAbbreviations(value);
+  let match = text.match(/(?:^|\s)(\d{1,3})\s*X\s*\d{2,4}\s*(?:ML|CC)\b/);
   if (match) return Math.max(1, Number(match[1]) || 1);
-  match = text.match(/[X×]\s*0?(\d{1,3})(?=\s*(?:VID|BOT|UN|UND|DISPLAY|$))/);
+  match = text.match(/(?:ML|CC)\s*X\s*0?(\d{1,3})\b/);
   if (match) return Math.max(1, Number(match[1]) || 1);
-  match = text.match(/(?:DISPLAY|CAJA|PACK)\s*(?:DE)?\s*(\d{1,3})/);
+  match = text.match(/(?:^|\s)X\s*0?(\d{1,3})(?=\s|$)/);
+  if (match) return Math.max(1, Number(match[1]) || 1);
+  match = text.match(/(?:DISPLAY|CAJA|PACK)\s*(?:DE\s*)?(\d{1,3})\b/);
   return match ? Math.max(1, Number(match[1]) || 1) : 0;
 }
 
@@ -108,68 +132,125 @@ function parseQuantityCell(raw, fallback = 0) {
   const text = String(raw || '').trim();
   if (!text) return Math.max(0, numeric(fallback));
   const normalized = text.replace(',', '.');
-  const fractionLike = normalized.match(/^\s*(\d+(?:\.\d+)?)\s*[/\\-]\s*0+(?:\.0+)?\s*$/);
+  const fractionLike = normalized.match(/^\s*(\d+(?:\.\d+)?)\s*[/\-]\s*0+(?:\.0+)?\s*$/);
   if (fractionLike) return Math.max(0, Number(fractionLike[1]) || 0);
   const first = normalized.match(/\d+(?:\.\d+)?/);
   return first ? Math.max(0, Number(first[0]) || 0) : Math.max(0, numeric(fallback));
 }
 
-function canonical(value) {
-  let text = normalize(value);
-  const ml = contentMl(text);
-  text = text.replace(/(\d+(?:[.,]\d+)?)\s*(ML|CC|LTS?|LT|LITROS?)/g, ml ? ` ${ml}ML ` : ' ');
-  return text
-    .replace(/\bZERO\b/g, 'SIN AZUCAR')
-    .replace(/\bLIGHT\b/g, 'SIN AZUCAR')
-    .replace(/\bSUGAR FREE\b/g, 'SIN AZUCAR')
-    .replace(/\bJOHNNIE\b/g, 'JW')
-    .replace(/\bWHISKY\b/g, 'WHIS')
+function isChargeLine(value) {
+  const text = expandAbbreviations(value);
+  if (!text) return false;
+  const productSignals = ['COCA','FANTA','MISTRAL','RAMAZZOTTI','OLMECA','KAHLUA','TANQUERAY','WALKER','CARMEN'];
+  if (productSignals.some(word => text.includes(word))) return false;
+  return CHARGE_WORDS.some(word => text === word || text.startsWith(`${word} `) || text.includes(` ${word} `));
+}
+
+function stripped(value) {
+  return expandAbbreviations(value)
+    .replace(/\d+(?:[.,]\d+)?\s*(?:ML|CC|LTS?|LT|LITROS?)/g, ' ')
+    .replace(/(?:^|\s)\d{1,3}\s*X\s*\d{2,4}(?=\s*(?:ML|CC))/g, ' ')
+    .replace(/(?:ML|CC)\s*X\s*0?\d{1,3}/g, ' ')
+    .replace(/(?:^|\s)X\s*0?\d{1,3}(?=\s|$)/g, ' ')
+    .replace(/\b\d{2}(?:[.,]\d)?\s*(?:GL|GRADOS?|°)?\b/g, ' ')
+    .replace(/\b(?:VNR|VID|VIDRIO|PET|RETORNABLE|RET|TR|BOT|BOTELLA|BOTELLAS|CAJA|CAJAS|PACK|DISPLAY)\b/g, ' ')
     .replace(/\s+/g, ' ').trim();
 }
 
 function tokens(value) {
-  return canonical(value).split(' ').filter(token =>
-    token.length > 1 && !STOP_WORDS.has(token) && !/^\d+(?:[.,]\d+)?(?:ML)?$/.test(token)
-  );
+  return stripped(value).split(' ').filter(token => token.length > 1 && !STOP_WORDS.has(token) && !/^\d+$/.test(token));
 }
 
-function baseSimilarity(left, right) {
-  const a = tokens(left), b = tokens(right);
-  if (!a.length || !b.length) return 0;
-  const aa = new Set(a), bb = new Set(b);
+function tokenSimilarity(left, right) {
+  if (left === right) return 1;
+  if (left.length >= 3 && right.length >= 3 && (left.startsWith(right) || right.startsWith(left))) {
+    return Math.min(left.length, right.length) / Math.max(left.length, right.length) * .92 + .08;
+  }
+  const a = new Set(left), b = new Set(right);
+  let overlap = 0;
+  for (const char of a) if (b.has(char)) overlap++;
+  return overlap / Math.max(a.size, b.size, 1) * .55;
+}
+
+function trigramSet(value) {
+  const compact = stripped(value).replace(/\s/g, '');
+  const set = new Set();
+  if (compact.length < 3) { if (compact) set.add(compact); return set; }
+  for (let index = 0; index <= compact.length - 3; index++) set.add(compact.slice(index, index + 3));
+  return set;
+}
+
+function trigramSimilarity(left, right) {
+  const a = trigramSet(left), b = trigramSet(right);
+  if (!a.size || !b.size) return 0;
   let hits = 0;
-  for (const token of aa) if (bb.has(token)) hits++;
-  const union = new Set([...aa, ...bb]).size || 1;
-  const coverage = hits / Math.min(aa.size, bb.size);
-  const jaccard = hits / union;
-  const compactA = canonical(left).replace(/\s/g, '');
-  const compactB = canonical(right).replace(/\s/g, '');
-  const contains = compactA && compactB && (compactA.includes(compactB) || compactB.includes(compactA)) ? 1 : 0;
-  return Math.min(1, jaccard * .48 + coverage * .4 + contains * .12);
+  for (const gram of a) if (b.has(gram)) hits++;
+  return hits / new Set([...a, ...b]).size;
+}
+
+function variantFlags(value) {
+  const text = expandAbbreviations(value);
+  return {
+    zero: /\bZERO\b|\bSIN AZUCAR\b/.test(text),
+    normal: /\bNORMAL\b|\bORIGINAL\b/.test(text),
+    transparent: /\bTRANSPARENTE\b/.test(text),
+    special: /\bESPECIAL\b/.test(text),
+    nobel: /\bNOBEL\b/.test(text),
+    silver: /\bSILVER\b/.test(text),
+    black: /\bBLACK\b/.test(text),
+    red: /\bRED\b/.test(text)
+  };
+}
+
+function variantAdjustment(source, product) {
+  const a = variantFlags(source), b = variantFlags(product);
+  let score = 0;
+  const exclusive = [['zero','normal'],['black','red']];
+  for (const [left, right] of exclusive) {
+    if ((a[left] && b[right]) || (a[right] && b[left])) score -= .48;
+  }
+  for (const key of ['zero','normal','transparent','special','nobel','silver','black','red']) {
+    if (a[key] && b[key]) score += .08;
+  }
+  return score;
+}
+
+function textSimilarity(source, product) {
+  const sourceTokens = tokens(source), productTokens = tokens(product);
+  if (!sourceTokens.length || !productTokens.length) return 0;
+  let productCoverage = 0;
+  for (const productToken of productTokens) {
+    productCoverage += Math.max(0, ...sourceTokens.map(sourceToken => tokenSimilarity(sourceToken, productToken)));
+  }
+  productCoverage /= productTokens.length;
+  let sourceCoverage = 0;
+  for (const sourceToken of sourceTokens) {
+    sourceCoverage += Math.max(0, ...productTokens.map(productToken => tokenSimilarity(sourceToken, productToken)));
+  }
+  sourceCoverage /= sourceTokens.length;
+  return Math.min(1, productCoverage * .56 + sourceCoverage * .24 + trigramSimilarity(source, product) * .20);
 }
 
 function rankProducts(line, products) {
-  const source = line.descriptionOriginal || line.description || '';
+  const source = line.descriptionOriginal || line.sourceLine || line.description || '';
   const sourceMl = contentMl(source);
   const sourceDegree = alcoholDegree(source);
+  const requestedId = String(line.matchedOrderProductId || line.productId || '');
   return (products || []).map(product => {
     const productMl = contentMl(product.description);
     const productDegree = alcoholDegree(product.description);
-    let score = baseSimilarity(source, product.description);
+    let score = textSimilarity(source, product.description);
     const reasons = [];
     if (sourceMl && productMl) {
-      if (sourceMl === productMl) { score += .16; reasons.push('mismo volumen'); }
-      else { score -= .34; reasons.push(`volumen ${sourceMl} ml vs ${productMl} ml`); }
+      if (sourceMl === productMl) { score += .22; reasons.push('mismo volumen'); }
+      else { score -= .42; reasons.push(`volumen ${sourceMl} ml vs ${productMl} ml`); }
     }
     if (sourceDegree && productDegree) {
-      if (Math.abs(sourceDegree - productDegree) <= .6) { score += .13; reasons.push('misma graduación'); }
-      else { score -= .44; reasons.push(`graduación ${sourceDegree}° vs ${productDegree}°`); }
+      if (Math.abs(sourceDegree - productDegree) <= 1.1) { score += .04; reasons.push('graduación compatible'); }
+      else { score -= .07; reasons.push(`graduación informativa ${sourceDegree}° vs ${productDegree}°`); }
     }
-    const display = normalize(product.unit).includes('DISPLAY');
-    if (display && sourceMl) {
-      const expected = orderPackSize(product.unit, product.description);
-      reasons.push(`display esperado de ${expected}`);
-    }
+    score += variantAdjustment(source, product.description);
+    if (String(product.productId) === requestedId) { score += .18; reasons.push('selección sugerida por Gemini'); }
     return {product, score: Math.max(0, Math.min(1, score)), reasons};
   }).sort((a, b) => b.score - a.score);
 }
@@ -180,19 +261,17 @@ function chooseProduct(line, products) {
   const best = ranked[0] || {product: null, score: 0, reasons: []};
   const second = ranked[1]?.score || 0;
   const requested = ranked.find(entry => String(entry.product.productId) === requestedId);
-  if (requested && requested.score >= .5) {
-    return {product: requested.product, candidate: requested.product, score: requested.score, method: 'gemini+validated', reason: requested.reasons.join(', ')};
+  if (requested && requested.score >= .34) {
+    return {product: requested.product, candidate: requested.product, score: requested.score, method: 'gemini+catalog-validation', reason: requested.reasons.join(', ')};
   }
-  const safe = best.score >= .61 || (best.score >= .52 && best.score - second >= .12);
-  return {product: safe ? best.product : null, candidate: best.product, score: best.score, method: safe ? 'deterministic' : 'unmatched', reason: best.reasons.join(', ')};
+  const unique = best.score >= .47 || (best.score >= .38 && best.score - second >= .08);
+  return {product: unique ? best.product : null, candidate: best.product, score: best.score, method: unique ? 'catalog-resolver' : 'unmatched', reason: best.reasons.join(', ')};
 }
 
 function toBase64(buffer) {
   const bytes = new Uint8Array(buffer);
   let binary = '';
-  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-  }
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
   return btoa(binary);
 }
 
@@ -226,31 +305,31 @@ const responseSchema = {
 
 function buildPrompt(context) {
   const products = (context.products || []).map(product => ({
-    productId: String(product.productId), description: String(product.description), unit: String(product.unit || 'UNIDAD'),
-    orderedQty: numeric(product.orderedQty), unitsPerOrderUnit: orderPackSize(product.unit, product.description)
+    productId: String(product.productId),
+    description: String(product.description),
+    unit: String(product.unit || 'UNIDAD'),
+    orderedQty: numeric(product.orderedQty),
+    unitsPerOrderUnit: orderPackSize(product.unit, product.description)
   }));
-  return `Compara visualmente los dos documentos adjuntos:
-DOCUMENTO A = factura recibida.
-DOCUMENTO B = pedido PDF emitido por el cliente.
+  return `Analiza DOCUMENTO A (factura) y compáralo con DOCUMENTO B (pedido PDF) y con el catálogo estructurado.
 
-Extrae todas las líneas reales de la factura y coteja cada una contra el pedido. No inventes ni descartes productos.
+Tu tarea no es recordar productos. Debes resolver cada línea usando EXCLUSIVAMENTE la información visible en la factura y las opciones del pedido actual.
 
-PEDIDO ESTRUCTURADO DE APOYO:
+CATÁLOGO DEL PEDIDO ACTUAL:
 ${JSON.stringify(products)}
 
-REGLAS OBLIGATORIAS:
-1. invoiceQuantity se obtiene EXCLUSIVAMENTE de la columna Cantidad de la factura. Copia su texto literal en quantityCellRaw.
-2. Los números 35, 40, 43.1, etc. dentro del nombre de un licor suelen ser graduación alcohólica y jamás deben usarse como cantidad.
-3. X06 significa seis unidades por caja; X01 significa una unidad. En 1X750ML, el 1 indica una unidad y 750ML el contenido.
-4. Para productos cuyo pedido usa la unidad DISPLAY: todos los displays contienen 24 unidades, EXCEPTO productos de 1.5 litros/1500 ml, cuyo display contiene 6 unidades.
-5. Ejemplos: TÓNICA 1.5 y AGUA CON GAS 1.5 = display de 6. Una tónica, bebida o agua de formato distinto a 1.5 = display de 24, salvo que la factura indique explícitamente otro pack.
-6. Si la factura no imprime el pack pero el producto pedido es DISPLAY, usa unitsPerOrderUnit del pedido estructurado.
-7. units = invoiceQuantity × packSize. El número de displays/cajas recibidos es units dividido por unitsPerOrderUnit del producto pedido.
-8. Lee por línea precio unitario neto, descuento, neto total, flete, IVA, impuesto adicional y otros cargos. grossLineTotal debe ser el valor final de esa línea.
-9. Compara marca, variante, volumen y graduación. Diferencias de volumen o graduación impiden una coincidencia exacta.
-10. Conserva productos facturados que no estaban pedidos con matchedOrderProductId vacío.
-11. Devuelve una línea por cada producto facturado. No confundas descuentos, impuestos, totales o códigos con productos.
-12. Los números deben venir sin símbolos de moneda ni separadores de miles. Si no puedes leer un dato, usa 0 o cadena vacía y agrega una advertencia.
+REGLAS GENERALES OBLIGATORIAS:
+1. Extrae una línea por cada producto real facturado. No conviertas flete, despacho, impuestos, descuentos, depósitos, garantías ni totales en productos.
+2. quantityCellRaw debe copiar literalmente la celda Cantidad. invoiceQuantity sale sólo de esa celda; nunca del nombre del producto.
+3. Detecta el pack desde la descripción: X06, X6, 1000CCX6 o 6X350CC significan 6 unidades por caja. X01 o 1X750ML significan 1 unidad.
+4. units = invoiceQuantity × packSize.
+5. Para cotejar, compara marca, familia, variante y volumen. Las abreviaturas son normales: ESP/ESPEC=ESPECIAL, TRANSP/TRANS=TRANSPARENTE, ZERO=SIN AZÚCAR. El texto no necesita ser idéntico.
+6. La graduación alcohólica ayuda, pero no es una condición absoluta: el catálogo puede omitirla o usar una denominación comercial distinta. El volumen sí debe coincidir cuando está presente en ambos textos.
+7. matchedOrderProductId debe ser uno de los IDs exactos del catálogo sólo cuando la línea corresponde razonablemente. No inventes IDs.
+8. Si el pedido usa DISPLAY: display normal=24 unidades; productos de 1,5 L/1500 ml=6. El pack impreso en la factura y el tamaño del display son conceptos distintos.
+9. Si el pedido usa CAJA (N), unitsPerOrderUnit es N. receivedOrderQty se calculará después como units / unitsPerOrderUnit.
+10. Lee precio neto, descuento, neto de línea, flete, IVA, impuesto adicional y otros cargos. grossLineTotal es el total final de la línea.
+11. Devuelve valores numéricos sin símbolos ni separadores de miles. Si un dato no es legible usa 0 y agrega una advertencia.
 
 PROVEEDOR ESPERADO: ${String(context.providerName || 'no informado')}
 FOLIO: ${String(context.folio || 'no informado')}`;
@@ -272,15 +351,19 @@ async function callGemini(env, model, invoiceMime, invoiceData, orderMime, order
   const parts = [{text: 'DOCUMENTO A — FACTURA'}, {inline_data: {mime_type: invoiceMime, data: invoiceData}}];
   if (orderData) parts.push({text: 'DOCUMENTO B — PEDIDO PDF'}, {inline_data: {mime_type: orderMime || 'application/pdf', data: orderData}});
   parts.push({text: buildPrompt(context)});
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY},
-    body: JSON.stringify({
-      contents: [{role: 'user', parts}],
-      generationConfig: {temperature: .03, responseMimeType: 'application/json', responseSchema, maxOutputTokens: 16384}
-    })
-  });
-  return parseGeminiResponse(response, model);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: 'POST', signal: controller.signal,
+      headers: {'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY},
+      body: JSON.stringify({
+        contents: [{role: 'user', parts}],
+        generationConfig: {temperature: 0, responseMimeType: 'application/json', responseSchema, maxOutputTokens: 16384}
+      })
+    });
+    return await parseGeminiResponse(response, model);
+  } finally { clearTimeout(timeout); }
 }
 
 async function callWithFallbacks(env, invoiceMime, invoiceData, orderMime, orderData, context) {
@@ -288,7 +371,11 @@ async function callWithFallbacks(env, invoiceMime, invoiceData, orderMime, order
   const attempts = [];
   for (const model of models) {
     try { return await callGemini(env, model, invoiceMime, invoiceData, orderMime, orderData, context); }
-    catch (error) { attempts.push({model, error: String(error.message || error), status: error.status || 0}); }
+    catch (error) {
+      attempts.push({model, error: String(error.message || error), status: error.status || 0});
+      const canFallback = !error.status || error.status === 404 || error.status === 400 || error.status >= 500;
+      if (!canFallback) break;
+    }
   }
   const error = new Error(attempts.map(item => `${item.model}: ${item.error}`).join(' | ') || 'Gemini no respondió');
   error.attempts = attempts; throw error;
@@ -314,7 +401,16 @@ function validateInvoice(raw, context) {
     other: Math.max(0, numeric(raw.totals?.other)), total: Math.max(0, numeric(raw.totals?.total))
   };
   const warnings = [...(Array.isArray(raw.warnings) ? raw.warnings : [])];
-  const lines = (Array.isArray(raw.items) ? raw.items : []).map((line, index) => {
+  const sourceItems = Array.isArray(raw.items) ? raw.items : [];
+  const productItems = sourceItems.filter(line => {
+    const source = String(line.descriptionOriginal || '').trim();
+    if (!isChargeLine(source)) return true;
+    warnings.push(`Cargo separado del listado de productos: ${source}`);
+    if (!totals.freight && /FLETE|DESPACHO|TRANSPORTE/.test(expandAbbreviations(source))) totals.freight += Math.max(0, Math.round(numeric(line.grossLineTotal) || numeric(line.netLineTotal)));
+    return false;
+  });
+
+  const lines = productItems.map((line, index) => {
     const sourceLine = String(line.descriptionOriginal || '').trim();
     const invoiceQuantity = parseQuantityCell(line.quantityCellRaw, line.invoiceQuantity);
     const match = chooseProduct(line, products);
@@ -324,9 +420,6 @@ function validateInvoice(raw, context) {
     const expectedOrderPack = product ? orderPackSize(product.unit, product.description) : 1;
     let packSize = explicitPack || Math.max(1, numeric(line.packSize) || 1);
     if (product && normalize(product.unit).includes('DISPLAY') && !explicitPack) packSize = expectedOrderPack;
-    if (product && normalize(product.unit).includes('DISPLAY') && explicitPack && explicitPack !== expectedOrderPack) {
-      warnings.push(`${sourceLine}: la factura indica pack ${explicitPack}, mientras el pedido define display de ${expectedOrderPack}.`);
-    }
     const units = Math.max(0, invoiceQuantity * packSize);
     const netLineTotal = Math.max(0, Math.round(numeric(line.netLineTotal)));
     const freightLine = Math.max(0, Math.round(numeric(line.freightLine)));
@@ -335,7 +428,7 @@ function validateInvoice(raw, context) {
     const otherLineCharges = Math.max(0, Math.round(numeric(line.otherLineCharges)));
     const componentTotal = netLineTotal + freightLine + vatLine + additionalTaxLine + otherLineCharges;
     let grossLineTotal = Math.max(0, Math.round(numeric(line.grossLineTotal)));
-    if (!grossLineTotal || Math.abs(grossLineTotal - componentTotal) > Math.max(3, componentTotal * .02)) grossLineTotal = componentTotal;
+    if (!grossLineTotal || Math.abs(grossLineTotal - componentTotal) > Math.max(3, componentTotal * .03)) grossLineTotal = componentTotal;
     const receivedOrderQty = product ? units / expectedOrderPack : 0;
     if (!product) warnings.push(`Sin coincidencia segura con el pedido: ${sourceLine || `línea ${index + 1}`}`);
     return {
@@ -347,12 +440,13 @@ function validateInvoice(raw, context) {
       grossPackPrice: invoiceQuantity ? Math.round(grossLineTotal / invoiceQuantity) : 0,
       grossUnitPrice: units ? Math.round(grossLineTotal / units) : 0,
       productId: product?.productId || '', suggestedProductId: !product && candidate?.productId ? String(candidate.productId) : '',
-      description: product?.description || sourceLine, receivedOrderQty: Number(receivedOrderQty.toFixed(3)),
+      description: product?.description || sourceLine, receivedOrderQty: Number(receivedOrderQty.toFixed(3)), orderPackSize: expectedOrderPack,
       confidence: Math.max(0, Math.min(1, Math.max(numeric(line.matchConfidence), match.score || 0))),
       matchMethod: match.method, matchScore: Number((match.score || 0).toFixed(4)),
       matchReason: String(line.matchReason || match.reason || ''), notes: String(line.notes || ''), engine: 'gemini'
     };
   }).filter(line => line.sourceLine || line.invoiceQuantity || line.netLineTotal || line.grossLineTotal);
+
   distributeResidual(lines, totals.total);
   for (const line of lines) {
     line.grossUnitPrice = line.units ? Math.round(line.grossLineTotal / line.units) : 0;
@@ -406,7 +500,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, {status: 204, headers: corsHeaders(origin)});
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === '/health') {
-      const base = {ok: true, service: 'pedidos-pro-ai', geminiConfigured: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL || DEFAULT_MODEL};
+      const base = {ok: true, service: 'pedidos-pro-ai', geminiConfigured: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL || DEFAULT_MODEL, resolver: 'catalog-v22'};
       if (url.searchParams.get('probe') !== '1' || !env.GEMINI_API_KEY) return json(base, 200, origin);
       try { return json({...base, probe: await probeGemini(env)}, 200, origin); }
       catch (error) { return json({...base, ok: false, probe: {ok: false, error: String(error.message || error)}}, 502, origin); }
