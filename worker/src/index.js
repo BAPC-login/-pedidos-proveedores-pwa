@@ -4,7 +4,7 @@ const MAX_FILE_BYTES = 12 * 1024 * 1024;
 const MAX_COMBINED_BYTES = 16 * 1024 * 1024;
 const STOP_WORDS = new Set([
   'DE','DEL','LA','LAS','EL','LOS','UN','UNA','UND','UNID','UNIDAD','UNIDADES','CAJA','CAJAS',
-  'BOT','BOTELLA','BOTELLAS','BEB','BEBIDA','BEBIDAS','PROD','PRODUCTO','PACK','FORMATO','VID','PET'
+  'BOT','BOTELLA','BOTELLAS','BEB','BEBIDA','BEBIDAS','PROD','PRODUCTO','PACK','FORMATO','VID','PET','WHIS','WHISKY','WALKER'
 ]);
 
 const corsHeaders = origin => ({
@@ -31,7 +31,13 @@ function json(data, status = 200, origin = '*') {
 }
 
 function number(value) {
-  const parsed = Number(String(value ?? '').replace(/\./g, '').replace(',', '.'));
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  let text = String(value ?? '').trim().replace(/\s/g, '');
+  if (!text) return 0;
+  if (text.includes(',') && text.includes('.')) text = text.replace(/\./g, '').replace(',', '.');
+  else if (text.includes(',')) text = text.replace(',', '.');
+  else if (/^-?\d{1,3}(?:\.\d{3})+$/.test(text)) text = text.replace(/\./g, '');
+  const parsed = Number(text);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -44,9 +50,17 @@ function normalize(value) {
 function contentMl(text) {
   const value = normalize(text);
   const match = value.match(/(\d+(?:[.,]\d+)?)\s*(ML|CC|LTS?|LT|LITROS?)/);
-  if (!match) return 0;
-  const amount = Number(match[1].replace(',', '.')) || 0;
-  return /^(?:L|LT)/.test(match[2]) ? Math.round(amount * 1000) : Math.round(amount);
+  if (match) {
+    const amount = Number(match[1].replace(',', '.')) || 0;
+    if (/^(?:L|LT)/.test(match[2])) {
+      if (amount >= 20 && amount <= 60 && /\bLITRO\b/.test(value)) return 1000;
+      return Math.round(amount * 1000);
+    }
+    return Math.round(amount);
+  }
+  if (/\bLITRO\b|\b1L\b/.test(value)) return 1000;
+  const standalone = value.match(/(?:^|\s)(250|330|350|500|600|700|750|900|1000|1500|2000)(?=\s|$)/);
+  return standalone ? Number(standalone[1]) : 0;
 }
 
 function alcoholDegree(text) {
@@ -99,7 +113,7 @@ function canonical(value) {
 }
 
 function tokens(value) {
-  return canonical(value).split(' ').filter(token => token.length > 1 && !STOP_WORDS.has(token));
+  return canonical(value).split(' ').filter(token => token.length > 1 && !STOP_WORDS.has(token) && !/^\d+(?:[.,]\d+)?(?:ML)?$/.test(token));
 }
 
 function similarity(a, b) {
