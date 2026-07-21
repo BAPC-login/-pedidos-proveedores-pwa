@@ -1,7 +1,30 @@
 {
   "status": "failed",
-  "application_shell": false,
-  "checked_at": "2026-07-21T21:24:57.922793+00:00",
-  "url": "https://pedidos-pro-platform.botreservasmultilocal.workers.dev/",
-  "health": null
+  "application_shell": true,
+  "checked_at": "2026-07-21T21:58:40.017619+00:00",
+  "url": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/",
+  "ai_health": {
+    "ok": true,
+    "service": "pedidos-pro-ai",
+    "geminiConfigured": true,
+    "model": "gemini-3.5-flash",
+    "resolver": "catalog-v22"
+  },
+  "platform_health": {
+    "ok": true,
+    "service": "pedidos-pro-platform",
+    "version": "2.0.0-alpha.1",
+    "databaseConfigured": true,
+    "databaseInitialized": true,
+    "schemaVersion": "5",
+    "storageConfigured": false,
+    "aiEndpoint": true,
+    "environment": "production",
+    "timestamp": "2026-07-21T21:58:38.994Z"
+  },
+  "security_checks": {
+    "unauthenticated_me_http": 401,
+    "invalid_login_http": 500,
+    "bootstrap_without_token_http": 403
+  }
 }
