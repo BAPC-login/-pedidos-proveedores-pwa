@@ -27,18 +27,23 @@
     if(!text)return{};
     try{return JSON.parse(text)}catch{return{error:text.slice(0,500)}}
   }
+  function networkMessage(error){
+    const message=String(error?.message||error||'');
+    if(/Load failed|Failed to fetch|FetchEvent\.respondWith|NetworkError|abort/i.test(message))return'No se pudo conectar con el Worker de Gemini. La app seguirá usando OCR local mientras se restablece la conexión.';
+    return message;
+  }
 
   async function health(probe=false){
     if(!settings().enabled){lastHealth={ok:false,mode:'ocr',message:'IA desactivada; se usará OCR local'};return lastHealth}
     if(!navigator.onLine){lastHealth={ok:false,mode:'ocr',message:'Sin conexión; se usará OCR local'};return lastHealth}
     try{
       const suffix=probe?'&probe=1':'';
-      const response=await fetchWithTimeout(`${endpoint()}/health?ts=${Date.now()}${suffix}`,{cache:'no-store',headers:{Accept:'application/json','Cache-Control':'no-cache'}},probe?16000:8000);
+      const response=await fetchWithTimeout(`${endpoint()}/health?ts=${Date.now()}${suffix}`,{cache:'no-store',headers:{Accept:'application/json'}},probe?16000:8000);
       const data=await readPayload(response);
       if(!response.ok)throw new Error(data?.probe?.error||data?.error||`HTTP ${response.status}`);
       const configured=!!data.geminiConfigured,probeOk=!probe||!!data.probe?.ok;
       lastHealth={ok:!!data.ok&&configured&&probeOk,mode:configured&&probeOk?'gemini':'ocr',model:data.model||'',message:configured&&probeOk?`Gemini conectado · ${data.model||'modelo activo'}`:configured?'La clave existe, pero Gemini no respondió a la prueba real':'Backend activo, pero falta configurar GEMINI_API_KEY',probe:data.probe||null};
-    }catch(error){lastHealth={ok:false,mode:'ocr',message:`Gemini no disponible: ${String(error.message||error)}`,error:String(error.message||error)}}
+    }catch(error){const message=networkMessage(error);lastHealth={ok:false,mode:'ocr',message,error:String(error?.message||error)}}
     return lastHealth;
   }
 
@@ -60,7 +65,7 @@
       showToast(status.ok?'Gemini respondió correctamente':'La prueba real de Gemini falló; revisa el mensaje mostrado');
       return status;
     }catch(error){
-      const message=String(error.message||error);if(badge){badge.textContent='Error de conexión';badge.classList.remove('online')}if(text)text.textContent=message;button.textContent='Reintentar';showToast(`Error al probar Gemini: ${message}`);return{ok:false,error:message};
+      const message=networkMessage(error);if(badge){badge.textContent='Error de conexión';badge.classList.remove('online')}if(text)text.textContent=message;button.textContent='Reintentar';showToast(`Error al probar Gemini: ${message}`);return{ok:false,error:message};
     }finally{button.dataset.busy='0';button.disabled=false;setTimeout(()=>{if(button.dataset.busy!=='1')button.textContent=original},2200)}
   }
 
@@ -94,7 +99,7 @@
     let estimated=10;
     const timer=setInterval(()=>{estimated=Math.min(72,estimated+4);progress(onProgress,estimated<34?'Enviando factura al analizador IA':'Gemini está leyendo y cotejando la factura',estimated)},1700);
     try{
-      const response=await fetchWithTimeout(`${endpoint()}/v1/invoices/analyze`,{method:'POST',body:form,headers:{'X-Pedidos-Client':'9.1.0'}},105000);
+      const response=await fetchWithTimeout(`${endpoint()}/v1/invoices/analyze`,{method:'POST',body:form,headers:{'X-Pedidos-Client':'9.1.1'}},105000);
       const payload=await readPayload(response);
       if(!response.ok||!payload.ok){
         const attempts=Array.isArray(payload.attempts)?payload.attempts.map(item=>`${item.model}: ${item.error}`).join(' | '):'';
@@ -115,7 +120,7 @@
     const hybrid=async function(file,products,onProgress,context={}){
       try{return await analyzeWithGemini(file,products,onProgress,context)}
       catch(error){
-        const reason=String(error.message||error);console.warn('Gemini no disponible; se utilizará OCR local',error);
+        const reason=networkMessage(error);console.warn('Gemini no disponible; se utilizará OCR local',error);
         progress(onProgress,'Gemini falló · iniciando OCR local',26,reason);
         try{
           const result=await localAnalyze(file,products,update=>progress(onProgress,update.label,Math.max(28,Math.min(99,28+(Number(update.percent)||0)*.7))),context);
