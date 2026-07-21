@@ -11,21 +11,24 @@ permissions:
 jobs:
   validate-combined:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Install connected Worker dependencies
-        working-directory: worker
-        run: npm install --no-audit --no-fund
-      - name: Bundle connected Worker configuration
-        working-directory: worker
-        run: npx wrangler deploy --dry-run --outdir /tmp/combined-worker
-      - name: Inspect live combined Worker
+      - name: Bundle and inspect combined Worker
         shell: bash
         run: |
-          set -u
+          set -euo pipefail
+          gh api -H 'Accept: application/vnd.github+json' \
+            "/repos/BAPC-login/-pedidos-proveedores-pwa/tarball/${{ github.sha }}" \
+            > /tmp/repo.tar.gz
+          mkdir /tmp/repo
+          tar -xzf /tmp/repo.tar.gz -C /tmp/repo --strip-components=1
+          cd /tmp/repo/worker
+          npm install --no-audit --no-fund --silent
+          npx wrangler deploy --dry-run --outdir /tmp/combined-worker > /tmp/dryrun.log 2>&1
+          echo "BUNDLE_OK=true"
+          tail -20 /tmp/dryrun.log
+
           probe() {
             label="$1"
             url="$2"
