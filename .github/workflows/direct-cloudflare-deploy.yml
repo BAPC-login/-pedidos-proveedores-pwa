@@ -6,24 +6,183 @@ on:
       - '.github/workflows/direct-cloudflare-deploy.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  inspect-storage:
+  patch-d1-storage:
     runs-on: ubuntu-latest
     steps:
-      - name: Print current R2 state
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Add D1 chunked file backend
         shell: bash
         run: |
-          set -u
-          BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
-          health_code=$(curl --silent --show-error --max-time 30 --dump-header /tmp/health.headers --output /tmp/health.json --write-out '%{http_code}' "$BASE/platform/health" || true)
-          storage_code=$(curl --silent --show-error --max-time 60 --output /tmp/storage.json --write-out '%{http_code}' \
-            -X POST "$BASE/api/platform-storage-selftest" || true)
-          echo "HEALTH_HTTP=$health_code"
-          cat /tmp/health.headers 2>/dev/null || true
-          cat /tmp/health.json 2>/dev/null || true
-          echo
-          echo "STORAGE_HTTP=$storage_code"
-          cat /tmp/storage.json 2>/dev/null || true
-          echo
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          schema = Path('professional/worker/src/schema.js')
+          text = schema.read_text(encoding='utf-8')
+          if "0004_file_chunks.sql" not in text:
+              text = text.replace(
+                  "import invoiceSchemaModule from '../../migrations/0003_invoices.sql';\n",
+                  "import invoiceSchemaModule from '../../migrations/0003_invoices.sql';\nimport fileChunkSchemaModule from '../../migrations/0004_file_chunks.sql';\n",
+              )
+          text = text.replace("const SCHEMA_VERSION = '6';", "const SCHEMA_VERSION = '7';")
+          if "const fileChunkSchema =" not in text:
+              text = text.replace(
+                  "const invoiceSchema = normalizeSql(invoiceSchemaModule, 'invoices');\n",
+                  "const invoiceSchema = normalizeSql(invoiceSchemaModule, 'invoices');\nconst fileChunkSchema = normalizeSql(fileChunkSchemaModule, 'file-chunks');\n",
+              )
+          text = text.replace(
+              "const invoiceStatements = await executeSchema(env.DB, invoiceSchema, 'invoices');\n    const seeded",
+              "const invoiceStatements = await executeSchema(env.DB, invoiceSchema, 'invoices');\n    const fileChunkStatements = await executeSchema(env.DB, fileChunkSchema, 'file-chunks');\n    const seeded",
+          )
+          text = text.replace(
+              "statements: identityStatements + procurementStatements + invoiceStatements",
+              "statements: identityStatements + procurementStatements + invoiceStatements + fileChunkStatements",
+          )
+          schema.write_text(text, encoding='utf-8')
+
+          documents = Path('professional/worker/src/api/documents.js')
+          text = documents.read_text(encoding='utf-8')
+          if "from 'node:buffer'" not in text:
+              text = text.replace("import {writeAudit} from '../auth.js';\n", "import {writeAudit} from '../auth.js';\nimport {Buffer} from 'node:buffer';\n")
+
+          replacement = r'''const FILE_CHUNK_BYTES = 192 * 1024;
+const FILE_BATCH_SIZE = 20;
+
+function buildStorageKey(actor, purpose, fileName, backend) {
+  return `${backend}/${actor.orgId}/${purpose}/${new Date().toISOString().slice(0, 10)}/${uuid()}-${sanitizeFileName(fileName)}`;
+}
+
+async function persistFile(env, actor, file, purpose) {
+  const limits = planFor(actor.organization.plan);
+  const usedBytes = await usageValue(env, actor.orgId, 'file_bytes');
+  if (usedBytes + file.size > limits.fileBytes) {
+    throw new HttpError(402, `El plan ${actor.organization.plan} permite hasta ${limits.fileBytes} bytes de archivos`, 'plan_limit');
+  }
+
+  const data = await file.arrayBuffer();
+  const hash = await sha256(data);
+  const fileId = uuid();
+  const contentType = file.type || 'application/octet-stream';
+  const backend = env.FILES ? 'r2' : 'd1';
+  const key = buildStorageKey(actor, purpose, file.name || 'archivo', backend);
+  const timestamp = nowIso();
+
+  if (env.FILES) {
+    await env.FILES.put(key, data, {
+      httpMetadata: {contentType},
+      customMetadata: {orgId: actor.orgId, uploadedBy: actor.userId, sha256: hash}
+    });
+    try {
+      await env.DB.prepare(`
+        INSERT INTO files (id, org_id, storage_key, file_name, content_type, size_bytes, sha256, purpose, uploaded_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(fileId, actor.orgId, key, file.name, contentType, file.size, hash, purpose, actor.userId, timestamp).run();
+    } catch (error) {
+      await env.FILES.delete(key).catch(() => {});
+      throw error;
+    }
+  } else {
+    await env.DB.prepare(`
+      INSERT INTO files (id, org_id, storage_key, file_name, content_type, size_bytes, sha256, purpose, uploaded_by, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(fileId, actor.orgId, key, file.name, contentType, file.size, hash, purpose, actor.userId, timestamp).run();
+
+    try {
+      const bytes = new Uint8Array(data);
+      const statements = [];
+      for (let offset = 0, index = 0; offset < bytes.length; offset += FILE_CHUNK_BYTES, index++) {
+        const chunk = Buffer.from(bytes.subarray(offset, Math.min(offset + FILE_CHUNK_BYTES, bytes.length))).toString('base64');
+        statements.push(env.DB.prepare(`
+          INSERT INTO file_chunks (file_id, chunk_index, data_base64, created_at) VALUES (?, ?, ?, ?)
+        `).bind(fileId, index, chunk, timestamp));
+        if (statements.length === FILE_BATCH_SIZE) {
+          await env.DB.batch(statements.splice(0));
+        }
+      }
+      if (statements.length) await env.DB.batch(statements);
+    } catch (error) {
+      await env.DB.prepare('DELETE FROM files WHERE id = ?').bind(fileId).run().catch(() => {});
+      throw error;
+    }
+  }
+
+  await incrementUsage(env, actor.orgId, 'file_bytes', file.size);
+  return {id: fileId, key, name: file.name, size: file.size, contentType, backend};
+}
+
+export async function uploadFile(request, env, actor, url) {
+  const form = await request.formData();
+  const file = form.get('file');
+  if (!(file instanceof File)) throw new HttpError(400, 'Adjunta un archivo', 'missing_file');
+  if (file.size > 20 * 1024 * 1024) throw new HttpError(413, 'El archivo supera 20 MB', 'file_too_large');
+  const purpose = String(url.searchParams.get('purpose') || 'general').replace(/[^a-z0-9_-]/gi, '').slice(0, 40) || 'general';
+  const stored = await persistFile(env, actor, file, purpose);
+  await writeAudit(env, actor, request, 'file.upload', 'file', stored.id, {purpose, size: file.size, backend: stored.backend});
+  return stored;
+}
+
+export async function getFile(env, actor, key) {
+  const record = await env.DB.prepare(`
+    SELECT id, storage_key, file_name, content_type, size_bytes FROM files WHERE org_id = ? AND storage_key = ?
+  `).bind(actor.orgId, key).first();
+  if (!record) throw new HttpError(404, 'Archivo no encontrado', 'not_found');
+
+  if (key.startsWith('d1/')) {
+    const chunkResult = await env.DB.prepare(`
+      SELECT data_base64 FROM file_chunks WHERE file_id = ? ORDER BY chunk_index
+    `).bind(record.id).all();
+    const chunks = (chunkResult.results || []).map(row => Buffer.from(String(row.data_base64 || ''), 'base64'));
+    if (!chunks.length && Number(record.size_bytes || 0) > 0) throw new HttpError(404, 'Contenido de archivo no encontrado', 'not_found');
+    const body = Buffer.concat(chunks);
+    return new Response(body, {
+      headers: {
+        'Content-Type': record.content_type || 'application/octet-stream',
+        'Content-Length': String(body.byteLength),
+        'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(record.file_name || 'archivo')}`,
+        'Cache-Control': 'private, max-age=60',
+        'X-Content-Type-Options': 'nosniff'
+      }
+    });
+  }
+
+  if (!env.FILES) throw new HttpError(404, 'Archivo no encontrado', 'not_found');
+  const object = await env.FILES.get(key);
+  if (!object) throw new HttpError(404, 'Archivo no encontrado', 'not_found');
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set('Cache-Control', 'private, max-age=60');
+  headers.set('X-Content-Type-Options', 'nosniff');
+  return new Response(object.body, {headers});
+}
+
+'''
+          pattern = re.compile(r"export async function uploadFile\(request, env, actor, url\) \{.*?\n\}\n\nexport async function getFile\(env, actor, key\) \{.*?\n\}\n\n", re.S)
+          text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit(f'Expected one file API block, replaced {count}')
+          documents.write_text(text, encoding='utf-8')
+
+          index = Path('professional/worker/src/index.js')
+          text = index.read_text(encoding='utf-8')
+          text = text.replace(
+              "storageConfigured: Boolean(env.FILES),\n      aiEndpoint:",
+              "storageConfigured: Boolean(env.FILES || env.DB),\n      storageBackend: env.FILES ? 'r2' : 'd1-chunks',\n      aiEndpoint:",
+          )
+          index.write_text(text, encoding='utf-8')
+          PY
+          node --check professional/worker/src/schema.js
+          node --check professional/worker/src/api/documents.js
+          node --check professional/worker/src/index.js
+      - name: Commit D1 storage backend
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add professional/migrations/0004_file_chunks.sql professional/worker/src/schema.js professional/worker/src/api/documents.js professional/worker/src/index.js
+          git commit -m "feat(storage): add automatic D1 chunked file backend"
+          git push origin HEAD:main
