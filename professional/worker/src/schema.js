@@ -1,9 +1,22 @@
-import identitySchema from '../../migrations/0001_identity.sql';
-import procurementSchema from '../../migrations/0002_procurement.sql';
-import invoiceSchema from '../../migrations/0003_invoices.sql';
+import identitySchemaModule from '../../migrations/0001_identity.sql';
+import procurementSchemaModule from '../../migrations/0002_procurement.sql';
+import invoiceSchemaModule from '../../migrations/0003_invoices.sql';
 
 const SCHEMA_VERSION = '3';
 let initializationPromise = null;
+
+function normalizeSql(moduleValue, label) {
+  const raw = typeof moduleValue === 'string' ? moduleValue : moduleValue?.default;
+  if (typeof raw !== 'string' || !raw.trim()) {
+    throw new Error(`SQL module ${label} did not resolve to text`);
+  }
+  // D1 enforces foreign keys at the service level and rejects toggling this PRAGMA via exec().
+  return raw.replace(/^\s*PRAGMA\s+foreign_keys\s*=\s*ON\s*;\s*/gim, '').trim();
+}
+
+const identitySchema = normalizeSql(identitySchemaModule, 'identity');
+const procurementSchema = normalizeSql(procurementSchemaModule, 'procurement');
+const invoiceSchema = normalizeSql(invoiceSchemaModule, 'invoices');
 
 async function hasCurrentSchema(db) {
   try {
