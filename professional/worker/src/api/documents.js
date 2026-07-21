@@ -2,12 +2,8 @@ import {
   HttpError,
   ROLES,
   assertMinimumRole,
-  assertRole,
-  bool,
-  canTransition,
   integer,
   monthKey,
-  normalizeRut,
   nowIso,
   number,
   optionalText,
@@ -16,27 +12,20 @@ import {
   requireText,
   sanitizeFileName,
   sha256,
-  slugify,
   uuid
 } from '../core.js';
 import {writeAudit} from '../auth.js';
+import {Buffer} from 'node:buffer';
+
+const FILE_CHUNK_BYTES = 128 * 1024;
+const FILE_BATCH_SIZE = 20;
+
 function rows(result) {
   return result?.results || [];
 }
 
 function safeJson(value, fallback = null) {
   try { return JSON.parse(value || ''); } catch { return fallback; }
-}
-
-function locationAllowed(actor, locationId) {
-  return actor.locationScope?.includes?.('*') || actor.locationScope?.includes?.(locationId);
-}
-
-async function requireLocation(env, actor, locationId) {
-  const location = await env.DB.prepare('SELECT * FROM locations WHERE id = ? AND org_id = ? AND active = 1')
-    .bind(locationId, actor.orgId).first();
-  if (!location || !locationAllowed(actor, location.id)) throw new HttpError(404, 'Local no encontrado', 'not_found');
-  return location;
 }
 
 async function incrementUsage(env, orgId, metric, amount = 1) {
@@ -53,19 +42,6 @@ async function usageValue(env, orgId, metric) {
   const row = await env.DB.prepare('SELECT quantity FROM usage_counters WHERE org_id = ? AND month_key = ? AND metric = ?')
     .bind(orgId, monthKey(), metric).first();
   return Number(row?.quantity || 0);
-}
-
-async function enforceCountLimit(env, actor, table, limitKey, extraWhere = '') {
-  const limits = planFor(actor.organization.plan);
-  const limit = Number(limits[limitKey]);
-  if (!Number.isFinite(limit)) return;
-  const allowedTables = new Set(['locations', 'suppliers', 'products']);
-  if (!allowedTables.has(table)) throw new HttpError(500, 'Configuración de límite inválida');
-  const row = await env.DB.prepare(`SELECT COUNT(*) AS total FROM ${table} WHERE org_id = ? ${extraWhere}`)
-    .bind(actor.orgId).first();
-  if (Number(row?.total || 0) >= limit) {
-    throw new HttpError(402, `El plan ${actor.organization.plan} permite hasta ${limit} ${limitKey}`, 'plan_limit');
-  }
 }
 
 export async function listInvoices(env, actor, url) {
@@ -215,26 +191,97 @@ export async function analyzeInvoice(request, env, actor) {
   return payload;
 }
 
+function buildStorageKey(actor, purpose, fileName, backend) {
+  return `${backend}/${actor.orgId}/${purpose}/${new Date().toISOString().slice(0, 10)}/${uuid()}-${sanitizeFileName(fileName)}`;
+}
+
+async function persistD1File(env, fileId, data, timestamp) {
+  const bytes = new Uint8Array(data);
+  const pending = [];
+  for (let offset = 0, index = 0; offset < bytes.length; offset += FILE_CHUNK_BYTES, index++) {
+    const chunk = Buffer.from(bytes.subarray(offset, Math.min(offset + FILE_CHUNK_BYTES, bytes.length))).toString('base64');
+    pending.push(env.DB.prepare(`
+      INSERT INTO file_chunks (file_id, chunk_index, data_base64, created_at) VALUES (?, ?, ?, ?)
+    `).bind(fileId, index, chunk, timestamp));
+    if (pending.length >= FILE_BATCH_SIZE) await env.DB.batch(pending.splice(0));
+  }
+  if (pending.length) await env.DB.batch(pending);
+}
+
 export async function uploadFile(request, env, actor, url) {
-  if (!env.FILES) throw new HttpError(501, 'El almacenamiento R2 todavía no está configurado', 'storage_not_configured');
   const form = await request.formData();
   const file = form.get('file');
   if (!(file instanceof File)) throw new HttpError(400, 'Adjunta un archivo', 'missing_file');
   if (file.size > 20 * 1024 * 1024) throw new HttpError(413, 'El archivo supera 20 MB', 'file_too_large');
+
+  const limits = planFor(actor.organization.plan);
+  const usedBytes = await usageValue(env, actor.orgId, 'file_bytes');
+  if (usedBytes + file.size > limits.fileBytes) {
+    throw new HttpError(402, 'Límite de almacenamiento del plan alcanzado', 'plan_limit');
+  }
+
   const purpose = String(url.searchParams.get('purpose') || 'general').replace(/[^a-z0-9_-]/gi, '').slice(0, 40) || 'general';
-  const key = `${actor.orgId}/${purpose}/${new Date().toISOString().slice(0, 10)}/${uuid()}-${sanitizeFileName(file.name)}`;
-  const hash = await sha256(await file.arrayBuffer());
-  await env.FILES.put(key, file.stream(), {httpMetadata: {contentType: file.type || 'application/octet-stream'}, customMetadata: {orgId: actor.orgId, uploadedBy: actor.userId, sha256: hash}});
-  await env.DB.prepare(`INSERT INTO files (id, org_id, storage_key, file_name, content_type, size_bytes, sha256, purpose, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`) 
-    .bind(uuid(), actor.orgId, key, file.name, file.type, file.size, hash, purpose, actor.userId, nowIso()).run();
+  const data = await file.arrayBuffer();
+  const hash = await sha256(data);
+  const fileId = uuid();
+  const contentType = file.type || 'application/octet-stream';
+  const backend = env.FILES ? 'r2' : 'd1';
+  const key = buildStorageKey(actor, purpose, file.name || 'archivo', backend);
+  const timestamp = nowIso();
+
+  if (env.FILES) {
+    await env.FILES.put(key, data, {
+      httpMetadata: {contentType},
+      customMetadata: {orgId: actor.orgId, uploadedBy: actor.userId, sha256: hash}
+    });
+  }
+
+  try {
+    await env.DB.prepare(`
+      INSERT INTO files (id, org_id, storage_key, file_name, content_type, size_bytes, sha256, purpose, uploaded_by, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(fileId, actor.orgId, key, file.name || 'archivo', contentType, file.size, hash, purpose, actor.userId, timestamp).run();
+
+    if (!env.FILES) await persistD1File(env, fileId, data, timestamp);
+  } catch (error) {
+    await env.DB.prepare('DELETE FROM files WHERE id = ?').bind(fileId).run().catch(() => {});
+    if (env.FILES) await env.FILES.delete(key).catch(() => {});
+    throw error;
+  }
+
   await incrementUsage(env, actor.orgId, 'file_bytes', file.size);
-  await writeAudit(env, actor, request, 'file.upload', 'file', key, {purpose, size: file.size});
-  return {key, name: file.name, size: file.size, contentType: file.type};
+  await writeAudit(env, actor, request, 'file.upload', 'file', fileId, {purpose, size: file.size, backend});
+  return {id: fileId, key, name: file.name, size: file.size, contentType, backend};
 }
 
 export async function getFile(env, actor, key) {
-  if (!env.FILES) throw new HttpError(501, 'El almacenamiento R2 todavía no está configurado', 'storage_not_configured');
-  if (!key.startsWith(`${actor.orgId}/`)) throw new HttpError(404, 'Archivo no encontrado', 'not_found');
+  const record = await env.DB.prepare(`
+    SELECT id, storage_key, file_name, content_type, size_bytes
+    FROM files WHERE org_id = ? AND storage_key = ?
+  `).bind(actor.orgId, key).first();
+  if (!record) throw new HttpError(404, 'Archivo no encontrado', 'not_found');
+
+  if (key.startsWith('d1/')) {
+    const chunkResult = await env.DB.prepare(`
+      SELECT data_base64 FROM file_chunks WHERE file_id = ? ORDER BY chunk_index
+    `).bind(record.id).all();
+    const chunks = rows(chunkResult).map(row => Buffer.from(String(row.data_base64 || ''), 'base64'));
+    if (!chunks.length && Number(record.size_bytes || 0) > 0) {
+      throw new HttpError(404, 'Contenido de archivo no encontrado', 'not_found');
+    }
+    const body = Buffer.concat(chunks);
+    return new Response(body, {
+      headers: {
+        'Content-Type': record.content_type || 'application/octet-stream',
+        'Content-Length': String(body.byteLength),
+        'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(record.file_name || 'archivo')}`,
+        'Cache-Control': 'private, max-age=60',
+        'X-Content-Type-Options': 'nosniff'
+      }
+    });
+  }
+
+  if (!env.FILES) throw new HttpError(404, 'Archivo no encontrado', 'not_found');
   const object = await env.FILES.get(key);
   if (!object) throw new HttpError(404, 'Archivo no encontrado', 'not_found');
   const headers = new Headers();
