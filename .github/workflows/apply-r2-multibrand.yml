@@ -22,15 +22,11 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-
-          p=Path('professional/worker/src/api/orders.js')
-          t=p.read_text(encoding='utf-8')
-
+          p=Path('professional/worker/src/api/orders.js');t=p.read_text(encoding='utf-8')
           def one(old,new,label):
               global t
               if old not in t: raise SystemExit(f'Missing orders marker: {label}')
               t=t.replace(old,new,1)
-
           one("import {writeAudit} from '../auth.js';\n","import {writeAudit} from '../auth.js';\nimport {archiveOrderPdf} from '../storage.js';\n",'storage import')
           one("  const created = await getOrder(env, actor, id);\n  if (idempotencyKey)","  const created = await getOrder(env, actor, id);\n  created.pdfDocument = await archiveOrderPdf(env, actor, created);\n  if (idempotencyKey)",'create archive')
           one("  await writeAudit(env, actor, request, 'order.update', 'order', orderId, {revision: Number(current.revision || 1) + 1});\n  return await getOrder(env, actor, orderId);","  await writeAudit(env, actor, request, 'order.update', 'order', orderId, {revision: Number(current.revision || 1) + 1});\n  const updated = await getOrder(env, actor, orderId);\n  updated.pdfDocument = await archiveOrderPdf(env, actor, updated);\n  return updated;",'update archive')
@@ -38,7 +34,6 @@ jobs:
           one("  await writeAudit(env, actor, request, 'order.transition', 'order', orderId, {from: order.status, to, reason});\n  return await getOrder(env, actor, orderId);","  await writeAudit(env, actor, request, 'order.transition', 'order', orderId, {from: order.status, to, reason});\n  const transitioned = await getOrder(env, actor, orderId);\n  transitioned.pdfDocument = await archiveOrderPdf(env, actor, transitioned);\n  return transitioned;",'transition archive')
           one("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?","UPDATE orders SET status = ?, revision = revision + 1, updated_at = ? WHERE id = ?",'reception revision')
           one("  await writeAudit(env, actor, request, 'reception.create', 'reception', receptionId, {orderId, status: nextStatus});\n  return {id: receptionId, orderId, status: 'completed', orderStatus: nextStatus};","  await writeAudit(env, actor, request, 'reception.create', 'reception', receptionId, {orderId, status: nextStatus});\n  const receivedOrder = await getOrder(env, actor, orderId);\n  const pdfDocument = await archiveOrderPdf(env, actor, receivedOrder);\n  return {id: receptionId, orderId, status: 'completed', orderStatus: nextStatus, pdfDocument};",'reception archive')
-
           p.write_text(t,encoding='utf-8')
           PY
           node --check professional/worker/src/storage.js
@@ -49,30 +44,19 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
-
-          p=Path('professional/worker/src/api/documents.js')
-          t=p.read_text(encoding='utf-8')
-
+          p=Path('professional/worker/src/api/documents.js');t=p.read_text(encoding='utf-8')
           def one(old,new,label):
               global t
               if old not in t: raise SystemExit(f'Missing documents marker: {label}')
               t=t.replace(old,new,1)
-
-          one("import {writeAudit} from '../auth.js';\n","import {writeAudit} from '../auth.js';\nimport {getStoredFile, linkExistingFile, recordSnapshot, storeFile} from '../storage.js';\n",'storage import')
+          one("import {writeAudit} from '../auth.js';\n","import {writeAudit} from '../auth.js';\nimport {linkExistingFile, recordSnapshot, storeFile} from '../storage.js';\n",'storage import')
           one("    createdAt: invoice.created_at\n","    createdAt: invoice.created_at,\n    pdfFileId: invoice.pdf_file_id || null\n",'invoice file field')
           one("  await env.DB.batch(statements);\n  await writeAudit(env, actor, request, 'invoice.create',","  await env.DB.batch(statements);\n  if (body.sourceFileId) {\n    await env.DB.prepare('UPDATE invoices SET pdf_file_id = ?, updated_at = ? WHERE id = ? AND org_id = ?').bind(String(body.sourceFileId), nowIso(), invoiceId, actor.orgId).run();\n    await linkExistingFile(env, actor, {fileId: String(body.sourceFileId), entityType: 'invoice', entityId: invoiceId, documentKind: 'invoice_original', revision: 1, metadata: {invoiceNumber}});\n  }\n  await recordSnapshot(env, actor, {entityType: 'invoice', entityId: invoiceId, revision: 1, snapshot: {...body, id: invoiceId, supplierName: supplier.name}});\n  await writeAudit(env, actor, request, 'invoice.create',",'invoice source link')
-          one("  if (file.size > 12 * 1024 * 1024) throw new HttpError(413, 'La factura supera 12 MB', 'file_too_large');\n  const upstream","  if (file.size > 12 * 1024 * 1024) throw new HttpError(413, 'La factura supera 12 MB', 'file_too_large');\n  const sourceFile = await storeFile(env, actor, file, {purpose: 'invoice-source'});\n  const upstream",'source archive')
-          one("  return payload;\n}\n\nexport async function uploadFile","  return {...payload, sourceFile};\n}\n\nexport async function uploadFile",'analysis response')
-
-          pattern=re.compile(r"export async function uploadFile\(request, env, actor, url\) \{.*?\n\}\n\nexport async function getFile\(env, actor, key\) \{.*?\n\}\n",re.S)
-          replacement="""export async function uploadFile(request, env, actor, url) {\n  const form = await request.formData();\n  const file = form.get('file');\n  if (!(file instanceof File)) throw new HttpError(400, 'Adjunta un archivo', 'missing_file');\n  if (file.size > 20 * 1024 * 1024) throw new HttpError(413, 'El archivo supera 20 MB', 'file_too_large');\n  const purpose = String(url.searchParams.get('purpose') || 'general').replace(/[^a-z0-9_-]/gi, '').slice(0, 40) || 'general';\n  const stored = await storeFile(env, actor, file, {purpose});\n  await incrementUsage(env, actor.orgId, 'file_bytes', file.size);\n  await writeAudit(env, actor, request, 'file.upload', 'file', stored.id, {purpose, size: file.size, key: stored.key});\n  return stored;\n}\n\nexport async function getFile(env, actor, key) {\n  return getStoredFile(env, actor, key);\n}\n"""
-          t,count=pattern.subn(replacement,t,count=1)
-          if count!=1: raise SystemExit(f'Could not replace file API: {count}')
+          one("  if (file.size > 12 * 1024 * 1024) throw new HttpError(413, 'La factura supera 12 MB', 'file_too_large');\n  const upstream","  if (file.size > 12 * 1024 * 1024) throw new HttpError(413, 'La factura supera 12 MB', 'file_too_large');\n  const sourceFile = await storeFile(env, actor, file, {purpose: 'invoice-source'});\n  await incrementUsage(env, actor.orgId, 'file_bytes', file.size);\n  const upstream",'source archive')
+          one("  return payload;\n}\n\nfunction buildStorageKey","  return {...payload, sourceFile};\n}\n\nfunction buildStorageKey",'analysis response')
           p.write_text(t,encoding='utf-8')
 
-          p=Path('professional/web/app-invoices.js')
-          t=p.read_text(encoding='utf-8')
+          p=Path('professional/web/app-invoices.js');t=p.read_text(encoding='utf-8')
           marker="        aiModel:analysis.model||'',\n"
           if marker not in t: raise SystemExit('Missing invoice UI marker')
           t=t.replace(marker,marker+"        sourceFileId:analysis.sourceFile?.id||'',\n",1)
@@ -87,9 +71,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import json,re
-
-          p=Path('worker/src/index.js')
-          t=p.read_text(encoding='utf-8')
+          p=Path('worker/src/index.js');t=p.read_text(encoding='utf-8')
           pattern=re.compile(r"function buildPrompt\(context\) \{.*?\n\}\n\nasync function parseGeminiResponse",re.S)
           replacement="""function buildPrompt(context) {\n  const products = (context.products || []).map(product => ({id: String(product.productId), d: String(product.description), u: String(product.unit || 'UNIDAD'), q: numeric(product.orderedQty), pack: orderPackSize(product.unit, product.description)}));\n  return `<task>Extrae y coteja factura A contra pedido B y CAT. Responde solo según JSON Schema.</task>\n<CAT>${JSON.stringify(products)}</CAT>\n<context>proveedor=${String(context.providerName || '')};folio=${String(context.folio || '')}</context>\n<rules>\n- Una salida por producto. Excluye flete, impuestos, descuentos, depósitos, garantías y totales.\n- quantityCellRaw copia Cantidad; invoiceQuantity sale solo de esa celda.\n- packSize sale de X06/X6/1000CCX6/6X350CC. units=invoiceQuantity*packSize.\n- Match por marca, familia, variante y volumen. Volumen distinto invalida. ESP=ESPECIAL; TRANS=TRANSPARENTE; ZERO=SIN AZUCAR.\n- matchedOrderProductId es un id exacto de CAT o vacío. Nunca inventes.\n- DISPLAY=24; 1.5L=6, salvo pack explícito.\n- Lee neto, descuento, flete, IVA, impuesto adicional, otros y total final por línea.\n- Números sin símbolos. Ilegible=0 y warning breve.\n</rules>`;\n}\n\nasync function parseGeminiResponse"""
           t,count=pattern.subn(replacement,t,count=1)
@@ -98,15 +80,8 @@ jobs:
           t=t.replace('maxOutputTokens: 16384','maxOutputTokens: 8192',1)
           p.write_text(t,encoding='utf-8')
 
-          p=Path('worker/wrangler.jsonc')
-          config=json.loads(p.read_text(encoding='utf-8'))
-          config['r2_buckets']=[{'binding':'FILES'}]
-          p.write_text(json.dumps(config,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-
-          p=Path('professional/web/sw.js')
-          t=p.read_text(encoding='utf-8')
-          t=re.sub(r"const VERSION = '[^']+';","const VERSION = 'pedidos-pro-platform-v2-r2-history';",t,count=1)
-          p.write_text(t,encoding='utf-8')
+          p=Path('worker/wrangler.jsonc');config=json.loads(p.read_text(encoding='utf-8'));config['r2_buckets']=[{'binding':'FILES'}];p.write_text(json.dumps(config,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          p=Path('professional/web/sw.js');t=p.read_text(encoding='utf-8');t=re.sub(r"const VERSION = '[^']+';","const VERSION = 'pedidos-pro-platform-v2-r2-history';",t,count=1);p.write_text(t,encoding='utf-8')
           PY
           node --check worker/src/index.js
           node --check professional/web/sw.js
