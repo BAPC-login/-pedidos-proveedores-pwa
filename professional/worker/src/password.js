@@ -1,7 +1,8 @@
 import {pbkdf2Sync, randomBytes, timingSafeEqual} from 'node:crypto';
 import {Buffer} from 'node:buffer';
 
-const ITERATIONS = 210000;
+// Cloudflare Workers currently caps PBKDF2 at 100,000 iterations.
+const ITERATIONS = 100000;
 const KEY_BYTES = 32;
 const DIGEST = 'sha256';
 
