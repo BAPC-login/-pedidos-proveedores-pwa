@@ -1,21 +1,22 @@
 import {
-  applySecurityHeaders,
+  corsHeaders,
+  errorResponse,
   HttpError,
   ok,
-  preflight,
-  routeMatch
+  routeMatch,
+  securityHeaders
 } from './core.js';
 import {ensureSchema} from './schema.js';
 import {
   authenticate,
   bootstrap,
-  changePassword,
   createUser,
   listSessions,
   listUsers,
   login,
   logout,
   me,
+  resetPassword as changePassword,
   revokeSession,
   updateUser
 } from './auth.js';
@@ -49,7 +50,20 @@ import {
 import {createBrand, listBrands, switchBrand} from './platform.js';
 import {listDocuments} from './storage.js';
 
-const APP_VERSION = '2.0.0-alpha.2';
+const APP_VERSION = '2.0.0-alpha.4';
+
+function addPlatformHeaders(response, request, env) {
+  const headers = new Headers(response.headers);
+  const origin = request.headers.get('Origin') || '';
+  for (const [name, value] of Object.entries(corsHeaders(origin, env))) headers.set(name, value);
+  for (const [name, value] of Object.entries(securityHeaders())) headers.set(name, value);
+  return new Response(response.body, {status: response.status, statusText: response.statusText, headers});
+}
+
+function preflightResponse(request, env) {
+  const origin = request.headers.get('Origin') || '';
+  return new Response(null, {status: 204, headers: {...corsHeaders(origin, env), ...securityHeaders()}});
+}
 
 async function applyOptionalRateLimit(env, key) {
   if (!env.RATE_LIMITER?.limit) return;
@@ -62,8 +76,7 @@ async function handleRequest(request, env, ctx) {
   const path = url.pathname;
   const method = request.method.toUpperCase();
 
-  if (method === 'OPTIONS') return preflight(request, env);
-
+  if (method === 'OPTIONS') return preflightResponse(request, env);
   const schema = await ensureSchema(env);
 
   if (method === 'GET' && path === '/health') {
@@ -86,7 +99,6 @@ async function handleRequest(request, env, ctx) {
     await applyOptionalRateLimit(env, `bootstrap:${request.headers.get('CF-Connecting-IP') || 'unknown'}`);
     return ok(await bootstrap(request, env), request, env);
   }
-
   if (method === 'POST' && path === '/api/auth/login') {
     await applyOptionalRateLimit(env, `login:${request.headers.get('CF-Connecting-IP') || 'unknown'}`);
     return ok(await login(request, env), request, env);
@@ -142,7 +154,6 @@ async function handleRequest(request, env, ctx) {
   if (method === 'GET' && path === '/api/sessions') return ok({sessions: await listSessions(env, actor)}, request, env);
   const sessionParams = routeMatch(path, '/api/sessions/:id/revoke');
   if (sessionParams && method === 'POST') return ok(await revokeSession(request, env, actor, sessionParams.id), request, env);
-
   if (method === 'GET' && path === '/api/audit') return ok({events: await auditLog(env, actor, url)}, request, env);
 
   throw new HttpError(404, 'Ruta no encontrada', 'not_found');
@@ -151,20 +162,10 @@ async function handleRequest(request, env, ctx) {
 export default {
   async fetch(request, env, ctx) {
     try {
-      return applySecurityHeaders(await handleRequest(request, env, ctx), request, env);
+      return addPlatformHeaders(await handleRequest(request, env, ctx), request, env);
     } catch (error) {
-      const status = Number(error?.status || 500);
-      const payload = {
-        ok: false,
-        error: status >= 500 ? 'No se pudo completar la operación' : String(error?.message || 'Error'),
-        code: error?.code || 'internal_error'
-      };
-      if (status < 500 && error?.details) payload.details = error.details;
-      if (status >= 500) console.error('request_failed', error);
-      return applySecurityHeaders(new Response(JSON.stringify(payload), {
-        status,
-        headers: {'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store'}
-      }), request, env);
+      if (Number(error?.status || 500) >= 500) console.error('request_failed', error);
+      return errorResponse(error, request, env);
     }
   }
 };
