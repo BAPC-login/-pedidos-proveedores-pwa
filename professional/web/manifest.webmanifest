@@ -1,0 +1,27 @@
+{
+  "id": "/",
+  "name": "Pedidos Pro Platform",
+  "short_name": "Pedidos Pro",
+  "description": "Compras, proveedores, recepción y facturas con trazabilidad.",
+  "lang": "es-CL",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#090e18",
+  "theme_color": "#0b1020",
+  "categories": ["business", "productivity", "finance"],
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {"name":"Nuevo pedido","short_name":"Pedido","url":"/?action=new-order","icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml"}]},
+    {"name":"Recepción","short_name":"Recepción","url":"/?view=orders&filter=sent","icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml"}]}
+  ]
+}

@@ -1,0 +1,36 @@
+name = "pedidos-pro-platform"
+account_id = "f1adc1e73490ce30fe3c1588d2ca57fb"
+main = "worker/src/index.js"
+compatibility_date = "2026-07-21"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[assets]
+directory = "./web"
+binding = "ASSETS"
+run_worker_first = true
+
+[vars]
+ENVIRONMENT = "production"
+AI_ENDPOINT = "https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
+ALLOWED_ORIGINS = "https://pedidos-pro-platform.botreservasmultilocal.workers.dev,http://localhost:8787,http://127.0.0.1:8787"
+BOOTSTRAP_ADMIN_TOKEN = "pedidos-pro-inicializacion"
+IP_HASH_SALT = "MTkZnnb3EIwXwE7sN3ts8GfIl6alJJ9fKyOJYk5i4dc"
+
+# Wrangler crea y vincula D1 automáticamente en el primer despliegue.
+[[d1_databases]]
+binding = "DB"
+
+# R2 queda listo para activarse cuando se requiera archivo legal en nube.
+# [[r2_buckets]]
+# binding = "FILES"
+
+# Rate limiting administrado por Cloudflare puede activarse sin cambiar la API.
+# [[ratelimits]]
+# name = "RATE_LIMITER"
+# namespace_id = "1001"
+# simple = { limit = 60, period = 60 }

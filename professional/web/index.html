@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es" data-theme="system">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="Pedidos Pro Platform: compras, recepción, facturas y control de proveedores.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css">
+  <title>Pedidos Pro Platform</title>
+</head>
+<body>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+
+  <section class="auth-screen" id="authScreen">
+    <div class="auth-brand">
+      <div class="brand-mark" aria-hidden="true">P</div>
+      <div><strong>Pedidos Pro</strong><span>PLATFORM</span></div>
+    </div>
+    <div class="auth-copy">
+      <span class="eyebrow">COMPRAS SIN PÉRDIDA DE CONTROL</span>
+      <h1>Del pedido a la factura, con trazabilidad real.</h1>
+      <p>Gestiona proveedores, aprobaciones, recepción y diferencias desde una aplicación rápida, instalable y preparada para crecer.</p>
+      <div class="auth-points">
+        <span>Multiempresa y multilocal</span>
+        <span>Sesiones revocables</span>
+        <span>Operación offline</span>
+        <span>Facturas con IA</span>
+      </div>
+    </div>
+    <div class="auth-card glass">
+      <div class="auth-card-head">
+        <span class="status-dot"></span>
+        <span>Acceso seguro</span>
+      </div>
+      <form id="loginForm" class="stack">
+        <label class="field"><span>Correo</span><input id="loginEmail" name="email" type="email" autocomplete="username" required placeholder="nombre@empresa.cl"></label>
+        <label class="field"><span>Contraseña</span><input id="loginPassword" name="password" type="password" autocomplete="current-password" required minlength="10" placeholder="••••••••••"></label>
+        <label class="field"><span>Empresa <small>opcional</small></span><input id="loginOrg" name="organizationSlug" autocomplete="organization" placeholder="mi-empresa"></label>
+        <button class="btn primary wide" type="submit"><span>Ingresar</span><span aria-hidden="true">→</span></button>
+      </form>
+      <button class="link-btn" id="openBootstrap" type="button">Primera instalación</button>
+      <div class="auth-note">Las cuentas no vencen automáticamente. Un administrador puede revocar usuarios o sesiones cuando sea necesario.</div>
+    </div>
+  </section>
+
+  <div class="app-shell hidden" id="appShell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark small">P</div>
+        <div><strong>Pedidos Pro</strong><span>PLATFORM</span></div>
+      </div>
+      <div class="workspace-card">
+        <span class="workspace-avatar" id="workspaceAvatar">PP</span>
+        <div><strong id="workspaceName">Empresa</strong><small id="workspacePlan">Plan gratuito</small></div>
+        <span class="chevron">⌄</span>
+      </div>
+      <nav class="side-nav" aria-label="Navegación principal">
+        <button class="nav-item active" data-view="dashboard"><span class="nav-icon">⌂</span><span>Resumen</span></button>
+        <button class="nav-item" data-view="orders"><span class="nav-icon">▤</span><span>Pedidos</span><b class="nav-count" id="pendingCount">0</b></button>
+        <button class="nav-item" data-view="invoices"><span class="nav-icon">▧</span><span>Facturas</span></button>
+        <button class="nav-item" data-view="catalog"><span class="nav-icon">◫</span><span>Catálogo</span></button>
+        <button class="nav-item" data-view="suppliers"><span class="nav-icon">◇</span><span>Proveedores</span></button>
+        <button class="nav-item admin-only" data-view="team"><span class="nav-icon">◎</span><span>Equipo</span></button>
+        <button class="nav-item admin-only" data-view="audit"><span class="nav-icon">◷</span><span>Auditoría</span></button>
+      </nav>
+      <div class="sidebar-spacer"></div>
+      <div class="free-plan-card">
+        <div><span class="plan-orbit"></span><strong>Plan gratuito</strong></div>
+        <p id="freeUsageText">Preparado para comenzar sin costo.</p>
+        <div class="usage-track"><i id="freeUsageBar"></i></div>
+      </div>
+      <nav class="side-nav lower">
+        <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>Configuración</span></button>
+        <button class="nav-item danger-text" id="logoutButton"><span class="nav-icon">↪</span><span>Cerrar sesión</span></button>
+      </nav>
+      <div class="user-mini">
+        <span class="user-avatar" id="userAvatar">BP</span>
+        <div><strong id="userName">Usuario</strong><small id="userRole">Rol</small></div>
+      </div>
+    </aside>
+
+    <header class="topbar">
+      <div class="mobile-brand"><div class="brand-mark tiny">P</div><strong>Pedidos Pro</strong></div>
+      <div class="page-heading"><span class="eyebrow" id="pageEyebrow">OPERACIÓN</span><h1 id="pageTitle">Resumen</h1></div>
+      <label class="global-search"><span>⌕</span><input id="globalSearch" placeholder="Buscar folio, producto o proveedor" autocomplete="off"><kbd>⌘ K</kbd></label>
+      <div class="top-actions">
+        <button class="sync-chip" id="syncChip"><i></i><span>Sincronizado</span></button>
+        <button class="icon-button" id="themeButton" aria-label="Cambiar apariencia">◐</button>
+        <button class="btn primary" id="primaryAction"><span>＋</span><span>Nuevo pedido</span></button>
+      </div>
+    </header>
+
+    <main class="content" id="mainContent" tabindex="-1"></main>
+
+    <nav class="bottom-nav" aria-label="Navegación móvil">
+      <button class="bottom-item active" data-view="dashboard"><span>⌂</span><small>Resumen</small></button>
+      <button class="bottom-item" data-view="orders"><span>▤</span><small>Pedidos</small></button>
+      <button class="bottom-create" id="mobileCreate" aria-label="Nuevo pedido">＋</button>
+      <button class="bottom-item" data-view="catalog"><span>◫</span><small>Catálogo</small></button>
+      <button class="bottom-item" data-view="suppliers"><span>◇</span><small>Proveedores</small></button>
+    </nav>
+  </div>
+
+  <dialog class="modal" id="modal">
+    <form method="dialog" class="modal-frame" id="modalFrame">
+      <header class="modal-head"><div><span class="eyebrow" id="modalEyebrow">PEDIDOS PRO</span><h2 id="modalTitle">Título</h2><p id="modalSubtitle"></p></div><button class="icon-button" value="cancel" aria-label="Cerrar">×</button></header>
+      <div class="modal-body" id="modalBody"></div>
+      <footer class="modal-foot" id="modalFoot"></footer>
+    </form>
+  </dialog>
+
+  <div class="command-menu hidden" id="commandMenu">
+    <div class="command-box glass"><label><span>⌕</span><input id="commandInput" placeholder="Ir a una sección o buscar..."></label><div id="commandResults"></div><small>Esc para cerrar · Enter para abrir</small></div>
+  </div>
+
+  <div class="toast-region" id="toastRegion" aria-live="polite"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
