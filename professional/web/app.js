@@ -29,7 +29,13 @@ if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catc
 
 async function initialize(){
   await updateSyncChip();
-  if(!state.token){showAuth();return}
+  if(!state.token){
+    $('#loginEmail').value='admin@pedidospro.local';
+    $('#loginOrg').value='pedidos-pro';
+    $('#openBootstrap').classList.add('hidden');
+    showAuth();
+    return;
+  }
   try{state.me=await api('/api/me');showApp();await navigate('dashboard');syncMutations()}catch(error){console.error(error);logoutLocal()}
 }
 initialize();
