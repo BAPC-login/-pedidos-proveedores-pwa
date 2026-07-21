@@ -12,20 +12,26 @@ jobs:
   inspect-authentication:
     runs-on: ubuntu-latest
     steps:
-      - name: Print live authentication state
+      - name: Print release 2026.07.21.8 authentication state
         shell: bash
         run: |
           set -u
           BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
-          selftest_code=$(curl --silent --show-error --max-time 60 --output /tmp/selftest.json --write-out '%{http_code}' \
-            -X POST "$BASE/api/platform-auth-selftest" || true)
-          invalid_code=$(curl --silent --show-error --max-time 60 --output /tmp/invalid.json --write-out '%{http_code}' \
-            -H 'Content-Type: application/json' \
-            --data '{"email":"admin@pedidospro.local","password":"contraseña-incorrecta","organizationSlug":"pedidos-pro"}' \
-            "$BASE/api/auth/login" || true)
-          echo "SELFTEST_HTTP=$selftest_code"
-          cat /tmp/selftest.json 2>/dev/null || true
-          echo
-          echo "INVALID_LOGIN_HTTP=$invalid_code"
-          cat /tmp/invalid.json 2>/dev/null || true
-          echo
+          for attempt in $(seq 1 18); do
+            selftest_code=$(curl --silent --show-error --max-time 60 --output /tmp/selftest.json --write-out '%{http_code}' \
+              -X POST "$BASE/api/platform-auth-selftest" || true)
+            invalid_code=$(curl --silent --show-error --max-time 60 --output /tmp/invalid.json --write-out '%{http_code}' \
+              -H 'Content-Type: application/json' \
+              --data '{"email":"admin@pedidospro.local","password":"contraseña-incorrecta","organizationSlug":"pedidos-pro"}' \
+              "$BASE/api/auth/login" || true)
+            echo "attempt=${attempt} selftest=${selftest_code} invalid_login=${invalid_code}"
+            cat /tmp/selftest.json 2>/dev/null || true
+            echo
+            cat /tmp/invalid.json 2>/dev/null || true
+            echo
+            if grep -q '"release":"2026.07.21.8"' /tmp/selftest.json 2>/dev/null; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
