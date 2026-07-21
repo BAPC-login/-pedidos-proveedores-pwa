@@ -21,7 +21,8 @@
       "/api/*",
       "/health",
       "/v1/*",
-      "/platform/health"
+      "/platform/health",
+      "/platform/diagnostics"
     ]
   },
   "vars": {
