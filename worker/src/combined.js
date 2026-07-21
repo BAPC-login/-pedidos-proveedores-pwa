@@ -2,6 +2,8 @@ import aiWorker from './index.js';
 import platformWorker from '../../professional/worker/src/index.js';
 import {ensureSchema} from '../../professional/worker/src/schema.js';
 
+const PLATFORM_RELEASE = '2026.07.21.4';
+
 function rewritePath(request, pathname) {
   const url = new URL(request.url);
   url.pathname = pathname;
@@ -39,6 +41,7 @@ export default {
         const tableResult = await env.DB.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name").all();
         return diagnosticResponse({
           ok: true,
+          release: PLATFORM_RELEASE,
           databaseBinding: Boolean(env.DB),
           schema,
           tables: (tableResult.results || []).map(row => row.name)
@@ -46,6 +49,7 @@ export default {
       } catch (error) {
         return diagnosticResponse({
           ok: false,
+          release: PLATFORM_RELEASE,
           databaseBinding: Boolean(env.DB),
           name: String(error?.name || 'Error'),
           error: String(error?.message || error),
