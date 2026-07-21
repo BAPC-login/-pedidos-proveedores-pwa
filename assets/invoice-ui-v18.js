@@ -5,7 +5,7 @@
 
   const State=root.PedidosState,Orders=root.PedidosOrders,DB=root.PedidosDB,Invoice=root.PedidosInvoice,Core=root.PedidosCore,PDF=root.PedidosPDF;
   const $=selector=>document.querySelector(selector),$$=selector=>[...document.querySelectorAll(selector)];
-  const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[char]));
   let busy=false,clock=null,started=0,decoratePending=false;
 
   function toast(message){const node=$('#toast');if(!node)return;node.textContent=message;node.classList.add('show');clearTimeout(node._v20);node._v20=setTimeout(()=>node.classList.remove('show'),4400)}
@@ -24,7 +24,7 @@
     if($('#invoiceAiPhase'))$('#invoiceAiPhase').textContent=phase==='retrying'?'REINTENTO AUTOMÁTICO':phase==='validating'?'VALIDACIÓN FINAL':phase==='done'?'LISTO':'GEMINI + PEDIDO PDF';
     const active=safe<18?0:safe<52?1:safe<88?2:3;$$('[data-step]').forEach((node,index)=>{node.classList.toggle('active',index===active);node.classList.toggle('done',index<active||safe>=100)});const inline=$('#invoiceProgress');if(inline)inline.innerHTML='';
   }
-  function loaderError(message){const overlay=ensureLoader();overlay.classList.remove('hidden','complete','retrying');overlay.classList.add('error');document.body.classList.add('invoice-ai-busy');$('#invoiceAiRing')?.style.setProperty('--invoice-progress','360deg');if($('#invoiceAiPercent'))$('#invoiceAiPercent'].textContent='!';if($('#invoiceAiPhase'))$('#invoiceAiPhase').textContent='REVISIÓN NECESARIA';if($('#invoiceAiTitle'))$('#invoiceAiTitle').textContent='No se pudo completar la lectura';if($('#invoiceAiDetail'))$('#invoiceAiDetail').textContent=String(message||'Error desconocido').slice(0,240)}
+  function loaderError(message){const overlay=ensureLoader();overlay.classList.remove('hidden','complete','retrying');overlay.classList.add('error');document.body.classList.add('invoice-ai-busy');$('#invoiceAiRing')?.style.setProperty('--invoice-progress','360deg');if($('#invoiceAiPercent'))$('#invoiceAiPercent').textContent='!';if($('#invoiceAiPhase'))$('#invoiceAiPhase').textContent='REVISIÓN NECESARIA';if($('#invoiceAiTitle'))$('#invoiceAiTitle').textContent='No se pudo completar la lectura';if($('#invoiceAiDetail'))$('#invoiceAiDetail').textContent=String(message||'Error desconocido').slice(0,240)}
   function hideLoader(delay=1000){setTimeout(()=>{const overlay=$('#invoiceAiOverlay');overlay?.classList.add('hidden');overlay?.classList.remove('complete','retrying','error');document.body.classList.remove('invoice-ai-busy');clearInterval(clock);clock=null},delay)}
 
   function currentContext(){const area=$('#receptionContent');if(!area)return null;const provider=area.querySelector('[data-reception-provider].active')||area.querySelector('[data-reception-provider]');const folio=area.querySelector(':scope > .card h3')?.textContent?.trim();return folio&&provider?{folio,providerId:provider.dataset.receptionProvider}:null}
