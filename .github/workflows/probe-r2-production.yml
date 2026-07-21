@@ -1,0 +1,30 @@
+name: Probe R2 production
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/probe-r2-production.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print live production state
+        shell: bash
+        run: |
+          set -u
+          BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
+          for attempt in $(seq 1 12); do
+            app_code=$(curl --silent --show-error --max-time 30 --output /tmp/app.html --write-out '%{http_code}' "$BASE/" || true)
+            ai_code=$(curl --silent --show-error --max-time 30 --output /tmp/ai.json --write-out '%{http_code}' "$BASE/health" || true)
+            platform_code=$(curl --silent --show-error --max-time 30 --output /tmp/platform.json --write-out '%{http_code}' "$BASE/platform/health" || true)
+            echo "attempt=${attempt} app=${app_code} ai=${ai_code} platform=${platform_code}"
+            cat /tmp/platform.json 2>/dev/null || true
+            echo
+            if grep -q '"schemaVersion":"7"' /tmp/platform.json 2>/dev/null && grep -q '"storageConfigured":true' /tmp/platform.json 2>/dev/null; then exit 0; fi
+            sleep 10
+          done
+          exit 0
