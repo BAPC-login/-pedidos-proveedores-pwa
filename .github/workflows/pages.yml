@@ -29,6 +29,8 @@ jobs:
           - preflight-v17.js
           - invoice-v12.js
           - ai-client-v17.js
+          - assets/invoice-ui-v18.js
+          - worker/src/index.js
           - pdf-v12.js
           - pdf-layout-v17.js
           - runtime-v14.js
