@@ -9,36 +9,32 @@ permissions:
   contents: read
 
 jobs:
-  validate-combined:
+  verify-live:
     runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Bundle and inspect combined Worker
+      - name: Verify PWA, Gemini and D1
         shell: bash
         run: |
           set -euo pipefail
-          gh api -H 'Accept: application/vnd.github+json' \
-            "/repos/BAPC-login/-pedidos-proveedores-pwa/tarball/${{ github.sha }}" \
-            > /tmp/repo.tar.gz
-          mkdir /tmp/repo
-          tar -xzf /tmp/repo.tar.gz -C /tmp/repo --strip-components=1
-          cd /tmp/repo/worker
-          npm install --no-audit --no-fund --silent
-          npx wrangler deploy --dry-run --outdir /tmp/combined-worker > /tmp/dryrun.log 2>&1
-          echo "BUNDLE_OK=true"
-          tail -20 /tmp/dryrun.log
+          BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
 
-          probe() {
-            label="$1"
-            url="$2"
-            code=$(curl --silent --show-error --location --max-time 30 \
-              --output "/tmp/${label}.body" --write-out '%{http_code}' "$url" || echo CURL_ERROR)
-            echo "${label}_HTTP=${code}"
-            printf '%s_BODY=' "$label"
-            head -c 1600 "/tmp/${label}.body" 2>/dev/null || true
-            echo
-          }
-          probe APP "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/"
-          probe AI_HEALTH "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/health"
-          probe PLATFORM_HEALTH "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/platform/health"
+          app_code=$(curl --silent --show-error --max-time 30 --output /tmp/app.html --write-out '%{http_code}' "$BASE/")
+          ai_code=$(curl --silent --show-error --max-time 30 --output /tmp/ai.json --write-out '%{http_code}' "$BASE/health")
+          platform_code=$(curl --silent --show-error --max-time 30 --output /tmp/platform.json --write-out '%{http_code}' "$BASE/platform/health")
+
+          echo "APP_HTTP=$app_code"
+          echo "AI_HTTP=$ai_code"
+          cat /tmp/ai.json
+          echo
+          echo "PLATFORM_HTTP=$platform_code"
+          cat /tmp/platform.json
+          echo
+
+          test "$app_code" = "200"
+          grep -q 'Pedidos Pro Platform' /tmp/app.html
+          test "$ai_code" = "200"
+          grep -q '"service":"pedidos-pro-ai"' /tmp/ai.json
+          grep -q '"geminiConfigured":true' /tmp/ai.json
+          test "$platform_code" = "200"
+          grep -q '"service":"pedidos-pro-platform"' /tmp/platform.json
+          grep -q '"databaseInitialized":true' /tmp/platform.json
