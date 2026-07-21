@@ -34,6 +34,7 @@ jobs:
           me_status=""
           login_status=""
           bootstrap_status=""
+          selftest_status=""
 
           for attempt in $(seq 1 36); do
             echo "Production verification attempt ${attempt}/36"
@@ -41,14 +42,16 @@ jobs:
             ai_health=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/health" 2>/dev/null || true)
             platform_health=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/platform/health" 2>/dev/null || true)
             app_js=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app.js" 2>/dev/null || true)
+            app_actions=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-actions.js" 2>/dev/null || true)
 
             if echo "$app" | grep -q 'Pedidos Pro Platform' \
               && echo "$app_js" | grep -q 'admin@pedidospro.local' \
+              && echo "$app_actions" | grep -q 'Cambiar contraseña' \
               && echo "$ai_health" | grep -q '"service":"pedidos-pro-ai"' \
               && echo "$ai_health" | grep -q '"geminiConfigured":true' \
               && echo "$platform_health" | grep -q '"service":"pedidos-pro-platform"' \
               && echo "$platform_health" | grep -q '"databaseInitialized":true' \
-              && echo "$platform_health" | grep -q '"schemaVersion":"5"'; then
+              && echo "$platform_health" | grep -q '"schemaVersion":"6"'; then
               app_ok="true"
               status="healthy"
               break
@@ -65,14 +68,16 @@ jobs:
             -H 'Content-Type: application/json' \
             --data '{"organizationName":"Unauthorized","locationName":"Unauthorized","displayName":"Unauthorized","email":"unauthorized@example.com","password":"unauthorized-password"}' \
             "$BASE_URL/api/bootstrap" || true)
+          selftest_status=$(curl --silent --show-error --max-time 20 --output /tmp/selftest.json --write-out '%{http_code}' \
+            -X POST "$BASE_URL/api/platform-auth-selftest" || true)
 
-          if [ "$me_status" != "401" ] || [ "$login_status" != "401" ] || [ "$bootstrap_status" != "403" ]; then
+          if [ "$me_status" != "401" ] || [ "$login_status" != "401" ] || [ "$bootstrap_status" != "403" ] || [ "$selftest_status" != "401" ]; then
             status="failed"
           fi
 
           mkdir -p deployment
           STATUS="$status" APP_OK="$app_ok" AI_HEALTH="$ai_health" PLATFORM_HEALTH="$platform_health" \
-          ME_STATUS="$me_status" LOGIN_STATUS="$login_status" BOOTSTRAP_STATUS="$bootstrap_status" python - <<'PY'
+          ME_STATUS="$me_status" LOGIN_STATUS="$login_status" BOOTSTRAP_STATUS="$bootstrap_status" SELFTEST_STATUS="$selftest_status" python - <<'PY'
           import datetime, json, os
           def load(name):
               raw = os.environ.get(name, '')
@@ -85,12 +90,14 @@ jobs:
               'application_shell': os.environ.get('APP_OK') == 'true',
               'checked_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
               'url': 'https://pedidos-pro-ai.botreservasmultilocal.workers.dev/',
+              'release': '2026.07.21.10',
               'ai_health': load('AI_HEALTH'),
               'platform_health': load('PLATFORM_HEALTH'),
               'security_checks': {
                   'unauthenticated_me_http': int(os.environ.get('ME_STATUS') or 0),
                   'invalid_login_http': int(os.environ.get('LOGIN_STATUS') or 0),
                   'bootstrap_without_token_http': int(os.environ.get('BOOTSTRAP_STATUS') or 0),
+                  'temporary_selftest_route_http': int(os.environ.get('SELFTEST_STATUS') or 0),
               },
           }
           with open('deployment/live-health.json', 'w', encoding='utf-8') as file:
