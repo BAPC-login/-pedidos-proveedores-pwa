@@ -1,0 +1,29 @@
+name: Validate current release
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/validate-current-release.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate professional platform
+        working-directory: professional
+        run: npm run verify
+      - name: Validate final worker sources
+        run: |
+          node --check professional/worker/src/storage.js
+          node --check professional/worker/src/index.js
+          node --check professional/web/app-views.js
+          node --check worker/src/combined.js
+      - name: Bundle exact Cloudflare worker
+        working-directory: worker
+        run: |
+          npm ci
+          npx wrangler deploy --dry-run --outdir ../deployment/current-release-bundle
