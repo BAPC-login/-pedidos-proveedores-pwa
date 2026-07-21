@@ -15,6 +15,7 @@ import {
   uuid
 } from '../core.js';
 import {writeAudit} from '../auth.js';
+import {linkExistingFile, recordSnapshot, storeFile} from '../storage.js';
 import {Buffer} from 'node:buffer';
 
 const FILE_CHUNK_BYTES = 128 * 1024;
@@ -63,7 +64,8 @@ export async function listInvoices(env, actor, url) {
     taxTotal: Number(invoice.tax_total || 0),
     grossTotal: Number(invoice.gross_total || 0),
     status: invoice.status,
-    createdAt: invoice.created_at
+    createdAt: invoice.created_at,
+    pdfFileId: invoice.pdf_file_id || null
   }));
 }
 
@@ -156,6 +158,11 @@ export async function createInvoice(request, env, actor) {
     `).bind(uuid(), actor.orgId, invoiceId, orderId, timestamp));
   }
   await env.DB.batch(statements);
+  if (body.sourceFileId) {
+    await env.DB.prepare('UPDATE invoices SET pdf_file_id = ?, updated_at = ? WHERE id = ? AND org_id = ?').bind(String(body.sourceFileId), nowIso(), invoiceId, actor.orgId).run();
+    await linkExistingFile(env, actor, {fileId: String(body.sourceFileId), entityType: 'invoice', entityId: invoiceId, documentKind: 'invoice_original', revision: 1, metadata: {invoiceNumber}});
+  }
+  await recordSnapshot(env, actor, {entityType: 'invoice', entityId: invoiceId, revision: 1, snapshot: {...body, id: invoiceId, supplierName: supplier.name}});
   await writeAudit(env, actor, request, 'invoice.create', 'invoice', invoiceId, {supplierId, invoiceNumber, lines: sourceLines.length, orderIds});
   return {id: invoiceId, supplierId, supplierName: supplier.name, invoiceNumber, invoiceDate, status: 'review', grossTotal: integer(totals.total, {min: 0}), lineCount: sourceLines.length};
 }
@@ -170,6 +177,8 @@ export async function analyzeInvoice(request, env, actor) {
   const file = form.get('file');
   if (!(file instanceof File)) throw new HttpError(400, 'Adjunta una factura', 'missing_file');
   if (file.size > 12 * 1024 * 1024) throw new HttpError(413, 'La factura supera 12 MB', 'file_too_large');
+  const sourceFile = await storeFile(env, actor, file, {purpose: 'invoice-source'});
+  await incrementUsage(env, actor.orgId, 'file_bytes', file.size);
   const upstream = new FormData();
   upstream.append('file', file, file.name || 'factura');
   const orderFile = form.get('orderFile');
@@ -188,7 +197,7 @@ export async function analyzeInvoice(request, env, actor) {
   if (!response.ok || !payload.ok) throw new HttpError(502, payload.error || 'La IA no pudo analizar la factura', 'ai_failed', payload.attempts || null);
   await incrementUsage(env, actor.orgId, 'ai_documents', 1);
   await writeAudit(env, actor, request, 'invoice.analyze', 'invoice', '', {model: payload.model, fileName: file.name});
-  return payload;
+  return {...payload, sourceFile};
 }
 
 function buildStorageKey(actor, purpose, fileName, backend) {

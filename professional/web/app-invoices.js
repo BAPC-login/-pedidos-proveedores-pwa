@@ -38,6 +38,7 @@ async function openInvoiceReview(analysis,supplierId,orderId=''){
         invoiceNumber:form.get('invoiceNumber'),invoiceDate:form.get('invoiceDate'),currency:'CLP',documentType:'33',
         totals:{net:Number(form.get('net')||0),vat:Number(form.get('vat')||0),additionalTax:Number(form.get('additionalTax')||0),total:Number(form.get('total')||0)},
         aiModel:analysis.model||'',
+        sourceFileId:analysis.sourceFile?.id||'',
         aiConfidence:invoice.matchSummary?.matched&&lines.length?invoice.matchSummary.matched/lines.length:0,
         lines:reviewedLines
       }});

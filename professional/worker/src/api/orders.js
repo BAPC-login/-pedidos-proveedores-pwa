@@ -20,6 +20,7 @@ import {
   uuid
 } from '../core.js';
 import {writeAudit} from '../auth.js';
+import {archiveOrderPdf} from '../storage.js';
 function rows(result) {
   return result?.results || [];
 }
@@ -240,6 +241,7 @@ export async function createOrder(request, env, actor) {
   await incrementUsage(env, actor.orgId, 'orders_created', 1);
   await writeAudit(env, actor, request, 'order.create', 'order', id, {folio, supplierId: supplier.id, items: items.length});
   const created = await getOrder(env, actor, id);
+  created.pdfDocument = await archiveOrderPdf(env, actor, created);
   if (idempotencyKey) {
     await env.DB.prepare(`INSERT OR IGNORE INTO idempotency_keys (org_id, idempotency_key, request_hash, status_code, response_json, created_at) VALUES (?, ?, '', 200, ?, ?)`) 
       .bind(actor.orgId, idempotencyKey, JSON.stringify(created), nowIso()).run();
@@ -272,7 +274,9 @@ export async function updateOrder(request, env, actor, orderId) {
     .bind(body.deliveryDate === undefined ? current.delivery_date : (body.deliveryDate || null), body.notes === undefined ? current.notes : optionalText(body.notes, {max: 2000}), grossTotal, nowIso(), orderId, actor.orgId));
   await env.DB.batch(statements);
   await writeAudit(env, actor, request, 'order.update', 'order', orderId, {revision: Number(current.revision || 1) + 1});
-  return await getOrder(env, actor, orderId);
+  const updated = await getOrder(env, actor, orderId);
+  updated.pdfDocument = await archiveOrderPdf(env, actor, updated);
+  return updated;
 }
 
 function transitionPermission(to) {
@@ -296,13 +300,15 @@ export async function transitionOrder(request, env, actor, orderId) {
   const sentAt = to === 'sent' ? timestamp : order.sent_at;
   const cancelledAt = to === 'cancelled' ? timestamp : order.cancelled_at;
   await env.DB.batch([
-    env.DB.prepare(`UPDATE orders SET status = ?, approved_by = ?, sent_at = ?, cancelled_at = ?, updated_at = ? WHERE id = ? AND org_id = ?`)
+    env.DB.prepare(`UPDATE orders SET status = ?, approved_by = ?, sent_at = ?, cancelled_at = ?, revision = revision + 1, updated_at = ? WHERE id = ? AND org_id = ?`)
       .bind(to, approvedBy, sentAt, cancelledAt, timestamp, orderId, actor.orgId),
     env.DB.prepare(`INSERT INTO order_events (id, org_id, order_id, actor_user_id, from_status, to_status, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`) 
       .bind(uuid(), actor.orgId, orderId, actor.userId, order.status, to, reason, timestamp)
   ]);
   await writeAudit(env, actor, request, 'order.transition', 'order', orderId, {from: order.status, to, reason});
-  return await getOrder(env, actor, orderId);
+  const transitioned = await getOrder(env, actor, orderId);
+  transitioned.pdfDocument = await archiveOrderPdf(env, actor, transitioned);
+  return transitioned;
 }
 
 export async function createReception(request, env, actor, orderId) {
@@ -338,10 +344,12 @@ export async function createReception(request, env, actor, orderId) {
     `).bind(accepted, rejected, timestamp, orderItem.id));
   }
   const nextStatus = complete ? 'received' : 'partially_received';
-  statements.push(env.DB.prepare('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?').bind(nextStatus, timestamp, orderId));
+  statements.push(env.DB.prepare('UPDATE orders SET status = ?, revision = revision + 1, updated_at = ? WHERE id = ?').bind(nextStatus, timestamp, orderId));
   statements.push(env.DB.prepare(`INSERT INTO order_events (id, org_id, order_id, actor_user_id, from_status, to_status, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`) 
     .bind(uuid(), actor.orgId, orderId, actor.userId, order.status, nextStatus, 'Recepción registrada', timestamp));
   await env.DB.batch(statements);
   await writeAudit(env, actor, request, 'reception.create', 'reception', receptionId, {orderId, status: nextStatus});
-  return {id: receptionId, orderId, status: 'completed', orderStatus: nextStatus};
+  const receivedOrder = await getOrder(env, actor, orderId);
+  const pdfDocument = await archiveOrderPdf(env, actor, receivedOrder);
+  return {id: receptionId, orderId, status: 'completed', orderStatus: nextStatus, pdfDocument};
 }
