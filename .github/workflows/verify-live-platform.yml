@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - 'professional/**'
-      - 'wrangler.jsonc'
+      - 'worker/**'
       - '.github/workflows/verify-live-platform.yml'
   workflow_dispatch:
 
@@ -21,57 +21,86 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Wait for Cloudflare deployment and verify endpoints
+      - name: Wait for Cloudflare and verify production
         id: verify
         shell: bash
         run: |
           set -u
-          HEALTH_URL="https://pedidos-pro-platform.botreservasmultilocal.workers.dev/health"
-          APP_URL="https://pedidos-pro-platform.botreservasmultilocal.workers.dev/"
+          BASE_URL="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
           status="failed"
-          response=""
-          shell_ok="false"
+          app_ok="false"
+          ai_health=""
+          platform_health=""
+          me_status=""
+          login_status=""
+          bootstrap_status=""
 
           for attempt in $(seq 1 36); do
-            echo "Health check attempt ${attempt}/36"
-            response=$(curl --fail --silent --show-error --max-time 20 "$HEALTH_URL" 2>/dev/null || true)
-            if echo "$response" | grep -q '"ok":true' \
-              && echo "$response" | grep -q '"databaseInitialized":true' \
-              && echo "$response" | grep -q '"service":"pedidos-pro-platform"'; then
+            echo "Production verification attempt ${attempt}/36"
+            app=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/" 2>/dev/null || true)
+            ai_health=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/health" 2>/dev/null || true)
+            platform_health=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/platform/health" 2>/dev/null || true)
+            app_js=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app.js" 2>/dev/null || true)
+
+            if echo "$app" | grep -q 'Pedidos Pro Platform' \
+              && echo "$app_js" | grep -q 'admin@pedidospro.local' \
+              && echo "$ai_health" | grep -q '"service":"pedidos-pro-ai"' \
+              && echo "$ai_health" | grep -q '"geminiConfigured":true' \
+              && echo "$platform_health" | grep -q '"service":"pedidos-pro-platform"' \
+              && echo "$platform_health" | grep -q '"databaseInitialized":true' \
+              && echo "$platform_health" | grep -q '"schemaVersion":"5"'; then
+              app_ok="true"
               status="healthy"
               break
             fi
             sleep 10
           done
 
-          if curl --fail --silent --show-error --max-time 20 "$APP_URL" | grep -q 'Pedidos Pro Platform'; then
-            shell_ok="true"
-          else
+          me_status=$(curl --silent --show-error --max-time 20 --output /tmp/me.json --write-out '%{http_code}' "$BASE_URL/api/me" || true)
+          login_status=$(curl --silent --show-error --max-time 20 --output /tmp/login.json --write-out '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            --data '{"email":"admin@pedidospro.local","password":"contraseña-incorrecta","organizationSlug":"pedidos-pro"}' \
+            "$BASE_URL/api/auth/login" || true)
+          bootstrap_status=$(curl --silent --show-error --max-time 20 --output /tmp/bootstrap.json --write-out '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            --data '{"organizationName":"Unauthorized","locationName":"Unauthorized","displayName":"Unauthorized","email":"unauthorized@example.com","password":"unauthorized-password"}' \
+            "$BASE_URL/api/bootstrap" || true)
+
+          if [ "$me_status" != "401" ] || [ "$login_status" != "401" ] || [ "$bootstrap_status" != "403" ]; then
             status="failed"
           fi
 
           mkdir -p deployment
-          STATUS="$status" RESPONSE="$response" SHELL_OK="$shell_ok" python - <<'PY'
+          STATUS="$status" APP_OK="$app_ok" AI_HEALTH="$ai_health" PLATFORM_HEALTH="$platform_health" \
+          ME_STATUS="$me_status" LOGIN_STATUS="$login_status" BOOTSTRAP_STATUS="$bootstrap_status" python - <<'PY'
           import datetime, json, os
-          raw = os.environ.get('RESPONSE', '')
-          try:
-              health = json.loads(raw) if raw else None
-          except json.JSONDecodeError:
-              health = {'raw': raw[:1000]}
+          def load(name):
+              raw = os.environ.get(name, '')
+              try:
+                  return json.loads(raw) if raw else None
+              except json.JSONDecodeError:
+                  return {'raw': raw[:1000]}
           payload = {
               'status': os.environ.get('STATUS', 'failed'),
-              'application_shell': os.environ.get('SHELL_OK') == 'true',
+              'application_shell': os.environ.get('APP_OK') == 'true',
               'checked_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-              'url': 'https://pedidos-pro-platform.botreservasmultilocal.workers.dev/',
-              'health': health,
+              'url': 'https://pedidos-pro-ai.botreservasmultilocal.workers.dev/',
+              'ai_health': load('AI_HEALTH'),
+              'platform_health': load('PLATFORM_HEALTH'),
+              'security_checks': {
+                  'unauthenticated_me_http': int(os.environ.get('ME_STATUS') or 0),
+                  'invalid_login_http': int(os.environ.get('LOGIN_STATUS') or 0),
+                  'bootstrap_without_token_http': int(os.environ.get('BOOTSTRAP_STATUS') or 0),
+              },
           }
           with open('deployment/live-health.json', 'w', encoding='utf-8') as file:
               json.dump(payload, file, ensure_ascii=False, indent=2)
               file.write('\n')
           PY
 
+          cat deployment/live-health.json
           if [ "$status" != "healthy" ]; then
-            echo "Platform did not become healthy within six minutes"
+            echo "Production verification failed"
             exit 1
           fi
       - name: Publish health verification result
