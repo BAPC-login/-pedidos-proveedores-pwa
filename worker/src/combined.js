@@ -1,6 +1,8 @@
 import aiWorker from './index.js';
 import platformWorker from '../../professional/worker/src/index.js';
 
+const PLATFORM_RELEASE = '2026.07.21.6';
+
 function rewritePath(request, pathname) {
   const url = new URL(request.url);
   url.pathname = pathname;
@@ -9,6 +11,16 @@ function rewritePath(request, pathname) {
 
 function isAiRoute(pathname) {
   return pathname === '/health' || pathname.startsWith('/v1/');
+}
+
+function withPlatformRelease(response) {
+  const headers = new Headers(response.headers);
+  headers.set('X-Pedidos-Pro-Release', PLATFORM_RELEASE);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
 }
 
 export default {
@@ -22,10 +34,10 @@ export default {
 
     // Independent health endpoint for the professional platform and D1.
     if (url.pathname === '/platform/health') {
-      return platformWorker.fetch(rewritePath(request, '/health'), env, ctx);
+      return withPlatformRelease(await platformWorker.fetch(rewritePath(request, '/health'), env, ctx));
     }
 
     // Pedidos Pro Platform owns /api/* and the application shell/assets.
-    return platformWorker.fetch(request, env, ctx);
+    return withPlatformRelease(await platformWorker.fetch(request, env, ctx));
   }
 };
