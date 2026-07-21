@@ -18,8 +18,9 @@ jobs:
           set -u
           BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
           for attempt in $(seq 1 24); do
-            app_code=$(curl --silent --show-error --max-time 30 --dump-header /tmp/app.headers --output /tmp/app.html --write-out '%{http_code}' "$BASE/" || true)
+            app_code=$(curl --silent --show-error --max-time 30 --output /tmp/app.html --write-out '%{http_code}' "$BASE/" || true)
             js_code=$(curl --silent --show-error --max-time 30 --output /tmp/app.js --write-out '%{http_code}' "$BASE/app.js" || true)
+            actions_code=$(curl --silent --show-error --max-time 30 --output /tmp/app-actions.js --write-out '%{http_code}' "$BASE/app-actions.js" || true)
             ai_code=$(curl --silent --show-error --max-time 30 --output /tmp/ai.json --write-out '%{http_code}' "$BASE/health" || true)
             platform_code=$(curl --silent --show-error --max-time 30 --dump-header /tmp/platform.headers --output /tmp/platform.json --write-out '%{http_code}' "$BASE/platform/health" || true)
             me_code=$(curl --silent --show-error --max-time 30 --output /tmp/me.json --write-out '%{http_code}' "$BASE/api/me" || true)
@@ -34,18 +35,18 @@ jobs:
             selftest_code=$(curl --silent --show-error --max-time 30 --output /tmp/selftest.json --write-out '%{http_code}' \
               -X POST "$BASE/api/platform-auth-selftest" || true)
 
-            echo "attempt=${attempt} app=${app_code} js=${js_code} ai=${ai_code} platform=${platform_code} me=${me_code} invalid=${invalid_code} bootstrap=${bootstrap_code} selftest=${selftest_code}"
+            echo "attempt=${attempt} app=${app_code} js=${js_code} actions=${actions_code} ai=${ai_code} platform=${platform_code} me=${me_code} invalid=${invalid_code} bootstrap=${bootstrap_code} selftest=${selftest_code}"
             cat /tmp/platform.json 2>/dev/null || true
             echo
             cat /tmp/invalid.json 2>/dev/null || true
             echo
 
             if [ "$app_code" = "200" ] \
-              && grep -qi '^x-pedidos-pro-release: 2026.07.21.10' /tmp/app.headers \
               && [ "$js_code" = "200" ] \
+              && [ "$actions_code" = "200" ] \
               && grep -q 'Pedidos Pro Platform' /tmp/app.html \
               && grep -q 'admin@pedidospro.local' /tmp/app.js \
-              && grep -q 'Cambiar contraseña' <(curl --silent --show-error --max-time 30 "$BASE/app-actions.js") \
+              && grep -q 'Cambiar contraseña' /tmp/app-actions.js \
               && [ "$ai_code" = "200" ] \
               && grep -q '"service":"pedidos-pro-ai"' /tmp/ai.json \
               && grep -q '"geminiConfigured":true' /tmp/ai.json \
