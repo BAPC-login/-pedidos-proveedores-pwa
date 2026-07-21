@@ -1,6 +1,7 @@
-const VERSION = 'pedidos-pro-platform-v2-alpha1';
+const VERSION = 'pedidos-pro-platform-v2-alpha2';
 const SHELL = [
-  './', './index.html', './styles.css', './app.js', './app-core.js', './app-views.js', './app-actions.js', './manifest.webmanifest', './icon.svg'
+  './', './index.html', './styles.css', './app.js', './app-core.js', './app-views.js', './app-actions.js',
+  './app-modal.js', './app-order-detail.js', './app-invoices.js', './manifest.webmanifest', './icon.svg'
 ];
 
 self.addEventListener('install', event => {
