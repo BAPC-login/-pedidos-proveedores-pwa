@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pedidos-pro-ai",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-21",
+  "workers_dev": true,
+  "vars": {
+    "GEMINI_MODEL": "gemini-3.5-flash",
+    "ALLOWED_ORIGINS": "https://bapc-login.github.io,http://localhost:8788,http://127.0.0.1:8788"
+  },
+  "secrets": {
+    "required": ["GEMINI_API_KEY"]
+  }
+}
