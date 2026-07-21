@@ -1,68 +1,88 @@
-# Despliegue sin tocar la versión actual
+# Despliegue de Pedidos Pro Platform
 
-## 1. Rama
+## Arquitectura activa
 
-Todo el trabajo profesional vive en `agent/professional-saas-v1`. La rama `main` y la publicación `gh-pages` permanecen intactas.
+Cloudflare está conectado al directorio `worker/` del repositorio. El despliegue de producción utiliza:
 
-## 2. Crear servicios gratuitos
+- `worker/wrangler.jsonc`
+- `worker/src/combined.js`
+- `worker/src/index.js` para Gemini
+- `professional/worker/src/index.js` para la plataforma
+- `professional/web` como Static Assets
 
-Desde Cloudflare:
+URL pública:
 
-1. Crea D1 `pedidos-pro-platform`.
-2. Copia su `database_id` a `professional/wrangler.toml`.
-3. Mantén el Worker actual `pedidos-pro-ai` separado.
-4. Opcional: crea R2 `pedidos-pro-files` cuando quieras almacenar documentos en nube.
-
-## 3. Secrets
-
-```bash
-cd professional
-npx wrangler secret put BOOTSTRAP_ADMIN_TOKEN
-npx wrangler secret put IP_HASH_SALT
+```text
+https://pedidos-pro-ai.botreservasmultilocal.workers.dev/
 ```
 
-Usa valores largos, aleatorios y distintos. El token de bootstrap solo sirve para crear el primer propietario.
+Rutas:
 
-## 4. Base de datos
-
-```bash
-npx wrangler d1 migrations apply pedidos-pro-platform --remote --config wrangler.toml
+```text
+/                    PWA profesional
+/api/*               API de Pedidos Pro Platform
+/platform/health     Salud de plataforma y D1
+/health              Salud de Gemini
+/v1/*                 Análisis Gemini existente
 ```
 
-## 5. Publicar Worker y PWA
+## Publicación
+
+El proyecto conectado despliega automáticamente desde `main` cuando cambia el directorio `worker/`. Para un despliegue manual autenticado:
 
 ```bash
-npm run verify
+cd worker
+npm install
 npm run deploy
 ```
 
-La carpeta `web` se publica como Static Assets del mismo Worker. Esto elimina problemas de CORS entre la nueva PWA y su API.
+También puede ejecutarse desde `professional/` usando su `wrangler.toml` alineado con producción.
 
-## 6. Crear primera cuenta
+## D1
 
-Abre la URL del Worker, pulsa **Primera instalación** y completa:
+El binding `DB` es aprovisionado por Wrangler. La API ejecuta un esquema idempotente en el primer acceso y crea:
 
-- Token de bootstrap.
-- Empresa.
+- Organización inicial.
 - Local principal.
-- Nombre.
-- Correo.
-- Contraseña de al menos 10 caracteres.
+- Propietario inicial.
+- Categorías base.
+- Tablas de usuarios, sesiones, catálogo, pedidos, recepciones, facturas, auditoría e historial de precios.
 
-La sesión creada no tiene fecha de expiración. Puede revocarse desde Configuración o Equipo.
+No se requiere:
 
-## 7. Activar almacenamiento R2
+- Crear D1 manualmente.
+- Copiar un `database_id`.
+- Ejecutar migraciones remotas.
+- Exponer un token de bootstrap.
 
-Descomenta `[[r2_buckets]]` en `wrangler.toml`, crea el bucket y vuelve a desplegar. Sin R2, el núcleo de pedidos funciona, pero los documentos no deben considerarse archivados legalmente en la nube.
+## Validación
 
-## 8. Paso a producción comercial
+El workflow `.github/workflows/verify-live-platform.yml` comprueba:
 
-Antes de vender:
+- PWA y módulos JavaScript.
+- Gemini configurado.
+- D1 inicializada y versión de esquema.
+- Rechazo de rutas autenticadas sin sesión.
+- Rechazo de credenciales incorrectas.
+- Bootstrap cerrado.
+- Ausencia de rutas temporales de prueba.
 
-- Crear un ambiente `staging` y otro `production` con bases separadas.
-- Cambiar `ENVIRONMENT` a `production`.
-- Restringir `ALLOWED_ORIGINS`.
-- Activar Rate Limiting.
-- Incorporar R2 y copias de seguridad.
-- Añadir pruebas end-to-end con facturas reales anonimizadas.
+El último resultado se guarda en:
+
+```text
+deployment/live-health.json
+```
+
+## Archivos en nube
+
+R2 continúa desactivado. La aplicación opera normalmente, pero activar R2 es necesario antes de considerar PDF, XML o imágenes como archivo documental permanente.
+
+## Antes de comercializar
+
+- Activar R2 y política de respaldos.
+- Añadir rate limiting administrado.
+- Configurar un dominio comercial.
+- Separar staging y producción.
+- Añadir recuperación de contraseña por correo.
 - Revisar privacidad, términos y tratamiento de datos.
+- Ejecutar pruebas con facturas reales anonimizadas.
