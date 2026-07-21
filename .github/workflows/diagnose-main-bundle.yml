@@ -26,20 +26,12 @@ jobs:
             (cd professional && npm run verify)
             verify_status=$?
             echo "verify_status=$verify_status"
-            echo "--- npm ci ---"
-            (cd worker && npm ci)
-            npm_status=$?
-            echo "npm_status=$npm_status"
             echo "--- wrangler dry run ---"
-            if [ "$npm_status" -eq 0 ]; then
-              (cd worker && npx wrangler deploy --dry-run --outdir ../deployment/current-release-bundle)
-              wrangler_status=$?
-            else
-              wrangler_status=99
-            fi
+            (cd worker && npx --yes wrangler@4.67.0 deploy --dry-run --outdir ../deployment/current-release-bundle)
+            wrangler_status=$?
             echo "wrangler_status=$wrangler_status"
           } > deployment/bundle-diagnostic.txt 2>&1
-          tail -n 160 deployment/bundle-diagnostic.txt
+          tail -n 200 deployment/bundle-diagnostic.txt
       - name: Publish diagnostic
         if: always()
         run: |
