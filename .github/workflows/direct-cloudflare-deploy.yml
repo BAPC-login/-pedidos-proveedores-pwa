@@ -12,23 +12,16 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect target and existing Cloudflare Worker
+      - uses: actions/checkout@v4
+      - name: Locate connected Worker source
         shell: bash
         run: |
-          set -u
-          probe() {
-            label="$1"
-            url="$2"
-            code=$(curl --silent --show-error --location --max-time 30 \
-              --output "/tmp/${label}.body" --write-out '%{http_code}' "$url" || echo CURL_ERROR)
-            echo "${label}_HTTP=${code}"
-            printf '%s_BODY=' "$label"
-            head -c 1600 "/tmp/${label}.body" 2>/dev/null || true
-            echo
-          }
-          probe TARGET_ROOT "https://pedidos-pro-platform.botreservasmultilocal.workers.dev/"
-          probe TARGET_HEALTH "https://pedidos-pro-platform.botreservasmultilocal.workers.dev/health"
-          probe EXISTING_ROOT "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/"
-          probe EXISTING_HEALTH "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/health"
-          probe EXISTING_ANALYZE "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/v1/invoices/analyze"
-          exit 1
+          echo "### Repository files"
+          find . -maxdepth 4 -type f \
+            ! -path './.git/*' \
+            | sort \
+            | sed -n '1,500p'
+          echo "### Worker signatures"
+          grep -RIn --exclude-dir=.git --exclude='*.map' \
+            -E 'catalog-v22|gemini-3\.5-flash|v1/invoices/analyze|geminiConfigured' . \
+            | head -200 || true
