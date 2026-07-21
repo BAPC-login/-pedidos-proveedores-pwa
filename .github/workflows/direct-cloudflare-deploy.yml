@@ -12,7 +12,7 @@ jobs:
   diagnose-d1:
     runs-on: ubuntu-latest
     steps:
-      - name: Read live D1 diagnostic
+      - name: Read live D1 diagnostic after PRAGMA fix
         shell: bash
         run: |
           set -u
@@ -24,3 +24,4 @@ jobs:
           cat /tmp/diagnostic.json 2>/dev/null || true
           echo
           test "$code" = "200"
+          grep -q '"ok":true' /tmp/diagnostic.json
