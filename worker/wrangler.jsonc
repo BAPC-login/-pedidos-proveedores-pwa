@@ -7,8 +7,5 @@
   "vars": {
     "GEMINI_MODEL": "gemini-3.5-flash",
     "ALLOWED_ORIGINS": "https://bapc-login.github.io,http://localhost:8788,http://127.0.0.1:8788"
-  },
-  "secrets": {
-    "required": ["GEMINI_API_KEY"]
   }
 }
