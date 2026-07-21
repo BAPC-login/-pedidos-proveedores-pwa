@@ -1,9 +1,9 @@
 {
   "status": "healthy",
   "application_shell": true,
-  "checked_at": "2026-07-21T22:34:07.973248+00:00",
+  "checked_at": "2026-07-21T22:34:50.921Z",
   "url": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/",
-  "release": "2026.07.21.10",
+  "release": "2026.07.21.12",
   "ai_health": {
     "ok": true,
     "service": "pedidos-pro-ai",
@@ -20,13 +20,23 @@
     "schemaVersion": "6",
     "storageConfigured": false,
     "aiEndpoint": true,
-    "environment": "production",
-    "timestamp": "2026-07-21T22:34:06.027Z"
+    "environment": "production"
+  },
+  "authentication": {
+    "valid_disposable_login_http": 200,
+    "session_issued": true,
+    "user_resolved": true,
+    "temporary_user_removed": true,
+    "invalid_login_http": 401
   },
   "security_checks": {
     "unauthenticated_me_http": 401,
-    "invalid_login_http": 401,
     "bootstrap_without_token_http": 403,
-    "temporary_selftest_route_http": 401
+    "temporary_auth_selftest_route_http": 401,
+    "temporary_storage_selftest_route_http": 401
+  },
+  "binary_document_archive": {
+    "enabled": false,
+    "reason": "R2 binding was not activated by the connected Cloudflare account; the experimental binding was reverted to preserve the verified production deployment."
   }
 }
