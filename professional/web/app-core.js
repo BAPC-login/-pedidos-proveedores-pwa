@@ -8,7 +8,7 @@ const state = {
   token: localStorage.getItem('pp:token') || '',
   me: null,
   view: 'dashboard',
-  cache: {dashboard:null,orders:[],products:[],suppliers:[],categories:[],locations:[],users:[],audit:[]},
+  cache: {dashboard:null,orders:[],invoices:[],products:[],suppliers:[],categories:[],locations:[],users:[],audit:[],brands:[]},
   online: navigator.onLine,
   pending: []
 };
