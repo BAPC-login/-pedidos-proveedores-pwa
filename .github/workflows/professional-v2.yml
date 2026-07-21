@@ -1,0 +1,39 @@
+name: Validate Pedidos Pro Platform
+
+on:
+  push:
+    branches: [agent/professional-saas-v1]
+    paths:
+      - 'professional/**'
+      - '.github/workflows/professional-v2.yml'
+  pull_request:
+    paths:
+      - 'professional/**'
+      - '.github/workflows/professional-v2.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: professional-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify JavaScript and business rules
+        working-directory: professional
+        run: npm run verify
+      - name: Validate D1 migrations
+        working-directory: professional
+        run: |
+          sqlite3 /tmp/pedidos-pro-platform.db < migrations/0001_identity.sql
+          sqlite3 /tmp/pedidos-pro-platform.db < migrations/0002_procurement.sql
+          sqlite3 /tmp/pedidos-pro-platform.db < migrations/0003_invoices.sql
+          sqlite3 /tmp/pedidos-pro-platform.db "PRAGMA foreign_key_check;"
+          sqlite3 /tmp/pedidos-pro-platform.db ".tables"
