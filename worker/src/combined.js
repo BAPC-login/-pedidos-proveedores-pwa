@@ -2,7 +2,7 @@ import aiWorker from './index.js';
 import platformWorker from '../../professional/worker/src/index.js';
 import {ensureSchema} from '../../professional/worker/src/schema.js';
 
-const PLATFORM_RELEASE = '2026.07.21.4';
+const PLATFORM_RELEASE = '2026.07.21.5';
 
 function rewritePath(request, pathname) {
   const url = new URL(request.url);
@@ -38,12 +38,18 @@ export default {
     if (url.pathname === '/platform/diagnostics' || url.pathname === '/api/platform-diagnostics') {
       try {
         const schema = await ensureSchema(env);
-        const tableResult = await env.DB.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name").all();
+        const [tableResult, userCount, organizationCount] = await Promise.all([
+          env.DB.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name").all(),
+          env.DB.prepare('SELECT COUNT(*) AS total FROM users').first(),
+          env.DB.prepare('SELECT COUNT(*) AS total FROM organizations').first()
+        ]);
         return diagnosticResponse({
           ok: true,
           release: PLATFORM_RELEASE,
           databaseBinding: Boolean(env.DB),
           schema,
+          users: Number(userCount?.total || 0),
+          organizations: Number(organizationCount?.total || 0),
           tables: (tableResult.results || []).map(row => row.name)
         });
       } catch (error) {
