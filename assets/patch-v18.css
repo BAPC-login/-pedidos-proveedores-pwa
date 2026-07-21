@@ -1,4 +1,4 @@
-/* Pedidos Pro v18 · recepción de facturas */
+/* Pedidos Pro v19 · recepción y cotejo de facturas */
 .invoice-row-v18{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:start;padding:16px 0;min-width:0}
 .invoice-row-v18>div:first-child{min-width:0;overflow:hidden}
 .invoice-title-v18{display:block;max-width:100%;overflow-wrap:anywhere;word-break:break-word;line-height:1.2}
@@ -10,12 +10,17 @@
 .invoice-engine-chip.gemini{background:var(--success-soft);color:var(--success)}
 .invoice-engine-chip.ocr{background:var(--warning-soft);color:var(--warning)}
 .invoice-engine-chip.error{background:var(--danger-soft);color:var(--danger)}
-.invoice-error-v18{display:grid;gap:3px;margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--warning-soft);color:var(--warning);font-size:12px;line-height:1.35}
+.invoice-error-v18{display:grid;gap:3px;margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--warning-soft);color:var(--warning);font-size:12px;line-height:1.35;overflow:hidden}
 .invoice-error-v18.danger{background:var(--danger-soft);color:var(--danger)}
-.invoice-error-v18 b,.invoice-error-v18 span{display:block}
+.invoice-error-v18 b,.invoice-error-v18 span{display:block;overflow-wrap:anywhere}
 .invoice-progress-v18 small{display:block;margin-top:7px;color:var(--muted);font-size:11px;line-height:1.35}
-.invoice-summary-warning{display:grid;gap:4px;width:100%;min-width:0;text-align:left}
-.invoice-summary-warning b,.invoice-summary-warning span{display:block}
+.invoice-summary-v19{display:grid;gap:10px;width:100%;min-width:0;text-align:left}
+.invoice-summary-head{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
+.invoice-summary-v19>div:not(.invoice-summary-head):not(.invoice-summary-warning){display:grid;gap:2px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.invoice-summary-v19>div:last-child{border-bottom:0;padding-bottom:0}
+.invoice-summary-v19 small{color:var(--muted);font-size:12px;line-height:1.35}
+.invoice-summary-warning{display:grid;gap:4px;width:100%;min-width:0;text-align:left;padding:10px 12px;border-radius:12px;background:var(--warning-soft);color:var(--warning)}
+.invoice-summary-warning b,.invoice-summary-warning span{display:block;overflow-wrap:anywhere}
 #invoiceProgress:empty{display:none}
 #invoiceReviewDialog .invoice-review-row{min-width:0}
 #invoiceReviewDialog textarea{resize:vertical;min-height:64px}
@@ -32,4 +37,5 @@
   .invoice-actions-v18{grid-template-columns:minmax(0,.68fr) minmax(0,1.42fr) 46px;gap:7px}
   .invoice-actions-v18 .btn{font-size:12px;padding:9px 7px}
   .invoice-meta-v18{align-items:flex-start}
+  .invoice-summary-head{align-items:flex-start;flex-direction:column;gap:3px}
 }
