@@ -9,9 +9,6 @@
     "global_fetch_strictly_public"
   ],
   "workers_dev": true,
-  "build": {
-    "command": "node scripts/ensure-r2.mjs"
-  },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
@@ -37,12 +34,6 @@
   "d1_databases": [
     {
       "binding": "DB"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "FILES",
-      "bucket_name": "pedidos-pro-files"
     }
   ]
 }
