@@ -6,38 +6,40 @@ on:
       - '.github/workflows/direct-cloudflare-deploy.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  inspect-production:
+  patch-auth:
     runs-on: ubuntu-latest
     steps:
-      - name: Print current production state
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Switch authentication to native PBKDF2 module
         shell: bash
         run: |
-          set -u
-          BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
-          probe() {
-            label="$1"
-            method="$2"
-            path="$3"
-            body="${4:-}"
-            if [ "$method" = "POST" ]; then
-              code=$(curl --silent --show-error --max-time 30 --output "/tmp/${label}.body" --write-out '%{http_code}' \
-                -H 'Content-Type: application/json' --data "$body" "$BASE$path" || true)
-            else
-              code=$(curl --silent --show-error --max-time 30 --output "/tmp/${label}.body" --write-out '%{http_code}' "$BASE$path" || true)
-            fi
-            echo "${label}_HTTP=${code}"
-            printf '%s_BODY=' "$label"
-            head -c 1000 "/tmp/${label}.body" 2>/dev/null || true
-            echo
-          }
-          probe APP GET /
-          probe APP_JS GET /app.js
-          probe AI GET /health
-          probe PLATFORM GET /platform/health
-          probe ME GET /api/me
-          probe LOGIN POST /api/auth/login '{"email":"admin@pedidospro.local","password":"contraseña-incorrecta","organizationSlug":"pedidos-pro"}'
-          probe BOOTSTRAP POST /api/bootstrap '{"organizationName":"Blocked","locationName":"Blocked","displayName":"Blocked","email":"blocked@example.com","password":"blocked-password"}'
-          probe DIAGNOSTICS GET /api/platform-diagnostics
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('professional/worker/src/auth.js')
+          text = path.read_text(encoding='utf-8')
+          original = text
+          text = text.replace('  hashPassword,\n', '')
+          text = text.replace('  uuid,\n  verifyPassword\n', '  uuid\n')
+          marker = "} from './core.js';\n"
+          import_line = "import {hashPassword, verifyPassword} from './password.js';\n"
+          if import_line not in text:
+              text = text.replace(marker, marker + import_line, 1)
+          if text == original:
+              raise SystemExit('Authentication import was not changed')
+          path.write_text(text, encoding='utf-8')
+          PY
+          node --check professional/worker/src/auth.js
+          node --check professional/worker/src/password.js
+      - name: Commit authentication compatibility fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add professional/worker/src/auth.js professional/worker/src/password.js
+          git commit -m "fix(auth): use native PBKDF2 in Cloudflare Workers"
+          git push origin HEAD:main
