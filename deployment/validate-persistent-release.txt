@@ -1,0 +1,1 @@
+Validate the exact main bundle after the persistent archive fallback and release 2026.07.21.13.
