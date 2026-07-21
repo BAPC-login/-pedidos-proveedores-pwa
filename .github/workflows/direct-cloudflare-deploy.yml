@@ -19,7 +19,7 @@ jobs:
           BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
           code=$(curl --silent --show-error --max-time 30 \
             --output /tmp/diagnostic.json --write-out '%{http_code}' \
-            "$BASE/platform/diagnostics" || echo CURL_ERROR)
+            "$BASE/api/platform-diagnostics" || echo CURL_ERROR)
           echo "DIAGNOSTIC_HTTP=$code"
           cat /tmp/diagnostic.json 2>/dev/null || true
           echo
