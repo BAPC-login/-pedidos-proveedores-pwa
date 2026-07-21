@@ -2,7 +2,6 @@ import {
   HttpError,
   ROLES,
   assertMinimumRole,
-  hashPassword,
   monthKey,
   normalizeEmail,
   nowIso,
@@ -13,9 +12,9 @@ import {
   requireText,
   sha256,
   slugify,
-  uuid,
-  verifyPassword
+  uuid
 } from './core.js';
+import {hashPassword, verifyPassword} from './password.js';
 
 function publicUser(row) {
   return {
