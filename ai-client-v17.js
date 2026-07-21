@@ -27,13 +27,50 @@
     if(!settings().enabled){lastHealth={ok:false,mode:'ocr',message:'IA desactivada; se usará OCR local'};return lastHealth}
     if(!navigator.onLine){lastHealth={ok:false,mode:'ocr',message:'Sin conexión; se usará OCR local'};return lastHealth}
     try{
-      const response=await fetchWithTimeout(`${endpoint()}/health`,{headers:{Accept:'application/json'}},8000);
+      const response=await fetchWithTimeout(`${endpoint()}/health?ts=${Date.now()}`,{cache:'no-store',headers:{Accept:'application/json','Cache-Control':'no-cache'}},8000);
       if(!response.ok)throw new Error(`HTTP ${response.status}`);
       const data=await response.json();
       lastHealth={ok:!!data.ok&&!!data.geminiConfigured,mode:data.geminiConfigured?'gemini':'ocr',model:data.model||'',message:data.geminiConfigured?`Gemini conectado · ${data.model||'modelo activo'}`:'Backend activo, pero falta configurar GEMINI_API_KEY'};
     }catch(error){lastHealth={ok:false,mode:'ocr',message:'Gemini no disponible; OCR local seguirá funcionando',error:String(error.message||error)}}
     return lastHealth;
   }
+
+  function showToast(message){
+    const node=document.querySelector('#toast');if(!node)return;
+    node.textContent=message;node.classList.add('show');clearTimeout(node._aiTimer);node._aiTimer=setTimeout(()=>node.classList.remove('show'),3200);
+  }
+
+  async function testConnection(button=document.querySelector('#testAi')){
+    if(!button||button.dataset.busy==='1')return lastHealth;
+    const badge=document.querySelector('#aiStatusBadge'),text=document.querySelector('#aiStatusText');
+    const original=button.textContent||'Probar conexión';
+    button.dataset.busy='1';button.disabled=true;button.textContent='Probando…';
+    if(badge){badge.textContent='Verificando…';badge.classList.remove('online')}
+    if(text)text.textContent='Comprobando el Worker y la configuración segura de Gemini…';
+    try{
+      const status=await health();
+      const time=new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      if(badge){badge.textContent=status.ok?'IA conectada':'Sin conexión IA';badge.classList.toggle('online',status.ok)}
+      if(text)text.textContent=status.ok?`Worker disponible y clave configurada · ${status.model||'modelo activo'} · ${time}`:`${status.message} · ${time}`;
+      button.textContent=status.ok?'Verificado ✓':'Reintentar';
+      showToast(status.ok?'Conexión de Gemini verificada':'No se pudo verificar Gemini; seguirá disponible el OCR local');
+      return status;
+    }catch(error){
+      const message=String(error.message||error);
+      if(badge){badge.textContent='Error de conexión';badge.classList.remove('online')}
+      if(text)text.textContent=message;
+      button.textContent='Reintentar';showToast(`Error al probar Gemini: ${message}`);
+      return{ok:false,error:message};
+    }finally{
+      button.dataset.busy='0';button.disabled=false;
+      setTimeout(()=>{if(button.dataset.busy!=='1')button.textContent=original},1800);
+    }
+  }
+
+  document.addEventListener('click',event=>{
+    const button=event.target.closest?.('#testAi');if(!button)return;
+    event.preventDefault();event.stopImmediatePropagation();testConnection(button);
+  },true);
 
   function normalizeLine(line,products){
     const product=products.find(item=>String(item.productId)===String(line.productId));
@@ -66,7 +103,7 @@
     const form=new FormData();
     form.append('file',file,file.name||'factura');
     form.append('context',JSON.stringify({locale:'es-CL',currency:'CLP',products:(products||[]).map(item=>({productId:item.productId,description:item.description,unit:item.unit,orderedQty:Number(item.orderedQty)||0}))}));
-    const response=await fetchWithTimeout(`${endpoint()}/v1/invoices/analyze`,{method:'POST',body:form,headers:{'X-Pedidos-Client':'9.0.0'}},90000);
+    const response=await fetchWithTimeout(`${endpoint()}/v1/invoices/analyze`,{method:'POST',body:form,headers:{'X-Pedidos-Client':'9.0.1'}},90000);
     const payload=await response.json().catch(()=>({}));
     if(!response.ok||!payload.ok)throw new Error(payload.error||`Gemini respondió HTTP ${response.status}`);
     progress(onProgress,'Validando cantidades, impuestos y precios',88);
@@ -104,5 +141,5 @@
     Invoice.analyze=hybrid;
   }
 
-  root.PedidosAI={DEFAULT_ENDPOINT,settings,endpoint,health,analyzeWithGemini,get lastHealth(){return lastHealth}};
+  root.PedidosAI={DEFAULT_ENDPOINT,settings,endpoint,health,testConnection,analyzeWithGemini,get lastHealth(){return lastHealth}};
 })(globalThis);
