@@ -2,13 +2,17 @@ name: Validate Pedidos Pro Platform
 
 on:
   push:
-    branches: [agent/professional-saas-v1]
+    branches: [agent/professional-saas-v1, main]
     paths:
       - 'professional/**'
+      - 'wrangler.jsonc'
+      - 'wrangler.ai.jsonc'
       - '.github/workflows/professional-v2.yml'
   pull_request:
     paths:
       - 'professional/**'
+      - 'wrangler.jsonc'
+      - 'wrangler.ai.jsonc'
       - '.github/workflows/professional-v2.yml'
 
 permissions:
@@ -37,3 +41,5 @@ jobs:
           sqlite3 /tmp/pedidos-pro-platform.db < migrations/0003_invoices.sql
           sqlite3 /tmp/pedidos-pro-platform.db "PRAGMA foreign_key_check;"
           sqlite3 /tmp/pedidos-pro-platform.db ".tables"
+      - name: Bundle Worker without deploying
+        run: npx wrangler deploy --dry-run --outdir /tmp/pedidos-pro-platform-build
