@@ -176,7 +176,7 @@
   }
 
   if(Invoice?.analyze&&!Invoice.analyze.__aiV20){
-    const hybrid=async function(file,products,onProgress,context={})=>analyzeWithGemini(file,products,onProgress,context);
+    const hybrid=async (file,products,onProgress,context={})=>analyzeWithGemini(file,products,onProgress,context);
     hybrid.__aiV20=true;Invoice.analyze=hybrid;
   }
 
