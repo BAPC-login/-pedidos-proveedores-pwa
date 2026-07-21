@@ -1,5 +1,6 @@
-checked_at=2026-07-21T23:52:47Z
-commit=e1013cad189f3fd85df3c1ae42923d6e027e3962
+checked_at=2026-07-21T23:56:17Z
+commit=8a491bb38430e107559ac069241526782ce94762
+router_fix=fde81c393955c42b04cb2369901a456c26632ef0
 --- professional verify ---
 
 > pedidos-pro-platform@2.0.0-alpha.4 verify
@@ -19,33 +20,18 @@ verify_status=0
 
  ⛅️ wrangler 4.67.0 (update available 4.113.0)
 ──────────────────────────────────────────────
+Total Upload: 167.00 KiB / gzip: 38.31 KiB
+Your Worker has access to the following bindings:
+Binding                                                               Resource                  
+env.DB                                                                D1 Database               
+env.ASSETS                                                            Assets                    
+env.GEMINI_MODEL ("gemini-3.5-flash")                                 Environment Variable      
+env.ENVIRONMENT ("production")                                        Environment Variable      
+env.AI_ENDPOINT ("https://pedidos-pro-ai.botreservasmul...")          Environment Variable      
+env.ALLOWED_ORIGINS ("https://bapc-login.github.io,https://...")      Environment Variable      
+env.IP_HASH_SALT ("MTkZnnb3EIwXwE7sN3ts8GfIl6alJJ9fKyOJY...")         Environment Variable      
+
+--dry-run: exiting now.
 
 Cloudflare collects anonymous telemetry about your usage of Wrangler. Learn more at https://github.com/cloudflare/workers-sdk/tree/main/packages/wrangler/telemetry.md
-
-[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 3 errors:[0m
-
-  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mNo matching export in "../professional/worker/src/core.js" for import "applySecurityHeaders"[0m
-  
-      ../professional/worker/src/index.js:2:2:
-  [37m      2 │   [32mapplySecurityHeaders[37m,
-          ╵   [32m~~~~~~~~~~~~~~~~~~~~[0m
-  
-  
-  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mNo matching export in "../professional/worker/src/core.js" for import "preflight"[0m
-  
-      ../professional/worker/src/index.js:5:2:
-  [37m      5 │   [32mpreflight[37m,
-          ╵   [32m~~~~~~~~~[0m
-  
-  
-  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mNo matching export in "../professional/worker/src/auth.js" for import "changePassword"[0m
-  
-      ../professional/worker/src/index.js:12:2:
-  [37m      12 │   [32mchangePassword[37m,
-           ╵   [32m~~~~~~~~~~~~~~[0m
-  
-  
-
-
-🪵  Logs were written to "/home/runner/.config/.wrangler/logs/wrangler-2026-07-21_23-53-02_657.log"
-wrangler_status=1
+wrangler_status=0
