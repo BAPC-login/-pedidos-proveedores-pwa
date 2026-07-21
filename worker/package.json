@@ -1,13 +1,13 @@
 {
-  "name": "pedidos-pro-ai-worker",
+  "name": "pedidos-pro-cloudflare-deployer",
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check src/index.js",
+    "check": "node --check ../professional/worker/src/index.js",
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy --yes"
   },
   "devDependencies": {
-    "wrangler": "^4.27.0"
+    "wrangler": "^4.94.0"
   }
 }
