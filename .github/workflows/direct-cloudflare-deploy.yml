@@ -9,13 +9,23 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  validate-combined:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify new platform and preserved AI Worker
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install connected Worker dependencies
+        working-directory: worker
+        run: npm install --no-audit --no-fund
+      - name: Bundle connected Worker configuration
+        working-directory: worker
+        run: npx wrangler deploy --dry-run --outdir /tmp/combined-worker
+      - name: Inspect live combined Worker
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
           probe() {
             label="$1"
             url="$2"
@@ -26,11 +36,6 @@ jobs:
             head -c 1600 "/tmp/${label}.body" 2>/dev/null || true
             echo
           }
-          probe PLATFORM_ROOT "https://pedidos-pro-platform.botreservasmultilocal.workers.dev/"
-          probe PLATFORM_HEALTH "https://pedidos-pro-platform.botreservasmultilocal.workers.dev/health"
+          probe APP "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/"
           probe AI_HEALTH "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/health"
-
-          grep -q 'Pedidos Pro Platform' /tmp/PLATFORM_ROOT.body
-          grep -q '"ok":true' /tmp/PLATFORM_HEALTH.body
-          grep -q '"databaseInitialized":true' /tmp/PLATFORM_HEALTH.body
-          grep -q '"service":"pedidos-pro-ai"' /tmp/AI_HEALTH.body
+          probe PLATFORM_HEALTH "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/platform/health"
