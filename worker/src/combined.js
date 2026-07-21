@@ -2,7 +2,7 @@ import aiWorker from './index.js';
 import platformWorker from '../../professional/worker/src/index.js';
 import {hashPassword} from '../../professional/worker/src/password.js';
 
-const PLATFORM_RELEASE = '2026.07.21.8';
+const PLATFORM_RELEASE = '2026.07.21.9';
 const DEFAULT_ORG_ID = 'e73d2d6e-dae8-46c6-87df-43ae05ca81fa';
 
 function rewritePath(request, pathname) {
