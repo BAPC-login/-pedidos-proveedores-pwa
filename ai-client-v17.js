@@ -159,7 +159,7 @@
         const result=payload.invoice||{};
         const lines=(result.lines||[]).map(line=>normalizeLine(line,products||[])).filter(line=>line.sourceLine||line.productId||line.units>0||line.grossLineTotal>0);
         if(!lines.length)throw new Error('Gemini no detectó líneas de productos en la factura');
-        progress(onProgress,'Cotejo completado',100,`${result.matchSummary?.matched||0} coincidencias de ${lines.length} líneas.','done');
+        progress(onProgress,'Cotejo completado',100,`${result.matchSummary?.matched||0} coincidencias de ${lines.length} líneas.`,'done');
         lastHealth={ok:true,mode:'gemini',model:payload.model||'',message:`Gemini conectado · ${payload.model||'modelo activo'}`};
         return{
           text:result.rawText||JSON.stringify(result),engine:'gemini',model:payload.model||'',warnings:result.warnings||[],comparedOrderPdf:!!payload.comparedOrderPdf,matchSummary:result.matchSummary||{},
