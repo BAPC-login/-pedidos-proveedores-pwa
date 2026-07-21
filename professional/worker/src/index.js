@@ -2,12 +2,12 @@ import {
   APP_VERSION,
   HttpError,
   errorResponse,
-  json,
   ok,
   routeMatch,
   securityHeaders,
   corsHeaders
 } from './core.js';
+import {ensureSchema} from './schema.js';
 import {
   authenticate,
   bootstrap,
@@ -58,6 +58,7 @@ async function applyOptionalRateLimit(env, key) {
 }
 
 async function apiRouter(request, env) {
+  const schema = await ensureSchema(env);
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, '') || '/';
   const method = request.method.toUpperCase();
@@ -67,6 +68,8 @@ async function apiRouter(request, env) {
       service: 'pedidos-pro-platform',
       version: APP_VERSION,
       databaseConfigured: Boolean(env.DB),
+      databaseInitialized: true,
+      schemaVersion: schema.version,
       storageConfigured: Boolean(env.FILES),
       aiEndpoint: Boolean(env.AI_ENDPOINT),
       environment: env.ENVIRONMENT || 'development',
