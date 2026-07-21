@@ -66,6 +66,10 @@ async function openUser(){
   });
 }
 
+function openLocation(){
+  openModal({eyebrow:'LOCALES',title:'Nuevo local',subtitle:'El local quedará disponible para pedidos y asignación de usuarios.',body:`<div class="form-grid"><label class="field"><span>Nombre</span><input name="name" required></label><label class="field"><span>Código</span><input name="code" placeholder="MDR"></label><label class="field full"><span>Zona horaria</span><input name="timezone" value="America/Santiago"></label></div>`,submitLabel:'Crear local',onSubmit:async form=>{await api('/api/locations',{method:'POST',json:Object.fromEntries(form)});state.cache.locations=[];toast('Local creado');await navigate('settings')}});
+}
+
 function openBrand(){
   openModal({
     eyebrow:'OWNER',title:'Nueva marca',subtitle:'La marca tendrá su propio catálogo, proveedores, pedidos, facturas, locales y usuarios.',
@@ -119,6 +123,7 @@ function handleAction(action){
   if(action==='new-product')return openProduct();
   if(action==='new-user')return openUser();
   if(action==='new-brand')return openBrand();
+  if(action==='new-location')return openLocation();
   if(action==='analyze-invoice')return openInvoiceAnalysis();
   if(action==='change-password')return openChangePassword();
 }
