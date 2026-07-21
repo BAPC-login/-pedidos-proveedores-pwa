@@ -21,8 +21,7 @@
       "/api/*",
       "/health",
       "/v1/*",
-      "/platform/health",
-      "/platform/diagnostics"
+      "/platform/health"
     ]
   },
   "vars": {
@@ -30,7 +29,6 @@
     "ENVIRONMENT": "production",
     "AI_ENDPOINT": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev",
     "ALLOWED_ORIGINS": "https://bapc-login.github.io,https://pedidos-pro-ai.botreservasmultilocal.workers.dev,http://localhost:8787,http://127.0.0.1:8787,http://localhost:8788,http://127.0.0.1:8788",
-    "BOOTSTRAP_ADMIN_TOKEN": "pedidos-pro-inicializacion",
     "IP_HASH_SALT": "MTkZnnb3EIwXwE7sN3ts8GfIl6alJJ9fKyOJYk5i4dc"
   },
   "d1_databases": [
