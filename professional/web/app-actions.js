@@ -1,5 +1,7 @@
 import {$,$$,esc,money,date,state,api,toast,setBusy,queueMutation,showApp,initials,logoutLocal} from './app-core.js';
 import {navigate,metric,statusLabel} from './app-views.js';
+import {openOrderDetail as openProfessionalOrderDetail} from './app-order-detail.js';
+import {openInvoiceAnalysis} from './app-invoices.js';
 function openModal({eyebrow='PEDIDOS PRO',title,subtitle='',body,submitLabel='Guardar',onSubmit}){
   $('#modalEyebrow').textContent=eyebrow;$('#modalTitle').textContent=title;$('#modalSubtitle').textContent=subtitle;$('#modalBody').innerHTML=body;
   $('#modalFoot').innerHTML='<button class="btn" value="cancel">Cancelar</button><button class="btn primary" type="button" id="modalSubmit">'+esc(submitLabel)+'</button>';
@@ -44,7 +46,7 @@ async function linkSupplier(productId){
 function bindDynamic(){
   $$('[data-view-link]').forEach(node=>node.onclick=()=>navigate(node.dataset.viewLink));
   $$('[data-action]').forEach(node=>node.onclick=()=>handleAction(node.dataset.action));
-  $$('[data-order]').forEach(node=>node.onclick=()=>openOrderDetail(node.dataset.order));
+  $$('[data-order]').forEach(node=>node.onclick=()=>openProfessionalOrderDetail(node.dataset.order));
   $$('[data-link-supplier]').forEach(node=>node.onclick=()=>linkSupplier(node.dataset.linkSupplier));
   $$('[data-toggle-user]').forEach(node=>node.onclick=async()=>{const active=node.dataset.active==='1';await api(`/api/users/${node.dataset.toggleUser}`,{method:'PATCH',json:{active:!active,locationScope:['*']}});toast(active?'Usuario revocado':'Usuario reactivado');await navigate('team')});
   $$('[data-revoke-session]').forEach(node=>node.onclick=async()=>{await api(`/api/sessions/${node.dataset.revokeSession}/revoke`,{method:'POST',json:{}});toast('Sesión revocada');if(node.dataset.revokeSession===state.me?.sessionId)logoutLocal();else await navigate('settings')});
@@ -54,6 +56,7 @@ function handleAction(action){
   if(action==='new-supplier')return openSupplier();
   if(action==='new-product')return openProduct();
   if(action==='new-user')return openUser();
+  if(action==='analyze-invoice')return openInvoiceAnalysis();
 }
 
 export {openBootstrap,openOrder,handleAction,bindDynamic};
