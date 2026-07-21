@@ -1,0 +1,50 @@
+name: Diagnose main bundle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/diagnose-main-bundle.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Capture validation and Wrangler output
+        shell: bash
+        run: |
+          set +e
+          mkdir -p deployment
+          {
+            echo "checked_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "commit=$GITHUB_SHA"
+            echo "--- professional verify ---"
+            (cd professional && npm run verify)
+            verify_status=$?
+            echo "verify_status=$verify_status"
+            echo "--- npm ci ---"
+            (cd worker && npm ci)
+            npm_status=$?
+            echo "npm_status=$npm_status"
+            echo "--- wrangler dry run ---"
+            if [ "$npm_status" -eq 0 ]; then
+              (cd worker && npx wrangler deploy --dry-run --outdir ../deployment/current-release-bundle)
+              wrangler_status=$?
+            else
+              wrangler_status=99
+            fi
+            echo "wrangler_status=$wrangler_status"
+          } > deployment/bundle-diagnostic.txt 2>&1
+          tail -n 160 deployment/bundle-diagnostic.txt
+      - name: Publish diagnostic
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/bundle-diagnostic.txt
+          git commit -m "chore(ci): record main bundle diagnostic [skip ci]" || exit 0
+          git push
