@@ -1,30 +1,18 @@
-const VERSION='pedidos-pro-v16';
-const CORE_CACHE=`${VERSION}-core`;
-const RUNTIME_CACHE=`${VERSION}-runtime`;
-const CORE=[
-  './','./index.html','./styles-v12.css?v=16','./patch-v12.css?v=16','./manifest.webmanifest?v=16','./assets/icon.svg?v=16',
-  './seed-1.js?v=16','./seed-2.js?v=16','./seed-3.js?v=16','./seed-4.js?v=16',
-  './core-v12.js?v=16','./db-v12.js?v=16','./state-v12.js?v=16','./orders-v12.js?v=16','./preflight-v16.js?v=16',
-  './invoice-v12.js?v=16','./pdf-v12.js?v=16','./pdf-layout-v16.js?v=16','./app-v12.js?v=16','./hotfix-v16.js?v=16'
-];
-const OCR=[
-  './vendor/pdfjs/pdf.min.js','./vendor/pdfjs/pdf.worker.min.js','./vendor/tesseract/tesseract.min.js','./vendor/tesseract/worker.min.js','./vendor/tessdata/spa.traineddata.gz',
-  './vendor/tesseract-core/tesseract-core.wasm.js','./vendor/tesseract-core/tesseract-core.wasm','./vendor/tesseract-core/tesseract-core-simd.wasm.js','./vendor/tesseract-core/tesseract-core-simd.wasm','./vendor/tesseract-core/tesseract-core-lstm.wasm.js','./vendor/tesseract-core/tesseract-core-lstm.wasm','./vendor/tesseract-core/tesseract-core-simd-lstm.wasm.js','./vendor/tesseract-core/tesseract-core-simd-lstm.wasm'
-];
+const VERSION='pedidos-pro-v17';
+const CORE_CACHE=`${VERSION}-core`,RUNTIME_CACHE=`${VERSION}-runtime`;
+const CORE=['./','./index.html','./styles-v12.css?v=17','./patch-v17.css?v=17','./manifest.webmanifest?v=17','./assets/icon.svg?v=17','./seed-1.js?v=17','./seed-2.js?v=17','./seed-3.js?v=17','./seed-4.js?v=17','./core-v12.js?v=17','./db-v12.js?v=17','./state-v12.js?v=17','./orders-v12.js?v=17','./preflight-v17.js?v=17','./invoice-v12.js?v=17','./ai-client-v17.js?v=17','./pdf-v12.js?v=17','./pdf-layout-v17.js?v=17','./app-v12.js?v=17','./professional-v17.js?v=17'];
+const OCR=['./vendor/pdfjs/pdf.min.js','./vendor/pdfjs/pdf.worker.min.js','./vendor/tesseract/tesseract.min.js','./vendor/tesseract/worker.min.js','./vendor/tessdata/spa.traineddata.gz','./vendor/tesseract-core/tesseract-core.wasm.js','./vendor/tesseract-core/tesseract-core.wasm','./vendor/tesseract-core/tesseract-core-simd.wasm.js','./vendor/tesseract-core/tesseract-core-simd.wasm','./vendor/tesseract-core/tesseract-core-lstm.wasm.js','./vendor/tesseract-core/tesseract-core-lstm.wasm','./vendor/tesseract-core/tesseract-core-simd-lstm.wasm.js','./vendor/tesseract-core/tesseract-core-simd-lstm.wasm'];
 const cacheOcr=()=>caches.open(RUNTIME_CACHE).then(cache=>Promise.allSettled(OCR.map(asset=>cache.add(asset))));
 self.addEventListener('install',event=>event.waitUntil(caches.open(CORE_CACHE).then(cache=>cache.addAll(CORE)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>!key.startsWith(VERSION)).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('message',event=>{if(event.data?.type==='SKIP_WAITING')self.skipWaiting();if(event.data?.type==='CACHE_OCR')event.waitUntil(cacheOcr())});
 self.addEventListener('fetch',event=>{
-  if(event.request.method!=='GET')return;
-  const url=new URL(event.request.url);
+  if(event.request.method!=='GET')return;const url=new URL(event.request.url);
   if(event.request.mode==='navigate'){
-    event.respondWith(fetch(event.request).then(response=>{if(response.ok){const copy=response.clone();caches.open(CORE_CACHE).then(cache=>cache.put('./index.html',copy))}return response}).catch(()=>caches.match('./index.html')));
-    return;
+    event.respondWith(fetch(event.request,{cache:'no-store'}).then(response=>{if(response.ok)caches.open(CORE_CACHE).then(cache=>cache.put('./index.html',response.clone()));return response}).catch(()=>caches.match('./index.html')));return;
   }
   if(url.origin===self.location.origin){
-    event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request).then(response=>{if(response.ok){const copy=response.clone();caches.open(url.pathname.includes('/vendor/')?RUNTIME_CACHE:CORE_CACHE).then(cache=>cache.put(event.request,copy))}return response})));
-    return;
+    event.respondWith(fetch(event.request).then(response=>{if(response.ok)caches.open(url.pathname.includes('/vendor/')?RUNTIME_CACHE:CORE_CACHE).then(cache=>cache.put(event.request,response.clone()));return response}).catch(()=>caches.match(event.request)));return;
   }
-  event.respondWith(caches.open(RUNTIME_CACHE).then(async cache=>{const cached=await cache.match(event.request);if(cached)return cached;const response=await fetch(event.request);if(response.ok||response.type==='opaque')cache.put(event.request,response.clone());return response}));
+  event.respondWith(caches.open(RUNTIME_CACHE).then(async cache=>{const cached=await cache.match(event.request);try{const response=await fetch(event.request);if(response.ok||response.type==='opaque')cache.put(event.request,response.clone());return response}catch(error){if(cached)return cached;throw error}}));
 });
