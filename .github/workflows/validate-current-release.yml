@@ -24,6 +24,16 @@ jobs:
           node --check worker/src/combined.js
       - name: Bundle exact Cloudflare worker
         working-directory: worker
+        shell: bash
         run: |
-          npm ci
-          npx wrangler deploy --dry-run --outdir ../deployment/current-release-bundle
+          set +e
+          npm ci > /tmp/npm-ci.log 2>&1
+          npm_status=$?
+          echo "NPM_CI_STATUS=$npm_status"
+          tail -n 80 /tmp/npm-ci.log
+          if [ "$npm_status" -ne 0 ]; then exit "$npm_status"; fi
+          npx wrangler deploy --dry-run --outdir ../deployment/current-release-bundle > /tmp/wrangler.log 2>&1
+          wrangler_status=$?
+          echo "WRANGLER_STATUS=$wrangler_status"
+          tail -n 120 /tmp/wrangler.log
+          exit "$wrangler_status"
