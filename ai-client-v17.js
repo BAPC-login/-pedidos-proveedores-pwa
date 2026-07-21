@@ -1,7 +1,7 @@
 (function(root){
   'use strict';
-  if(root.__PEDIDOS_AI_CLIENT_V20__)return;
-  root.__PEDIDOS_AI_CLIENT_V20__=true;
+  if(root.__PEDIDOS_AI_CLIENT_V22__)return;
+  root.__PEDIDOS_AI_CLIENT_V22__=true;
 
   const DEFAULT_ENDPOINT='https://pedidos-pro-ai.botreservasmultilocal.workers.dev';
   const Invoice=root.PedidosInvoice;
@@ -105,7 +105,7 @@
       else if(seconds<25){percent=31+(seconds-8)*1.55;label='Gemini está leyendo la factura';detail='Identifica filas, cantidades, formatos, descuentos e impuestos.'}
       else if(seconds<50){percent=57+(seconds-25)*.82;label='Comparando factura y pedido';detail='Valida marca, formato, graduación y unidades por display o caja.'}
       else if(seconds<85){percent=77.5+(seconds-50)*.35;label='Validando el cotejo';detail='Las facturas extensas pueden tardar un poco más. La animación seguirá activa.'}
-      else{percent=Math.min(94,89.8+(seconds-85)*.08);label=attempt>1?'Segundo intento de análisis':'Finalizando la lectura';detail='La solicitud continúa activa; no cierres la aplicación.'}
+      else{percent=Math.min(94,89.8+(seconds-85)*.08);label=attempt>1?'Segundo intento de análisis':'Finalizando la lectura';detail='La solicitud continúa activa; puedes seguir usando la aplicación.'}
       progress(onProgress,label,Math.min(94,percent),detail,'reading');
     },700);
     return()=>clearInterval(timer);
@@ -149,7 +149,7 @@
       progress(onProgress,attempt===1?'Preparando cotejo inteligente':'Reconectando con el analizador',attempt===1?9:18,attempt===1?'Se comparará la factura con el PDF real del pedido.':'El primer intento perdió conexión o excedió el tiempo.','preparing');
       const stopClock=startProgressClock(onProgress,attempt);
       try{
-        const response=await fetchWithTimeout(`${endpoint()}/v1/invoices/analyze`,{method:'POST',body:buildForm(file,products,context),headers:{'X-Pedidos-Client':'10.0.0'}},attempt===1?105000:120000);
+        const response=await fetchWithTimeout(`${endpoint()}/v1/invoices/analyze`,{method:'POST',body:buildForm(file,products,context),headers:{'X-Pedidos-Client':'10.2.0'}},attempt===1?105000:120000);
         const payload=await readPayload(response);
         if(!response.ok||!payload.ok){
           const attempts=Array.isArray(payload.attempts)?payload.attempts.map(item=>`${item.model}: ${item.error}`).join(' | '):'';
@@ -175,14 +175,14 @@
     throw new Error(friendlyError(lastError));
   }
 
-  if(Invoice?.analyze&&!Invoice.analyze.__aiV20){
+  if(Invoice?.analyze&&!Invoice.analyze.__aiV22){
     const hybrid=async (file,products,onProgress,context={})=>analyzeWithGemini(file,products,onProgress,context);
-    hybrid.__aiV20=true;Invoice.analyze=hybrid;
+    hybrid.__aiV22=true;Invoice.analyze=hybrid;
   }
 
   function loadEnhancements(){
-    if(!document.querySelector('link[data-pedidos-v20]')){const link=document.createElement('link');link.rel='stylesheet';link.href='./assets/patch-v18.css?v=20';link.dataset.pedidosV20='1';document.head.appendChild(link)}
-    if(!document.querySelector('script[data-pedidos-v20]')){const script=document.createElement('script');script.src='./assets/invoice-ui-v18.js?v=20';script.defer=true;script.dataset.pedidosV20='1';document.head.appendChild(script)}
+    if(!document.querySelector('link[data-pedidos-v22]')){const link=document.createElement('link');link.rel='stylesheet';link.href='./assets/patch-v18.css?v=22';link.dataset.pedidosV22='1';document.head.appendChild(link)}
+    if(!document.querySelector('script[data-pedidos-v22]')){const script=document.createElement('script');script.src='./assets/invoice-ui-v18.js?v=22';script.defer=true;script.dataset.pedidosV22='1';document.head.appendChild(script)}
   }
 
   root.PedidosAI={DEFAULT_ENDPOINT,settings,endpoint,health,testConnection,analyzeWithGemini,isOnePointFive,get lastHealth(){return lastHealth}};
