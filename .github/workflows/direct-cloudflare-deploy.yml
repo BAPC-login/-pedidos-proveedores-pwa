@@ -9,15 +9,15 @@ permissions:
   contents: read
 
 jobs:
-  inspect-authentication:
+  verify-authentication:
     runs-on: ubuntu-latest
     steps:
-      - name: Print release 2026.07.21.8 authentication state
+      - name: Verify release 2026.07.21.9 authentication
         shell: bash
         run: |
           set -u
           BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
-          for attempt in $(seq 1 18); do
+          for attempt in $(seq 1 24); do
             selftest_code=$(curl --silent --show-error --max-time 60 --output /tmp/selftest.json --write-out '%{http_code}' \
               -X POST "$BASE/api/platform-auth-selftest" || true)
             invalid_code=$(curl --silent --show-error --max-time 60 --output /tmp/invalid.json --write-out '%{http_code}' \
@@ -29,7 +29,12 @@ jobs:
             echo
             cat /tmp/invalid.json 2>/dev/null || true
             echo
-            if grep -q '"release":"2026.07.21.8"' /tmp/selftest.json 2>/dev/null; then
+            if [ "$selftest_code" = "200" ] \
+              && grep -q '"release":"2026.07.21.9"' /tmp/selftest.json \
+              && grep -q '"ok":true' /tmp/selftest.json \
+              && grep -q '"sessionIssued":true' /tmp/selftest.json \
+              && grep -q '"userResolved":true' /tmp/selftest.json \
+              && [ "$invalid_code" = "401" ]; then
               exit 0
             fi
             sleep 10
