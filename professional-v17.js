@@ -8,7 +8,7 @@
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const date=value=>{try{return new Date(value).toLocaleDateString('es-CL')}catch{return'—'}};
   const statusText=value=>value==='complete'?'Completo':value==='partial'?'Parcial':'Pendiente';
-  let historyRevision=0,historyBusy=false,pdfUrl='';
+  let historyRevision=0,historyBusy=false,pdfUrl='',previewRevision=0;
 
   function toast(message){
     const node=$('#toast');if(!node)return;
@@ -18,8 +18,8 @@
   function provider(id,fallback=''){return State.provider(id)||{id,name:fallback||'Proveedor',logoSize:24}}
   function setTop(view){
     const titles={order:['PEDIDO ACTUAL','Preparar pedido'],files:['DOCUMENTOS','Archivos PDF'],management:['COMPRAS','Gestión profesional'],data:['CATÁLOGOS','Base de datos'],profile:['CONFIGURACIÓN','Perfil']};
-    const value=titles[view]||titles.order;
-    if($('#eyebrow'))$('#eyebrow').childNodes[0].textContent=value[0]+' ';
+    const value=titles[view]||titles.order,eyebrow=$('#eyebrow');
+    if(eyebrow){const version=$('#buildVersion')?.textContent||'';eyebrow.innerHTML=`${value[0]} <span id="buildVersion">${esc(version)}</span>`}
     if($('#pageHeading'))$('#pageHeading').textContent=value[1];
     const show=view==='order'||view==='files';$('#clearDraft')?.classList.toggle('hidden',!show);$('#generateOrder')?.classList.toggle('hidden',!show);
     if($('#generateOrder'))$('#generateOrder').textContent=view==='order'?'Emitir pedido':'PDFs';
@@ -47,10 +47,9 @@
   }
 
   function orderLifecycleCard(order){
-    const existing=$('#orderLifecycle');
-    const rows=State.draftRows();
+    const existing=$('#orderLifecycle'),rows=State.draftRows();
     const html=`<div class="order-lifecycle-card"><div><span class="native-eyebrow">ESTADO DEL PEDIDO</span><strong>${order?.folio?`Pedido ${esc(order.folio)}`:'Borrador sin emitir'}</strong><small>${order?.folio?'Guardado en historial y disponible para recepción.':'Completa cantidades y presiona “Emitir pedido”.'}</small></div><div class="order-lifecycle-side"><span class="status ${esc(order?.status||'pending')}">${order?.folio?statusText(order.status):`${rows.length} ítems`}</span></div></div>`;
-    if(existing)existing.outerHTML=`<div id="orderLifecycle">${html}</div>`;
+    if(existing)existing.innerHTML=html;
     else $('#view-order')?.insertAdjacentHTML('afterbegin',`<div id="orderLifecycle">${html}</div>`);
   }
   async function refreshOrderLifecycle(){
@@ -70,12 +69,12 @@
       await Promise.all([renderHistoryStable(),renderFilesStable(stored)]);
       await refreshOrderLifecycle();safeSwitchView('files');toast(`Pedido ${stored.folio} emitido y guardado`);
     }catch(error){console.error(error);toast(error.message||'No se pudo emitir el pedido')}
-    finally{if(button){button.dataset.busy='0';button.disabled=false;button.textContent='PDFs'}}
+    finally{if(button){button.dataset.busy='0';button.disabled=false;button.textContent=$('#view-order')?.classList.contains('active')?'Emitir pedido':'PDFs'}}
   }
 
   async function pdfOptions(order,providerId){
     const fallback=(order.rows||[]).find(row=>row.providerId===providerId)?.providerName||'',entry=provider(providerId,fallback);
-    return{order,provider:{...entry,logo:await DB.assetDataUrl(`provider:${providerId}`)},profile:profile(),logos:{logo1:await DB.assetDataUrl('profile:logo1'),logo2:await DB.assetDataUrl('profile:logo2'),logo1Size:profile().logoSize,logo2Size:profile().logo2Size}};
+    return{order,provider:{...entry,logo:await DB.assetDataUrl(`provider:${providerId}`)},profile:{...profile()},logos:{logo1:await DB.assetDataUrl('profile:logo1'),logo2:await DB.assetDataUrl('profile:logo2'),logo1Size:profile().logoSize,logo2Size:profile().logo2Size}};
   }
   async function handlePdf(order,providerId,mode){
     const entry=provider(providerId,(order.rows||[]).find(row=>row.providerId===providerId)?.providerName||'Proveedor');
@@ -118,12 +117,13 @@
 
   async function renderHeaderPreview(){
     const box=$('#headerPreview');if(!box)return;
-    const current=profile(),[logo1,logo2]=await Promise.all([DB.assetDataUrl('profile:logo1'),DB.assetDataUrl('profile:logo2')]);
+    const revision=++previewRevision,current={...profile()},[logo1,logo2]=await Promise.all([DB.assetDataUrl('profile:logo1'),DB.assetDataUrl('profile:logo2')]);
+    if(revision!==previewRevision)return;
     const justify={left:'flex-start',center:'center',right:'flex-end'}[current.logoAlignX||'center'],align={top:'flex-start',center:'center',bottom:'flex-end'}[current.logoAlignY||'center'];
     const logos=[logo1&&`<img src="${logo1}" alt="Logo principal" style="max-width:${Number(current.logoSize)||42}mm;max-height:78px;object-fit:contain">`,logo2&&`<img src="${logo2}" alt="Logo secundario" style="max-width:${Number(current.logo2Size)||28}mm;max-height:58px;object-fit:contain">`].filter(Boolean).join('');
     const logoArea=`<div class="preview-logo-area" style="justify-content:${justify};align-items:${align}">${logos||'<span class="muted">Sin logos</span>'}</div>`;
     const info=`<table class="preview-info"><tr><th>RAZÓN SOCIAL</th><td>${esc(current.companyName||'')}</td></tr><tr><th>RUT</th><td>${esc(current.rut||'')}</td></tr><tr><th>DIRECCIÓN</th><td>${esc(current.address||'')}</td></tr><tr><th>LOCAL</th><td>${esc(current.location||'')}</td></tr></table>`;
-    let header=current.logoPosition==='top'?`${logoArea}${info}`:current.logoPosition==='bottom'?`${info}${logoArea}`:current.logoPosition==='right'?`<div class="preview-side right">${info}${logoArea}</div>`:`<div class="preview-side">${logoArea}${info}</div>`;
+    const header=current.logoPosition==='top'?`${logoArea}${info}`:current.logoPosition==='bottom'?`${info}${logoArea}`:current.logoPosition==='right'?`<div class="preview-side right">${info}${logoArea}</div>`:`<div class="preview-side">${logoArea}${info}</div>`;
     box.innerHTML=`<div class="preview-document">${header}<div class="preview-table-head" style="background:${current.tableHeaderColor||'#48484c'}">DESCRIPCIÓN <span>CANTIDAD　 UNIDAD</span></div></div>`;
   }
   function syncProfileControls(){
@@ -131,7 +131,8 @@
   }
   function saveAlignment(){
     if(!$('#logoAlignX')||!$('#logoAlignY'))return;
-    profile().logoAlignX=$('#logoAlignX').value||'center';profile().logoAlignY=$('#logoAlignY').value||'center';State.persist();renderHeaderPreview();
+    profile().logoAlignX=$('#logoAlignX').value||'center';profile().logoAlignY=$('#logoAlignY').value||'center';State.persist();
+    setTimeout(renderHeaderPreview,0);
   }
 
   function ensureAiCard(){
@@ -174,15 +175,15 @@
     if(event.target.closest('[data-history-delete],[data-history-load],[data-history-edit],[data-history-reception],[data-history-add-provider]'))setTimeout(()=>{renderHistoryStable();refreshOrderLifecycle()},500);
   },true);
   document.addEventListener('input',event=>{
-    if(event.target.matches('#historySearch')){event.stopImmediatePropagation();renderHistoryStable()}
-    if(event.target.matches('#logoAlignX,#logoAlignY'))saveAlignment();
-    if(event.target.matches('#companyLogoSize,#companyLogo2Size'))setTimeout(renderHeaderPreview,20);
+    if(event.target.matches('#historySearch')){event.stopImmediatePropagation();renderHistoryStable();return}
+    if(event.target.matches('#logoAlignX,#logoAlignY')){event.stopImmediatePropagation();saveAlignment();return}
+    if(event.target.matches('#companyLogoSize,#companyLogo2Size'))setTimeout(renderHeaderPreview,40);
     if(event.target.matches('#orderList [data-qty]'))setTimeout(refreshOrderLifecycle,30);
   },true);
   document.addEventListener('change',event=>{
-    if(event.target.matches('#historyStatus')){event.stopImmediatePropagation();renderHistoryStable()}
-    if(event.target.matches('#logoAlignX,#logoAlignY'))saveAlignment();
-    if(event.target.matches('#logoPosition,#companyLogoSize,#companyLogo2Size,#headerColor'))setTimeout(renderHeaderPreview,30);
+    if(event.target.matches('#historyStatus')){event.stopImmediatePropagation();renderHistoryStable();return}
+    if(event.target.matches('#logoAlignX,#logoAlignY')){event.stopImmediatePropagation();saveAlignment();return}
+    if(event.target.matches('#logoPosition,#companyLogoSize,#companyLogo2Size,#headerColor'))setTimeout(renderHeaderPreview,80);
     if(event.target.matches('#aiEnabled,#aiEndpoint'))saveAiSettings();
   },true);
   $('#pdfDialog')?.addEventListener('close',()=>{if(pdfUrl)URL.revokeObjectURL(pdfUrl);pdfUrl=''});
