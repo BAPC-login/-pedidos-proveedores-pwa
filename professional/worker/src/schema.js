@@ -2,7 +2,7 @@ import identitySchemaModule from '../../migrations/0001_identity.sql';
 import procurementSchemaModule from '../../migrations/0002_procurement.sql';
 import invoiceSchemaModule from '../../migrations/0003_invoices.sql';
 
-const SCHEMA_VERSION = '4';
+const SCHEMA_VERSION = '5';
 const DEFAULT_ORG_ID = 'e73d2d6e-dae8-46c6-87df-43ae05ca81fa';
 const DEFAULT_LOCATION_ID = 'e263b119-d0bb-484e-b65c-abe2c57f9e86';
 const DEFAULT_USER_ID = '80a9afe9-4751-4181-b816-eb78c94619ef';
@@ -15,6 +15,29 @@ function normalizeSql(moduleValue, label) {
     throw new Error(`SQL module ${label} did not resolve to text`);
   }
   return raw.replace(/^\s*PRAGMA\s+foreign_keys\s*=\s*ON\s*;\s*/gim, '').trim();
+}
+
+function prepareSchemaStatements(db, sql, label) {
+  const statements = sql
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean)
+    .map((statement, index) => {
+      try {
+        return db.prepare(statement);
+      } catch (error) {
+        throw new Error(`Could not prepare ${label} statement ${index + 1}: ${error?.message || error}`);
+      }
+    });
+  if (!statements.length) throw new Error(`Schema ${label} has no executable statements`);
+  return statements;
+}
+
+async function executeSchema(db, sql, label) {
+  const statements = prepareSchemaStatements(db, sql, label);
+  // D1 batch receives complete SQL statements; unlike exec(), it does not split multiline DDL by line.
+  await db.batch(statements);
+  return statements.length;
 }
 
 const identitySchema = normalizeSql(identitySchemaModule, 'identity');
@@ -77,13 +100,17 @@ export async function ensureSchema(env) {
   if (initializationPromise) return initializationPromise;
 
   initializationPromise = (async () => {
-    // CREATE IF NOT EXISTS makes this safe for empty and partially initialized databases.
-    await env.DB.exec(identitySchema);
-    await env.DB.exec(procurementSchema);
-    await env.DB.exec(invoiceSchema);
+    const identityStatements = await executeSchema(env.DB, identitySchema, 'identity');
+    const procurementStatements = await executeSchema(env.DB, procurementSchema, 'procurement');
+    const invoiceStatements = await executeSchema(env.DB, invoiceSchema, 'invoices');
     const seeded = await seedDefaultWorkspace(env.DB);
 
-    return {initialized: true, seeded, version: SCHEMA_VERSION};
+    return {
+      initialized: true,
+      seeded,
+      version: SCHEMA_VERSION,
+      statements: identityStatements + procurementStatements + invoiceStatements
+    };
   })().catch(error => {
     initializationPromise = null;
     throw error;
