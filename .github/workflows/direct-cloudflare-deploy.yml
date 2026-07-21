@@ -11,17 +11,27 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Locate connected Worker source
+      - name: Locate connected Worker source via GitHub API
         shell: bash
         run: |
-          echo "### Repository files"
-          find . -maxdepth 4 -type f \
-            ! -path './.git/*' \
-            | sort \
-            | sed -n '1,500p'
+          set -euo pipefail
+          SHA="${{ github.event.pull_request.head.sha }}"
+          echo "HEAD_SHA=${SHA}"
+          gh api -H 'Accept: application/vnd.github+json' \
+            "/repos/BAPC-login/-pedidos-proveedores-pwa/tarball/${SHA}" \
+            > /tmp/repo.tar.gz
+          mkdir /tmp/repo
+          tar -xzf /tmp/repo.tar.gz -C /tmp/repo --strip-components=1
           echo "### Worker signatures"
           grep -RIn --exclude-dir=.git --exclude='*.map' \
-            -E 'catalog-v22|gemini-3\.5-flash|v1/invoices/analyze|geminiConfigured' . \
-            | head -200 || true
+            -E 'catalog-v22|gemini-3\.5-flash|v1/invoices/analyze|geminiConfigured' /tmp/repo \
+            | sed 's#/tmp/repo/##' \
+            | head -300 || true
+          echo "### Candidate Worker files"
+          find /tmp/repo -maxdepth 5 -type f \
+            \( -name '*worker*.js' -o -name '*worker*.mjs' -o -name 'index.js' -o -name 'index.mjs' -o -name 'wrangler*.jsonc' -o -name 'wrangler*.toml' \) \
+            | sed 's#/tmp/repo/##' \
+            | sort
