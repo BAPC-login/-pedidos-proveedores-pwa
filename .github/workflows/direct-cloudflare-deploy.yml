@@ -9,29 +9,28 @@ permissions:
   contents: read
 
 jobs:
-  inspect:
+  verify:
     runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Locate connected Worker source via GitHub API
+      - name: Verify new platform and preserved AI Worker
         shell: bash
         run: |
           set -euo pipefail
-          SHA="${{ github.event.pull_request.head.sha }}"
-          echo "HEAD_SHA=${SHA}"
-          gh api -H 'Accept: application/vnd.github+json' \
-            "/repos/BAPC-login/-pedidos-proveedores-pwa/tarball/${SHA}" \
-            > /tmp/repo.tar.gz
-          mkdir /tmp/repo
-          tar -xzf /tmp/repo.tar.gz -C /tmp/repo --strip-components=1
-          echo "### Worker signatures"
-          grep -RIn --exclude-dir=.git --exclude='*.map' \
-            -E 'catalog-v22|gemini-3\.5-flash|v1/invoices/analyze|geminiConfigured' /tmp/repo \
-            | sed 's#/tmp/repo/##' \
-            | head -300 || true
-          echo "### Candidate Worker files"
-          find /tmp/repo -maxdepth 5 -type f \
-            \( -name '*worker*.js' -o -name '*worker*.mjs' -o -name 'index.js' -o -name 'index.mjs' -o -name 'wrangler*.jsonc' -o -name 'wrangler*.toml' \) \
-            | sed 's#/tmp/repo/##' \
-            | sort
+          probe() {
+            label="$1"
+            url="$2"
+            code=$(curl --silent --show-error --location --max-time 30 \
+              --output "/tmp/${label}.body" --write-out '%{http_code}' "$url" || echo CURL_ERROR)
+            echo "${label}_HTTP=${code}"
+            printf '%s_BODY=' "$label"
+            head -c 1600 "/tmp/${label}.body" 2>/dev/null || true
+            echo
+          }
+          probe PLATFORM_ROOT "https://pedidos-pro-platform.botreservasmultilocal.workers.dev/"
+          probe PLATFORM_HEALTH "https://pedidos-pro-platform.botreservasmultilocal.workers.dev/health"
+          probe AI_HEALTH "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/health"
+
+          grep -q 'Pedidos Pro Platform' /tmp/PLATFORM_ROOT.body
+          grep -q '"ok":true' /tmp/PLATFORM_HEALTH.body
+          grep -q '"databaseInitialized":true' /tmp/PLATFORM_HEALTH.body
+          grep -q '"service":"pedidos-pro-ai"' /tmp/AI_HEALTH.body
