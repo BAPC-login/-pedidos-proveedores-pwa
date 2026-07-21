@@ -1,6 +1,6 @@
-name = "pedidos-pro-platform"
+name = "pedidos-pro-ai"
 account_id = "f1adc1e73490ce30fe3c1588d2ca57fb"
-main = "worker/src/index.js"
+main = "../worker/src/combined.js"
 compatibility_date = "2026-07-21"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
@@ -13,20 +13,18 @@ head_sampling_rate = 1
 directory = "./web"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-run_worker_first = ["/api/*", "/health"]
+run_worker_first = ["/api/*", "/health", "/v1/*", "/platform/health"]
 
 [vars]
+GEMINI_MODEL = "gemini-3.5-flash"
 ENVIRONMENT = "production"
 AI_ENDPOINT = "https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
-ALLOWED_ORIGINS = "https://pedidos-pro-platform.botreservasmultilocal.workers.dev,http://localhost:8787,http://127.0.0.1:8787"
-BOOTSTRAP_ADMIN_TOKEN = "pedidos-pro-inicializacion"
-IP_HASH_SALT = "MTkZnnb3EIwXwE7sN3ts8GfIl6alJJ9fKyOJYk5i4dc"
+ALLOWED_ORIGINS = "https://bapc-login.github.io,https://pedidos-pro-ai.botreservasmultilocal.workers.dev,http://localhost:8787,http://127.0.0.1:8787,http://localhost:8788,http://127.0.0.1:8788"
 
-# Wrangler crea y vincula D1 automáticamente en el primer despliegue.
 [[d1_databases]]
 binding = "DB"
 
-# R2 queda listo para activarse cuando se requiera archivo legal en nube.
+# R2 puede activarse cuando se requiera conservar archivos legales en nube.
 # [[r2_buckets]]
 # binding = "FILES"
 
