@@ -1,6 +1,7 @@
 import identitySchemaModule from '../../migrations/0001_identity.sql';
 import procurementSchemaModule from '../../migrations/0002_procurement.sql';
 import invoiceSchemaModule from '../../migrations/0003_invoices.sql';
+import platformSchemaModule from '../../migrations/0004_multibrand_r2_history.sql';
 import fileChunkSchemaModule from '../../migrations/0004_file_chunks.sql';
 
 const SCHEMA_VERSION = '7';
@@ -47,6 +48,7 @@ async function executeSchema(db, sql, label) {
 const identitySchema = normalizeSql(identitySchemaModule, 'identity');
 const procurementSchema = normalizeSql(procurementSchemaModule, 'procurement');
 const invoiceSchema = normalizeSql(invoiceSchemaModule, 'invoices');
+const platformSchema = normalizeSql(platformSchemaModule, 'platform-r2-history');
 const fileChunkSchema = normalizeSql(fileChunkSchemaModule, 'file-chunks');
 
 async function seedDefaultWorkspace(db) {
@@ -137,7 +139,7 @@ export async function ensureSchema(env) {
       seeded,
       ownerPasswordMigrated,
       version: SCHEMA_VERSION,
-      statements: identityStatements + procurementStatements + invoiceStatements + fileChunkStatements
+      statements: identityStatements + procurementStatements + invoiceStatements + platformStatements + fileChunkStatements
     };
   })().catch(error => {
     initializationPromise = null;

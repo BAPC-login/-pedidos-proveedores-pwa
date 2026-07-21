@@ -15,6 +15,7 @@ import {
   uuid
 } from '../core.js';
 import {writeAudit} from '../auth.js';
+import {linkExistingFile, recordSnapshot, storeFile} from '../storage.js';
 import {Buffer} from 'node:buffer';
 
 const FILE_CHUNK_BYTES = 128 * 1024;
@@ -26,6 +27,10 @@ function rows(result) {
 
 function safeJson(value, fallback = null) {
   try { return JSON.parse(value || ''); } catch { return fallback; }
+}
+
+function locationAllowed(actor, locationId) {
+  return actor.locationScope?.includes?.('*') || actor.locationScope?.includes?.(locationId);
 }
 
 async function incrementUsage(env, orgId, metric, amount = 1) {
@@ -47,12 +52,23 @@ async function usageValue(env, orgId, metric) {
 export async function listInvoices(env, actor, url) {
   const supplierId = String(url.searchParams.get('supplierId') || '');
   const result = await env.DB.prepare(`
-    SELECT i.*, s.name AS supplier_name
-    FROM invoices i JOIN suppliers s ON s.id = i.supplier_id
+    SELECT i.*, s.name AS supplier_name,
+      GROUP_CONCAT(DISTINCT il.location_id) AS location_ids,
+      GROUP_CONCAT(DISTINCT l.name) AS location_names,
+      f.storage_key AS pdf_key, f.file_name AS pdf_name
+    FROM invoices i
+    JOIN suppliers s ON s.id = i.supplier_id
+    LEFT JOIN invoice_location_links il ON il.invoice_id = i.id
+    LEFT JOIN locations l ON l.id = il.location_id
+    LEFT JOIN files f ON f.id = i.pdf_file_id
     WHERE i.org_id = ? AND (? = '' OR i.supplier_id = ?)
+    GROUP BY i.id
     ORDER BY i.invoice_date DESC, i.created_at DESC LIMIT 500
   `).bind(actor.orgId, supplierId, supplierId).all();
-  return rows(result).map(invoice => ({
+  return rows(result).filter(invoice => {
+    const locations=String(invoice.location_ids||'').split(',').filter(Boolean);
+    return actor.locationScope?.includes?.('*') || locations.some(id=>locationAllowed(actor,id));
+  }).map(invoice => ({
     id: invoice.id,
     supplierId: invoice.supplier_id,
     supplierName: invoice.supplier_name,
@@ -63,7 +79,12 @@ export async function listInvoices(env, actor, url) {
     taxTotal: Number(invoice.tax_total || 0),
     grossTotal: Number(invoice.gross_total || 0),
     status: invoice.status,
-    createdAt: invoice.created_at
+    createdAt: invoice.created_at,
+    pdfFileId: invoice.pdf_file_id || null,
+    pdfKey: invoice.pdf_key || '',
+    pdfName: invoice.pdf_name || '',
+    locationIds: String(invoice.location_ids || '').split(',').filter(Boolean),
+    locationNames: String(invoice.location_names || '').split(',').filter(Boolean)
   }));
 }
 
@@ -85,6 +106,14 @@ export async function createInvoice(request, env, actor) {
   if (!sourceLines.length) throw new HttpError(400, 'La factura no contiene líneas', 'empty_invoice');
   if (sourceLines.length > 1000) throw new HttpError(400, 'La factura supera 1.000 líneas', 'too_many_items');
   const totals = body.totals || {};
+  const orderIds = [...new Set((Array.isArray(body.orderIds) ? body.orderIds : []).map(String).filter(Boolean))];
+  const locationIds = new Set();
+  if (!orderIds.length) {
+    const locationId=String(body.locationId||'');
+    const location=await env.DB.prepare('SELECT id FROM locations WHERE id = ? AND org_id = ? AND active = 1').bind(locationId,actor.orgId).first();
+    if (!location || !locationAllowed(actor,location.id)) throw new HttpError(400,'Selecciona un local válido','invalid_location');
+    locationIds.add(location.id);
+  }
   const invoiceId = uuid();
   const timestamp = nowIso();
   const statements = [env.DB.prepare(`
@@ -146,16 +175,24 @@ export async function createInvoice(request, env, actor) {
       `).bind(grossUnitPrice, invoiceDate, timestamp, actor.orgId, supplierId, productId));
     }
   }
-  const orderIds = [...new Set((Array.isArray(body.orderIds) ? body.orderIds : []).map(String).filter(Boolean))];
   for (const orderId of orderIds) {
-    const order = await env.DB.prepare('SELECT id FROM orders WHERE id = ? AND org_id = ? AND supplier_id = ?')
+    const order = await env.DB.prepare('SELECT id, location_id FROM orders WHERE id = ? AND org_id = ? AND supplier_id = ?')
       .bind(orderId, actor.orgId, supplierId).first();
-    if (!order) throw new HttpError(400, 'Pedido relacionado inválido', 'invalid_order');
+    if (!order || !locationAllowed(actor,order.location_id)) throw new HttpError(400, 'Pedido relacionado inválido', 'invalid_order');
+    locationIds.add(order.location_id);
     statements.push(env.DB.prepare(`
       INSERT INTO invoice_order_links (id, org_id, invoice_id, order_id, created_at) VALUES (?, ?, ?, ?, ?)
     `).bind(uuid(), actor.orgId, invoiceId, orderId, timestamp));
   }
+  for (const locationId of locationIds) {
+    statements.push(env.DB.prepare('INSERT OR IGNORE INTO invoice_location_links (invoice_id, org_id, location_id, created_at) VALUES (?, ?, ?, ?)').bind(invoiceId,actor.orgId,locationId,timestamp));
+  }
   await env.DB.batch(statements);
+  if (body.sourceFileId) {
+    await env.DB.prepare('UPDATE invoices SET pdf_file_id = ?, updated_at = ? WHERE id = ? AND org_id = ?').bind(String(body.sourceFileId), nowIso(), invoiceId, actor.orgId).run();
+    await linkExistingFile(env, actor, {fileId: String(body.sourceFileId), entityType: 'invoice', entityId: invoiceId, documentKind: 'invoice_original', revision: 1, metadata: {invoiceNumber}});
+  }
+  await recordSnapshot(env, actor, {entityType: 'invoice', entityId: invoiceId, locationId: [...locationIds][0] || null, revision: 1, snapshot: {...body, id: invoiceId, supplierName: supplier.name, locationIds:[...locationIds]}});
   await writeAudit(env, actor, request, 'invoice.create', 'invoice', invoiceId, {supplierId, invoiceNumber, lines: sourceLines.length, orderIds});
   return {id: invoiceId, supplierId, supplierName: supplier.name, invoiceNumber, invoiceDate, status: 'review', grossTotal: integer(totals.total, {min: 0}), lineCount: sourceLines.length};
 }
@@ -170,6 +207,8 @@ export async function analyzeInvoice(request, env, actor) {
   const file = form.get('file');
   if (!(file instanceof File)) throw new HttpError(400, 'Adjunta una factura', 'missing_file');
   if (file.size > 12 * 1024 * 1024) throw new HttpError(413, 'La factura supera 12 MB', 'file_too_large');
+  const sourceFile = await storeFile(env, actor, file, {purpose: 'invoice-source'});
+  await incrementUsage(env, actor.orgId, 'file_bytes', file.size);
   const upstream = new FormData();
   upstream.append('file', file, file.name || 'factura');
   const orderFile = form.get('orderFile');
@@ -188,7 +227,7 @@ export async function analyzeInvoice(request, env, actor) {
   if (!response.ok || !payload.ok) throw new HttpError(502, payload.error || 'La IA no pudo analizar la factura', 'ai_failed', payload.attempts || null);
   await incrementUsage(env, actor.orgId, 'ai_documents', 1);
   await writeAudit(env, actor, request, 'invoice.analyze', 'invoice', '', {model: payload.model, fileName: file.name});
-  return payload;
+  return {...payload, sourceFile};
 }
 
 function buildStorageKey(actor, purpose, fileName, backend) {

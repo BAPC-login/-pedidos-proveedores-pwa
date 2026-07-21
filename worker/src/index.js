@@ -304,35 +304,20 @@ const responseSchema = {
 };
 
 function buildPrompt(context) {
-  const products = (context.products || []).map(product => ({
-    productId: String(product.productId),
-    description: String(product.description),
-    unit: String(product.unit || 'UNIDAD'),
-    orderedQty: numeric(product.orderedQty),
-    unitsPerOrderUnit: orderPackSize(product.unit, product.description)
-  }));
-  return `Analiza DOCUMENTO A (factura) y compáralo con DOCUMENTO B (pedido PDF) y con el catálogo estructurado.
-
-Tu tarea no es recordar productos. Debes resolver cada línea usando EXCLUSIVAMENTE la información visible en la factura y las opciones del pedido actual.
-
-CATÁLOGO DEL PEDIDO ACTUAL:
-${JSON.stringify(products)}
-
-REGLAS GENERALES OBLIGATORIAS:
-1. Extrae una línea por cada producto real facturado. No conviertas flete, despacho, impuestos, descuentos, depósitos, garantías ni totales en productos.
-2. quantityCellRaw debe copiar literalmente la celda Cantidad. invoiceQuantity sale sólo de esa celda; nunca del nombre del producto.
-3. Detecta el pack desde la descripción: X06, X6, 1000CCX6 o 6X350CC significan 6 unidades por caja. X01 o 1X750ML significan 1 unidad.
-4. units = invoiceQuantity × packSize.
-5. Para cotejar, compara marca, familia, variante y volumen. Las abreviaturas son normales: ESP/ESPEC=ESPECIAL, TRANSP/TRANS=TRANSPARENTE, ZERO=SIN AZÚCAR. El texto no necesita ser idéntico.
-6. La graduación alcohólica ayuda, pero no es una condición absoluta: el catálogo puede omitirla o usar una denominación comercial distinta. El volumen sí debe coincidir cuando está presente en ambos textos.
-7. matchedOrderProductId debe ser uno de los IDs exactos del catálogo sólo cuando la línea corresponde razonablemente. No inventes IDs.
-8. Si el pedido usa DISPLAY: display normal=24 unidades; productos de 1,5 L/1500 ml=6. El pack impreso en la factura y el tamaño del display son conceptos distintos.
-9. Si el pedido usa CAJA (N), unitsPerOrderUnit es N. receivedOrderQty se calculará después como units / unitsPerOrderUnit.
-10. Lee precio neto, descuento, neto de línea, flete, IVA, impuesto adicional y otros cargos. grossLineTotal es el total final de la línea.
-11. Devuelve valores numéricos sin símbolos ni separadores de miles. Si un dato no es legible usa 0 y agrega una advertencia.
-
-PROVEEDOR ESPERADO: ${String(context.providerName || 'no informado')}
-FOLIO: ${String(context.folio || 'no informado')}`;
+  const products = (context.products || []).map(product => ({id: String(product.productId), d: String(product.description), u: String(product.unit || 'UNIDAD'), q: numeric(product.orderedQty), pack: orderPackSize(product.unit, product.description)}));
+  return `<task>Extrae y coteja factura A contra pedido B y CAT. Responde solo según JSON Schema.</task>
+<CAT>${JSON.stringify(products)}</CAT>
+<context>proveedor=${String(context.providerName || '')};folio=${String(context.folio || '')}</context>
+<rules>
+- Una salida por producto. Excluye flete, impuestos, descuentos, depósitos, garantías y totales.
+- quantityCellRaw copia Cantidad; invoiceQuantity sale solo de esa celda.
+- packSize sale de X06/X6/1000CCX6/6X350CC. units=invoiceQuantity*packSize.
+- Match por marca, familia, variante y volumen. Volumen distinto invalida. ESP=ESPECIAL; TRANS=TRANSPARENTE; ZERO=SIN AZUCAR.
+- matchedOrderProductId es un id exacto de CAT o vacío. Nunca inventes.
+- DISPLAY=24; 1.5L=6, salvo pack explícito.
+- Lee neto, descuento, flete, IVA, impuesto adicional, otros y total final por línea.
+- Números sin símbolos. Ilegible=0 y warning breve.
+</rules>`;
 }
 
 async function parseGeminiResponse(response, model) {
@@ -359,7 +344,7 @@ async function callGemini(env, model, invoiceMime, invoiceData, orderMime, order
       headers: {'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY},
       body: JSON.stringify({
         contents: [{role: 'user', parts}],
-        generationConfig: {temperature: 0, responseMimeType: 'application/json', responseSchema, maxOutputTokens: 16384}
+        generationConfig: {temperature: 0, responseMimeType: 'application/json', responseSchema, maxOutputTokens: 8192}
       })
     });
     return await parseGeminiResponse(response, model);

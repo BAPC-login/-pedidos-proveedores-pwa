@@ -7,9 +7,10 @@ async function ensureSources(){
   if(!state.cache.suppliers.length)state.cache.suppliers=(await api('/api/suppliers')).suppliers;
   if(!state.cache.orders.length)state.cache.orders=(await api('/api/orders')).orders;
   if(!state.cache.products.length)state.cache.products=(await api('/api/products')).products;
+  if(!state.cache.locations.length)state.cache.locations=(await api('/api/locations')).locations;
 }
 
-async function openInvoiceReview(analysis,supplierId,orderId=''){
+async function openInvoiceReview(analysis,supplierId,orderId='',locationId=''){
   const invoice=analysis.invoice||{};
   const lines=Array.isArray(invoice.lines)?invoice.lines:[];
   const today=new Date().toISOString().slice(0,10);
@@ -25,23 +26,17 @@ async function openInvoiceReview(analysis,supplierId,orderId=''){
         const packSize=Number(row.querySelector('[name=packSize]').value||1);
         const grossLineTotal=Number(row.querySelector('[name=grossLineTotal]').value||0);
         const units=packageQty*packSize;
-        return {
-          ...original,
-          productId:row.querySelector('[name=productId]').value,
-          sourceDescription:original.sourceLine||original.descriptionOriginal||original.description||`Línea ${index+1}`,
-          packageQty,packSize,units,grossLineTotal,
-          grossUnitPrice:units?Math.round(grossLineTotal/units):0
-        };
+        return {...original,productId:row.querySelector('[name=productId]').value,sourceDescription:original.sourceLine||original.descriptionOriginal||original.description||`Línea ${index+1}`,packageQty,packSize,units,grossLineTotal,grossUnitPrice:units?Math.round(grossLineTotal/units):0};
       });
       await api('/api/invoices',{method:'POST',json:{
-        supplierId,orderIds:orderId?[orderId]:[],
+        supplierId,locationId,orderIds:orderId?[orderId]:[],
         invoiceNumber:form.get('invoiceNumber'),invoiceDate:form.get('invoiceDate'),currency:'CLP',documentType:'33',
         totals:{net:Number(form.get('net')||0),vat:Number(form.get('vat')||0),additionalTax:Number(form.get('additionalTax')||0),total:Number(form.get('total')||0)},
-        aiModel:analysis.model||'',
+        aiModel:analysis.model||'',sourceFileId:analysis.sourceFile?.id||'',
         aiConfidence:invoice.matchSummary?.matched&&lines.length?invoice.matchSummary.matched/lines.length:0,
         lines:reviewedLines
       }});
-      toast('Factura guardada');
+      toast('Factura y original archivados');
       await navigate('invoices');
     }
   });
@@ -50,30 +45,32 @@ async function openInvoiceReview(analysis,supplierId,orderId=''){
 export async function openInvoiceAnalysis(){
   await ensureSources();
   if(!state.cache.suppliers.length)return toast('Primero debes crear un proveedor','error');
+  if(!state.cache.locations.length)return toast('Primero debes crear un local','error');
   const eligibleOrders=state.cache.orders.filter(order=>!['draft','cancelled','closed'].includes(order.status));
   openModal({
     eyebrow:'LECTURA INTELIGENTE',title:'Analizar factura',
-    subtitle:'La IA propone; tú confirmas antes de guardar.',
-    body:`<div class="form-grid"><label class="field"><span>Proveedor</span><select name="supplierId">${state.cache.suppliers.map(supplier=>`<option value="${esc(supplier.id)}">${esc(supplier.name)}</option>`).join('')}</select></label><label class="field"><span>Pedido relacionado <small>opcional</small></span><select name="orderId"><option value="">Sin pedido</option>${eligibleOrders.map(order=>`<option value="${esc(order.id)}">${esc(order.folio)} · ${esc(order.supplierName)}</option>`).join('')}</select></label><label class="field full"><span>Factura PDF o imagen</span><input name="file" type="file" accept="application/pdf,image/*" required></label></div><div class="auth-note">El plan gratuito incluye una cuota mensual de análisis. El resultado siempre requiere revisión humana.</div>`,
-    submitLabel:'Analizar documento',
+    subtitle:'La factura original se archiva en R2 antes del análisis.',
+    body:`<div class="form-grid"><label class="field"><span>Proveedor</span><select name="supplierId">${state.cache.suppliers.map(supplier=>`<option value="${esc(supplier.id)}">${esc(supplier.name)}</option>`).join('')}</select></label><label class="field"><span>Local</span><select name="locationId">${state.cache.locations.map(location=>`<option value="${esc(location.id)}">${esc(location.name)}</option>`).join('')}</select></label><label class="field"><span>Pedido relacionado <small>opcional</small></span><select name="orderId"><option value="">Sin pedido</option>${eligibleOrders.map(order=>`<option value="${esc(order.id)}">${esc(order.folio)} · ${esc(order.supplierName)} · ${esc(order.locationName)}</option>`).join('')}</select></label><label class="field full"><span>Factura PDF o imagen</span><input name="file" type="file" accept="application/pdf,image/*" required></label></div><div class="auth-note">La IA propone el cotejo. El documento original, su hash y la revisión humana permanecen guardados.</div>`,
+    submitLabel:'Archivar y analizar',
     onSubmit:async form=>{
       const file=form.get('file');
       if(!(file instanceof File)||!file.size)throw new Error('Adjunta una factura');
       const supplierId=String(form.get('supplierId')||'');
       const orderId=String(form.get('orderId')||'');
+      let locationId=String(form.get('locationId')||'');
       let products=state.cache.products.map(product=>({productId:product.id,description:product.name,unit:product.baseUnit||'unidad',orderedQty:0,unitsPerOrderUnit:1}));
       let providerName=state.cache.suppliers.find(supplier=>supplier.id===supplierId)?.name||'';
       let folio='';
       if(orderId){
         const order=(await api(`/api/orders/${orderId}`)).order;
-        folio=order.folio;providerName=order.supplierName;
+        folio=order.folio;providerName=order.supplierName;locationId=order.locationId;
         products=order.items.map(item=>({productId:item.productId,description:item.description,unit:item.orderUnit,orderedQty:item.quantityOrdered,unitsPerOrderUnit:item.unitsPerOrderUnit}));
       }
       const upload=new FormData();
       upload.append('file',file,file.name);
-      upload.append('context',JSON.stringify({providerName,folio,products}));
+      upload.append('context',JSON.stringify({providerName,folio,products,locationId}));
       const response=await api('/api/invoices/analyze',{method:'POST',body:upload});
-      setTimeout(()=>openInvoiceReview(response.analysis,supplierId,orderId),0);
+      setTimeout(()=>openInvoiceReview(response.analysis,supplierId,orderId,locationId),0);
     }
   });
 }

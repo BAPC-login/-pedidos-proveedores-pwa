@@ -69,45 +69,34 @@ async function enforceCountLimit(env, actor, table, limitKey, extraWhere = '') {
 }
 
 export async function dashboard(env, actor) {
-  const [orders, pending, spend, suppliers, products, issues] = await Promise.all([
-    env.DB.prepare(`SELECT COUNT(*) AS total FROM orders WHERE org_id = ? AND created_at >= datetime('now','-30 day')`).bind(actor.orgId).first(),
-    env.DB.prepare(`SELECT COUNT(*) AS total FROM orders WHERE org_id = ? AND status IN ('requested','approved','sent','confirmed','partially_received')`).bind(actor.orgId).first(),
-    env.DB.prepare(`SELECT COALESCE(SUM(gross_total),0) AS total FROM invoices WHERE org_id = ? AND invoice_date >= date('now','-30 day') AND status != 'void'`).bind(actor.orgId).first(),
-    env.DB.prepare(`SELECT COUNT(*) AS total FROM suppliers WHERE org_id = ? AND active = 1`).bind(actor.orgId).first(),
-    env.DB.prepare(`SELECT COUNT(*) AS total FROM products WHERE org_id = ? AND active = 1`).bind(actor.orgId).first(),
-    env.DB.prepare(`SELECT COUNT(*) AS total FROM reconciliation_issues WHERE org_id = ? AND status = 'open'`).bind(actor.orgId).first()
+  const scope=actor.locationScope?.includes?.('*')?'*':(actor.locationScope||[]).join(',');
+  const orderScope=`(? = '*' OR instr(',' || ? || ',', ',' || location_id || ',') > 0)`;
+  const invoiceScope=`(? = '*' OR EXISTS (SELECT 1 FROM invoice_location_links il WHERE il.invoice_id = invoices.id AND instr(',' || ? || ',', ',' || il.location_id || ',') > 0))`;
+  const [orders,pending,spend,suppliers,products,issues,documents]=await Promise.all([
+    env.DB.prepare(`SELECT COUNT(*) AS total FROM orders WHERE org_id = ? AND created_at >= datetime('now','-30 day') AND ${orderScope}`).bind(actor.orgId,scope,scope).first(),
+    env.DB.prepare(`SELECT COUNT(*) AS total FROM orders WHERE org_id = ? AND status IN ('requested','approved','sent','confirmed','partially_received') AND ${orderScope}`).bind(actor.orgId,scope,scope).first(),
+    env.DB.prepare(`SELECT COALESCE(SUM(gross_total),0) AS total FROM invoices WHERE org_id = ? AND invoice_date >= date('now','-30 day') AND status != 'void' AND ${invoiceScope}`).bind(actor.orgId,scope,scope).first(),
+    env.DB.prepare('SELECT COUNT(*) AS total FROM suppliers WHERE org_id = ? AND active = 1').bind(actor.orgId).first(),
+    env.DB.prepare('SELECT COUNT(*) AS total FROM products WHERE org_id = ? AND active = 1').bind(actor.orgId).first(),
+    env.DB.prepare("SELECT COUNT(*) AS total FROM reconciliation_issues WHERE org_id = ? AND status = 'open'").bind(actor.orgId).first(),
+    env.DB.prepare(`SELECT COUNT(*) AS total FROM document_links dl WHERE dl.org_id = ? AND (? = '*' OR EXISTS (SELECT 1 FROM entity_snapshots es WHERE es.org_id=dl.org_id AND es.entity_type=dl.entity_type AND es.entity_id=dl.entity_id AND instr(',' || ? || ',', ',' || es.location_id || ',') > 0))`).bind(actor.orgId,scope,scope).first()
   ]);
-  const recent = await env.DB.prepare(`
-    SELECT o.id, o.folio, o.status, o.delivery_date, o.created_at, o.gross_total,
-      s.name AS supplier_name, l.name AS location_name,
-      u.display_name AS requested_by_name
-    FROM orders o
-    JOIN suppliers s ON s.id = o.supplier_id
-    JOIN locations l ON l.id = o.location_id
-    LEFT JOIN users u ON u.id = o.requested_by
-    WHERE o.org_id = ?
+  const recent=await env.DB.prepare(`
+    SELECT o.id,o.folio,o.status,o.delivery_date,o.created_at,o.gross_total,o.location_id,
+      s.name AS supplier_name,l.name AS location_name,u.display_name AS requested_by_name
+    FROM orders o JOIN suppliers s ON s.id=o.supplier_id JOIN locations l ON l.id=o.location_id
+    LEFT JOIN users u ON u.id=o.requested_by
+    WHERE o.org_id=? AND (?='*' OR instr(',' || ? || ',', ',' || o.location_id || ',') > 0)
     ORDER BY o.created_at DESC LIMIT 8
-  `).bind(actor.orgId).all();
+  `).bind(actor.orgId,scope,scope).all();
+  const [orderHistory,spendHistory]=await Promise.all([
+    env.DB.prepare(`SELECT substr(created_at,1,7) AS month,COUNT(*) AS total FROM orders WHERE org_id=? AND created_at>=datetime('now','-12 month') AND ${orderScope} GROUP BY month ORDER BY month`).bind(actor.orgId,scope,scope).all(),
+    env.DB.prepare(`SELECT substr(invoice_date,1,7) AS month,COALESCE(SUM(gross_total),0) AS total FROM invoices WHERE org_id=? AND invoice_date>=date('now','-12 month') AND status!='void' AND ${invoiceScope} GROUP BY month ORDER BY month`).bind(actor.orgId,scope,scope).all()
+  ]);
   return {
-    metrics: {
-      orders30d: Number(orders?.total || 0),
-      pendingOrders: Number(pending?.total || 0),
-      spend30d: Number(spend?.total || 0),
-      suppliers: Number(suppliers?.total || 0),
-      products: Number(products?.total || 0),
-      openIssues: Number(issues?.total || 0)
-    },
-    recentOrders: rows(recent).map(order => ({
-      id: order.id,
-      folio: order.folio,
-      status: order.status,
-      supplierName: order.supplier_name,
-      locationName: order.location_name,
-      requestedBy: order.requested_by_name,
-      deliveryDate: order.delivery_date,
-      grossTotal: Number(order.gross_total || 0),
-      createdAt: order.created_at
-    }))
+    metrics:{orders30d:Number(orders?.total||0),pendingOrders:Number(pending?.total||0),spend30d:Number(spend?.total||0),suppliers:Number(suppliers?.total||0),products:Number(products?.total||0),openIssues:Number(issues?.total||0),archivedDocuments:Number(documents?.total||0)},
+    history:{orders:rows(orderHistory).map(row=>({month:row.month,total:Number(row.total||0)})),spend:rows(spendHistory).map(row=>({month:row.month,total:Number(row.total||0)}))},
+    recentOrders:rows(recent).map(order=>({id:order.id,folio:order.folio,status:order.status,supplierName:order.supplier_name,locationName:order.location_name,requestedBy:order.requested_by_name,deliveryDate:order.delivery_date,grossTotal:Number(order.gross_total||0),createdAt:order.created_at}))
   };
 }
 
@@ -121,7 +110,7 @@ export async function listLocations(env, actor) {
 
 export async function createLocation(request, env, actor) {
   assertMinimumRole(actor.role, ROLES.ADMIN);
-  await enforceCountLimit(env, actor, 'locations', 'locations', 'AND active = 1');
+  if (!actor.isPlatformOwner) await enforceCountLimit(env, actor, 'locations', 'locations', 'AND active = 1');
   const body = await readJson(request);
   const id = uuid();
   const name = requireText(body.name, 'Nombre del local', {max: 120});
