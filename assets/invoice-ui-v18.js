@@ -1,204 +1,68 @@
 (function(root){
   'use strict';
-  if(root.__PEDIDOS_INVOICE_UI_V19__)return;
-  root.__PEDIDOS_INVOICE_UI_V19__=true;
+  if(root.__PEDIDOS_INVOICE_UI_V20__)return;
+  root.__PEDIDOS_INVOICE_UI_V20__=true;
 
   const State=root.PedidosState,Orders=root.PedidosOrders,DB=root.PedidosDB,Invoice=root.PedidosInvoice,Core=root.PedidosCore,PDF=root.PedidosPDF;
   const $=selector=>document.querySelector(selector),$$=selector=>[...document.querySelectorAll(selector)];
-  const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-  let busy=false,decorateQueued=false,progressToken=0;
+  const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[char]));
+  let busy=false,clock=null,started=0,decoratePending=false;
 
-  function toast(message){
-    const node=$('#toast');if(!node)return;
-    node.textContent=message;node.classList.add('show');clearTimeout(node._v19Timer);node._v19Timer=setTimeout(()=>node.classList.remove('show'),4600);
-  }
-  function truncate(value,max=280){const text=String(value||'').replace(/\s+/g,' ').trim();return text.length>max?`${text.slice(0,max-1)}…`:text}
-  function activeContext(){
-    const rootNode=$('#receptionContent');if(!rootNode)return null;
-    const active=rootNode.querySelector('[data-reception-provider].active')||rootNode.querySelector('[data-reception-provider]');
-    const folio=rootNode.querySelector(':scope > .card h3')?.textContent?.trim()||'';
-    const providerId=active?.dataset.receptionProvider||'';
-    return folio&&providerId?{folio,providerId,active}:null;
-  }
-  function refreshReception(){
-    const current=$('#receptionContent [data-reception-provider].active')||$('#receptionContent [data-reception-provider]');
-    if(current){current.click();return}
-    document.querySelector('[data-management-tab="reception"]')?.click();
-  }
-  function showProgress(label,percent,detail=''){
-    const box=$('#invoiceProgress');if(!box)return;
-    const safe=Math.max(0,Math.min(100,Number(percent)||0));
-    box.innerHTML=`<div class="progress invoice-progress-v18"><div class="progress-head"><b>${esc(label)}</b><span>${Math.round(safe)}%</span></div><div class="progress-track"><i style="width:${safe}%"></i></div>${detail?`<small>${esc(truncate(detail,200))}</small>`:''}</div>`;
-  }
-  function clearProgressLater(token,delay=1800){setTimeout(()=>{if(token===progressToken&&$('#invoiceProgress'))$('#invoiceProgress').innerHTML=''},delay)}
-  function productContext(order,providerId){
-    return(order.rows||[]).filter(row=>row.providerId===providerId).map(row=>({productId:row.productId,description:row.description,unit:row.unit,orderedQty:Number(row.orderedQty)||0}));
-  }
-  async function buildOrderPdf(order,providerId){
-    if(!PDF?.blob)return null;
-    const row=(order.rows||[]).find(item=>item.providerId===providerId);
-    const entry=State.provider(providerId)||{id:providerId,name:row?.providerName||'Proveedor',logoSize:24};
-    const [providerLogo,logo1,logo2]=await Promise.all([
-      DB.assetDataUrl(`provider:${providerId}`),DB.assetDataUrl('profile:logo1'),DB.assetDataUrl('profile:logo2')
-    ]);
-    return PDF.blob({
-      order,
-      provider:{...entry,id:providerId,name:entry.name||row?.providerName||'Proveedor',logo:providerLogo},
-      profile:{...(State.value.profile||{})},
-      logos:{logo1,logo2,logo1Size:State.value.profile?.logoSize,logo2Size:State.value.profile?.logo2Size}
-    });
-  }
-  async function clearAppliedData(invoice){
-    const prices=(await DB.all('prices')).filter(row=>String(row.invoiceId)===String(invoice.id));
-    for(const price of prices)await DB.remove('prices',price.id);
-    await Orders.recomputeReception(invoice.folio,invoice.providerId);
-  }
-  function classifyResult(result){
-    const lines=Array.isArray(result?.summary?.lines)?result.summary.lines:[];
-    const linked=lines.filter(line=>line.productId).length,unlinked=lines.length-linked;
-    return{lines,linked,unlinked,status:lines.length?'review':'error'};
-  }
-  async function persistResult(invoice,result){
-    const classified=classifyResult(result);
-    invoice.ocrText=result.text||'';invoice.invoiceNumber=result.summary?.invoiceNumber||'';invoice.taxTotals=result.summary?.totals||{};invoice.lines=classified.lines;
-    invoice.engine=result.engine||result.summary?.engine||'unknown';invoice.model=result.model||'';invoice.warnings=result.warnings||[];invoice.fallbackReason=result.fallbackReason||'';invoice.comparedOrderPdf=!!result.comparedOrderPdf;
-    invoice.status=classified.status;invoice.error=classified.status==='error'?'No se detectaron líneas de productos en la factura':'';
-    invoice.displayName=Core.invoiceDisplayName(invoice.providerName,invoice.invoiceNumber||`SIN-${invoice.id}`,invoice.originalName);
-    invoice.analysisSummary={linked:classified.linked,unlinked:classified.unlinked,total:classified.lines.length,engine:invoice.engine,model:invoice.model,comparedOrderPdf:invoice.comparedOrderPdf};
-    await Orders.saveInvoice(invoice);
-    await Orders.recomputeReception(invoice.folio,invoice.providerId);
-    return classified;
-  }
-  async function analyzeStoredInvoice(invoice,order,providerId){
-    const provider=State.provider(providerId)||{name:(order.rows||[]).find(row=>row.providerId===providerId)?.providerName||invoice.providerName||'Proveedor'};
-    const token=++progressToken;
-    invoice.providerName=provider.name;invoice.status='processing';invoice.error='';invoice.fallbackReason='';invoice.updatedAt=new Date().toISOString();
-    await Orders.saveInvoice(invoice);await clearAppliedData(invoice);refreshReception();
-    try{
-      showProgress('Generando pedido PDF para el cotejo',3);
-      const orderFile=await buildOrderPdf(order,providerId);
-      const result=await Invoice.analyze(
-        invoice.file,
-        productContext(order,providerId),
-        update=>showProgress(update.label,update.percent,update.detail),
-        {providerName:provider.name,folio:order.folio,orderFile,orderFileName:`PEDIDO_${order.folio}_${provider.name}.pdf`}
-      );
-      const classified=await persistResult(invoice,result);
-      const detail=result.engine==='gemini'
-        ?`${classified.linked} coincidencias exactas · ${classified.unlinked} líneas no coincidentes · pedido PDF ${result.comparedOrderPdf?'comparado':'no disponible'}`
-        :`OCR local: ${classified.lines.length} líneas como borrador, sin aplicar coincidencias automáticas`;
-      showProgress(result.engine==='gemini'?'Cotejo terminado · revisa antes de aplicar':'OCR terminado · revisión manual obligatoria',100,detail);
-      toast(result.engine==='gemini'
-        ?`${invoice.displayName}: ${classified.linked}/${classified.lines.length} líneas cotejadas; confirma el resultado`
-        :`${invoice.displayName}: Gemini falló; OCR dejó un borrador sin alterar la recepción`);
-    }catch(error){
-      const message=String(error.message||error);invoice.status='error';invoice.error=message;invoice.analysisSummary={linked:0,unlinked:0,total:0,engine:'error'};await Orders.saveInvoice(invoice);await Orders.recomputeReception(invoice.folio,invoice.providerId);
-      showProgress('No se pudo analizar la factura',100,message);toast(`Error al leer ${invoice.originalName}: ${truncate(message,170)}`);
-    }
-    refreshReception();clearProgressLater(token,2600);
-  }
-  async function processFiles(files){
-    if(busy||!files.length)return;
-    const context=activeContext();if(!context)return toast('No se pudo identificar el pedido o proveedor activo');
-    const order=await Orders.get(context.folio);if(!order)return toast('Pedido no encontrado');
-    busy=true;
-    try{
-      for(const file of files){
-        const provider=State.provider(context.providerId)||{name:(order.rows||[]).find(row=>row.providerId===context.providerId)?.providerName||'Proveedor'};
-        const invoice={folio:order.folio,providerId:context.providerId,providerName:provider.name,originalName:file.name,file,createdAt:new Date().toISOString(),status:'processing',lines:[],engine:'pending'};
-        await Orders.saveInvoice(invoice);
-        await analyzeStoredInvoice(invoice,order,context.providerId);
-      }
-    }finally{busy=false}
-  }
-  async function retryInvoice(id){
-    if(busy)return;
-    const invoice=await DB.get('invoices',Number(id));if(!invoice)return toast('Factura no encontrada');
-    if(!invoice.file)return toast('El archivo original ya no está disponible para reintentar');
-    const order=await Orders.get(invoice.folio);if(!order)return toast('Pedido no encontrado');
-    busy=true;try{await analyzeStoredInvoice(invoice,order,invoice.providerId)}finally{busy=false}
-  }
-  function statusLabel(invoice){
-    if(invoice.status==='processing')return'Comparando factura con pedido PDF';
-    if(invoice.status==='error')return'Error de lectura';
-    if(invoice.status==='review')return'Leída · pendiente de confirmar';
-    if(invoice.status==='reviewed')return'Revisada y aplicada';
-    return'Pendiente';
-  }
-  function engineLabel(invoice){
-    if(invoice.status==='processing')return'Analizando';
-    if(invoice.engine==='gemini')return invoice.model?`Gemini · ${invoice.model}`:'Gemini';
-    if(invoice.engine==='ocr')return'OCR borrador';
-    return invoice.status==='error'?'Error':'Pendiente';
-  }
-  async function decorateRow(row){
-    const review=row.querySelector('[data-invoice-review]');if(!review)return;
-    const id=Number(review.dataset.invoiceReview);if(!id||row.dataset.v19Ready==='1'||row.dataset.v19Decorating==='1')return;
-    row.dataset.v19Decorating='1';
-    try{
-      const invoice=await DB.get('invoices',id);if(!invoice)return;
-      row.classList.add('invoice-row-v18');row.dataset.invoiceStatus=invoice.status||'';
-      const primary=row.querySelector(':scope > div:first-child');
-      const title=primary?.querySelector(':scope > b');if(title){title.classList.add('invoice-title-v18');title.textContent=invoice.displayName||invoice.originalName||'Factura'}
-      const small=primary?.querySelector(':scope > small');if(small)small.textContent=statusLabel(invoice);
-      primary?.querySelector('.invoice-meta-v18')?.remove();primary?.querySelector('.invoice-error-v18')?.remove();
-      const lines=Array.isArray(invoice.lines)?invoice.lines:[],linked=lines.filter(line=>line.productId).length,unlinked=lines.length-linked;
-      const meta=document.createElement('div');meta.className='invoice-meta-v18';meta.innerHTML=`<span class="invoice-engine-chip ${esc(invoice.engine||invoice.status||'')}">${esc(engineLabel(invoice))}</span><span>${linked}/${lines.length} coincidentes${unlinked?` · ${unlinked} por revisar`:''}</span>${invoice.comparedOrderPdf?'<span>Pedido PDF cotejado</span>':''}`;primary?.appendChild(meta);
-      const detail=invoice.error||invoice.fallbackReason||((invoice.warnings||[])[0]||'');
-      if(detail){const error=document.createElement('div');error.className=`invoice-error-v18 ${invoice.status==='error'?'danger':'warning'}`;error.innerHTML=`<b>${invoice.status==='error'?'Motivo del error':invoice.engine==='ocr'?'Gemini no respondió · OCR no aplicado':'Aviso del cotejo'}</b><span>${esc(truncate(detail))}</span>`;primary?.appendChild(error)}
-      const actions=row.querySelector('.invoice-actions');if(actions){
-        actions.classList.add('invoice-actions-v18');actions.querySelectorAll('button').forEach(button=>button.type='button');
-        const view=actions.querySelector('[data-invoice-view]');if(view)view.textContent='Ver factura';
-        review.textContent='Revisar cotejo';
-        let retry=actions.querySelector('[data-invoice-retry]');
-        if(invoice.status==='error'||invoice.status==='review'||invoice.engine==='ocr'||invoice.fallbackReason){
-          if(!retry){retry=document.createElement('button');retry.type='button';retry.className='btn small';retry.dataset.invoiceRetry=String(invoice.id);actions.insertBefore(retry,actions.querySelector('[data-invoice-delete]'))}
-          retry.textContent='Reprocesar con IA';
-        }else retry?.remove();
-        const remove=actions.querySelector('[data-invoice-delete]');if(remove){remove.setAttribute('aria-label','Eliminar factura');remove.title='Eliminar factura'}
-      }
-      const summary=row.querySelector('.invoice-item-summary');
-      if(summary&&lines.length){
-        const expected=lines.filter(line=>line.productId),unexpected=lines.filter(line=>!line.productId);
-        const list=expected.slice(0,6).map(line=>`<div><b>${esc(line.description)}</b><small>${line.packageQty} ${line.packSize>1?'cajas':'unidades'} × ${line.packSize} · ${line.units} un · $${Number(line.grossUnitPrice||0).toLocaleString('es-CL')}/un</small></div>`).join('');
-        const warning=unexpected.length?`<div class="invoice-summary-warning"><b>${unexpected.length} línea${unexpected.length>1?'s':''} no coincide${unexpected.length>1?'n':''} con el pedido</b><span>${unexpected.map(line=>esc(line.sourceLine||line.description)).join(' · ')}</span></div>`:'';
-        summary.innerHTML=`<div class="invoice-summary-v19"><div class="invoice-summary-head"><span>${lines.length} líneas facturadas</span><b>$${Number(invoice.taxTotals?.total||0).toLocaleString('es-CL')}</b></div>${list}${warning}</div>`;
-      }
-    }finally{row.dataset.v19Decorating='0';row.dataset.v19Ready='1'}
-  }
-  function queueDecorate(){
-    if(decorateQueued)return;decorateQueued=true;
-    queueMicrotask(async()=>{decorateQueued=false;for(const row of $$('.invoice-row'))await decorateRow(row)})
-  }
-  function applySuggestedSelections(id){
-    setTimeout(async()=>{
-      const dialog=$('#invoiceReviewDialog');if(!dialog?.open)return;
-      const invoice=await DB.get('invoices',Number(id));if(!invoice)return;
-      const lines=invoice.lines||[];
-      $$('#invoiceReviewRows [data-review-index]').forEach((element,index)=>{
-        const line=lines[index],select=element.querySelector('[data-review-product]');
-        const safeSuggestion=line?.suggestedProductId&&Number(line.matchScore)>=.5&&!/graduaci[oó]n.*distint/i.test(line.matchReason||'');
-        if(select&&!select.value&&safeSuggestion&&[...select.options].some(option=>option.value===String(line.suggestedProductId)))select.value=String(line.suggestedProductId);
-        const textarea=element.querySelector('textarea');if(textarea&&line?.matchReason&&!textarea.value.includes('Cotejo IA:'))textarea.value=`${textarea.value}\nCotejo IA: ${line.matchReason}`.trim();
-      });
-    },140);
-  }
+  function toast(message){const node=$('#toast');if(!node)return;node.textContent=message;node.classList.add('show');clearTimeout(node._v20);node._v20=setTimeout(()=>node.classList.remove('show'),4400)}
+  function elapsed(){const seconds=Math.max(0,Math.floor((Date.now()-started)/1000));return`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`}
 
-  document.addEventListener('change',event=>{
-    if(event.target?.id!=='invoiceInput')return;
-    event.preventDefault();event.stopImmediatePropagation();
-    const files=[...(event.target.files||[])];event.target.value='';processFiles(files);
-  },true);
-  document.addEventListener('click',event=>{
-    const retry=event.target.closest?.('[data-invoice-retry]');if(retry){event.preventDefault();event.stopImmediatePropagation();retryInvoice(retry.dataset.invoiceRetry);return}
-    const review=event.target.closest?.('[data-invoice-review]');if(review)applySuggestedSelections(review.dataset.invoiceReview);
-  },true);
+  function ensureLoader(){
+    let overlay=$('#invoiceAiOverlay');if(overlay)return overlay;
+    overlay=document.createElement('div');overlay.id='invoiceAiOverlay';overlay.className='invoice-ai-overlay hidden';overlay.innerHTML=`<div class="invoice-ai-card"><div class="invoice-ai-brand"><span>✦</span> LECTURA INTELIGENTE</div><div class="invoice-ai-visual"><div class="invoice-ai-ring" id="invoiceAiRing"><div class="invoice-ai-ring-core"><strong id="invoiceAiPercent">0%</strong><span>procesando</span></div></div><i class="invoice-ai-orbit-dot"></i></div><div class="invoice-ai-phase" id="invoiceAiPhase">GEMINI + PEDIDO PDF</div><h3 id="invoiceAiTitle">Preparando factura</h3><p id="invoiceAiDetail">La factura se comparará con el pedido del proveedor.</p><div class="invoice-ai-steps"><span data-step="prepare">Preparar</span><span data-step="read">Leer</span><span data-step="compare">Cotejar</span><span data-step="validate">Validar</span></div><div class="invoice-ai-footer"><span><i></i> Proceso seguro</span><time id="invoiceAiElapsed">00:00</time></div></div>`;
+    document.body.appendChild(overlay);return overlay;
+  }
+  function showProgress(label,percent,detail='',phase='reading'){
+    const overlay=ensureLoader(),safe=Math.max(0,Math.min(100,Number(percent)||0));
+    if(overlay.classList.contains('hidden')){overlay.classList.remove('hidden');document.body.classList.add('invoice-ai-busy');started=Date.now();clearInterval(clock);clock=setInterval(()=>{const node=$('#invoiceAiElapsed');if(node)node.textContent=elapsed()},500)}
+    overlay.classList.toggle('complete',safe>=100||phase==='done');overlay.classList.toggle('retrying',phase==='retrying');overlay.classList.remove('error');
+    $('#invoiceAiRing')?.style.setProperty('--invoice-progress',`${safe*3.6}deg`);if($('#invoiceAiPercent'))$('#invoiceAiPercent').textContent=`${Math.round(safe)}%`;if($('#invoiceAiTitle'))$('#invoiceAiTitle').textContent=label;if($('#invoiceAiDetail'))$('#invoiceAiDetail').textContent=detail||'Procesando documentos.';
+    if($('#invoiceAiPhase'))$('#invoiceAiPhase').textContent=phase==='retrying'?'REINTENTO AUTOMÁTICO':phase==='validating'?'VALIDACIÓN FINAL':phase==='done'?'LISTO':'GEMINI + PEDIDO PDF';
+    const active=safe<18?0:safe<52?1:safe<88?2:3;$$('[data-step]').forEach((node,index)=>{node.classList.toggle('active',index===active);node.classList.toggle('done',index<active||safe>=100)});const inline=$('#invoiceProgress');if(inline)inline.innerHTML='';
+  }
+  function loaderError(message){const overlay=ensureLoader();overlay.classList.remove('hidden','complete','retrying');overlay.classList.add('error');document.body.classList.add('invoice-ai-busy');$('#invoiceAiRing')?.style.setProperty('--invoice-progress','360deg');if($('#invoiceAiPercent'))$('#invoiceAiPercent').textContent='!';if($('#invoiceAiPhase'))$('#invoiceAiPhase').textContent='REVISIÓN NECESARIA';if($('#invoiceAiTitle'))$('#invoiceAiTitle').textContent='No se pudo completar la lectura';if($('#invoiceAiDetail'))$('#invoiceAiDetail').textContent=String(message||'Error desconocido').slice(0,240)}
+  function hideLoader(delay=1000){setTimeout(()=>{const overlay=$('#invoiceAiOverlay');overlay?.classList.add('hidden');overlay?.classList.remove('complete','retrying','error');document.body.classList.remove('invoice-ai-busy');clearInterval(clock);clock=null},delay)}
 
-  const observer=new MutationObserver(queueDecorate);
-  const start=()=>{
-    const reception=$('#receptionContent');if(reception)observer.observe(reception,{childList:true,subtree:true});
-    queueDecorate();
-    const marker=$('#buildVersion');if(marker)marker.textContent='v9.2.0';
-  };
+  function currentContext(){const area=$('#receptionContent');if(!area)return null;const provider=area.querySelector('[data-reception-provider].active')||area.querySelector('[data-reception-provider]');const folio=area.querySelector(':scope > .card h3')?.textContent?.trim();return folio&&provider?{folio,providerId:provider.dataset.receptionProvider}:null}
+  function refreshReception(){($('#receptionContent [data-reception-provider].active')||$('#receptionContent [data-reception-provider]'))?.click()}
+  function productsFor(order,providerId){return(order.rows||[]).filter(row=>row.providerId===providerId).map(row=>({productId:row.productId,description:row.description,unit:row.unit,orderedQty:Number(row.orderedQty)||0}))}
+  async function orderPdf(order,providerId){const row=(order.rows||[]).find(item=>item.providerId===providerId),provider=State.provider(providerId)||{id:providerId,name:row?.providerName||'Proveedor',logoSize:24};const[logo,logo1,logo2]=await Promise.all([DB.assetDataUrl(`provider:${providerId}`),DB.assetDataUrl('profile:logo1'),DB.assetDataUrl('profile:logo2')]);return PDF.blob({order,provider:{...provider,id:providerId,logo},profile:{...State.value.profile},logos:{logo1,logo2,logo1Size:State.value.profile?.logoSize,logo2Size:State.value.profile?.logo2Size}})}
+  async function clearApplied(invoice){for(const row of(await DB.all('prices')).filter(row=>String(row.invoiceId)===String(invoice.id)))await DB.remove('prices',row.id);await Orders.recomputeReception(invoice.folio,invoice.providerId)}
+
+  async function analyzeInvoice(invoice,order,position=''){
+    const provider=State.provider(invoice.providerId)||{name:invoice.providerName||'Proveedor'};invoice.status='processing';invoice.error='';await Orders.saveInvoice(invoice);await clearApplied(invoice);refreshReception();
+    try{
+      showProgress('Generando pedido PDF',3,position||'Se crea el documento de referencia.','preparing');
+      const reference=await orderPdf(order,invoice.providerId);
+      const result=await Invoice.analyze(invoice.file,productsFor(order,invoice.providerId),update=>showProgress(update.label,update.percent,update.detail,update.phase),{providerName:provider.name,folio:order.folio,orderFile:reference,orderFileName:`PEDIDO_${order.folio}_${provider.name}.pdf`});
+      const lines=result.summary?.lines||[],linked=lines.filter(line=>line.productId).length;invoice.ocrText=result.text||'';invoice.invoiceNumber=result.summary?.invoiceNumber||'';invoice.taxTotals=result.summary?.totals||{};invoice.lines=lines;invoice.engine='gemini';invoice.model=result.model||'';invoice.warnings=result.warnings||[];invoice.comparedOrderPdf=!!result.comparedOrderPdf;invoice.status=lines.length?'review':'error';invoice.displayName=Core.invoiceDisplayName(provider.name,invoice.invoiceNumber||`SIN-${invoice.id}`,invoice.originalName);invoice.analysisSummary={linked,unlinked:lines.length-linked,total:lines.length};await Orders.saveInvoice(invoice);await Orders.recomputeReception(invoice.folio,invoice.providerId);
+      showProgress('Factura lista para revisar',100,`${linked} coincidencias exactas · ${lines.length-linked} líneas por revisar. Nada se aplica hasta confirmar.`,'done');toast(`${invoice.displayName}: ${linked}/${lines.length} líneas cotejadas`);hideLoader(1300);
+    }catch(error){invoice.status='error';invoice.error=String(error.message||error);invoice.analysisSummary={linked:0,unlinked:0,total:0};await Orders.saveInvoice(invoice);await Orders.recomputeReception(invoice.folio,invoice.providerId);loaderError(invoice.error);toast('La factura quedó guardada. Usa “Reprocesar con IA”.');hideLoader(3200)}
+    refreshReception();
+  }
+  async function processFiles(files){if(busy||!files.length)return;const context=currentContext();if(!context)return toast('Selecciona un proveedor del pedido');const order=await Orders.get(context.folio);if(!order)return toast('Pedido no encontrado');busy=true;try{for(let index=0;index<files.length;index++){const file=files[index],provider=State.provider(context.providerId)||{name:'Proveedor'},invoice={folio:order.folio,providerId:context.providerId,providerName:provider.name,originalName:file.name,file,createdAt:new Date().toISOString(),status:'processing',lines:[],engine:'pending'};await Orders.saveInvoice(invoice);await analyzeInvoice(invoice,order,files.length>1?`Factura ${index+1} de ${files.length}`:'')}}finally{busy=false}}
+  async function retryInvoice(id){if(busy)return;const invoice=await DB.get('invoices',Number(id));if(!invoice?.file)return toast('El archivo original no está disponible');const order=await Orders.get(invoice.folio);if(!order)return toast('Pedido no encontrado');busy=true;try{await analyzeInvoice(invoice,order,'Reprocesando factura guardada')}finally{busy=false}}
+
+  function statusText(invoice){if(invoice.status==='processing')return'Comparando factura con pedido PDF';if(invoice.status==='error')return'Lectura pendiente';if(invoice.status==='review')return'Leída · pendiente de confirmar';if(invoice.status==='reviewed')return'Revisada y aplicada';return'Pendiente'}
+  async function decorate(row){const review=row.querySelector('[data-invoice-review]'),id=Number(review?.dataset.invoiceReview);if(!id||row.dataset.v20==='1')return;const invoice=await DB.get('invoices',id);if(!invoice)return;row.dataset.v20='1';row.classList.add('invoice-row-v18');const main=row.querySelector(':scope > div:first-child'),title=main?.querySelector(':scope > b'),small=main?.querySelector(':scope > small');if(title){title.classList.add('invoice-title-v18');title.textContent=invoice.displayName||invoice.originalName}if(small)small.textContent=statusText(invoice);const lines=invoice.lines||[],linked=lines.filter(line=>line.productId).length;const meta=document.createElement('div');meta.className='invoice-meta-v18';meta.innerHTML=`<span class="invoice-engine-chip ${invoice.status==='error'?'error':'gemini'}">${invoice.status==='error'?'Error':invoice.model?`Gemini · ${esc(invoice.model)}`:'Gemini'}</span><span>${linked}/${lines.length} coincidentes</span>${invoice.comparedOrderPdf?'<span>PDF cotejado</span>':''}`;main?.appendChild(meta);if(invoice.error){const warning=document.createElement('div');warning.className='invoice-error-v18 danger';warning.innerHTML=`<b>Motivo del error</b><span>${esc(invoice.error.slice(0,280))}</span>`;main?.appendChild(warning)}const actions=row.querySelector('.invoice-actions');if(actions){actions.classList.add('invoice-actions-v18');actions.querySelector('[data-invoice-view]')?.replaceChildren('Ver factura');review.replaceChildren('Revisar cotejo');if((invoice.status==='error'||invoice.status==='review')&&!actions.querySelector('[data-invoice-retry]')){const retry=document.createElement('button');retry.className='btn small';retry.type='button';retry.dataset.invoiceRetry=String(invoice.id);retry.textContent='Reprocesar con IA';actions.insertBefore(retry,actions.querySelector('[data-invoice-delete]'))}}}
+  function queueDecorate(){if(decoratePending)return;decoratePending=true;queueMicrotask(async()=>{decoratePending=false;for(const row of $$('.invoice-row'))await decorate(row)})}
+
+  function correctDraftUnits(){const node=$('#summaryUnits');if(!node)return;node.textContent=Math.round(State.draftRows().reduce((sum,row)=>sum+Number(row.orderedQty||0)*Core.packFromUnit(row.unit,row.description),0))}
+  function enhanceReview(id){setTimeout(async()=>{const dialog=$('#invoiceReviewDialog');if(!dialog?.open)return;const invoice=await DB.get('invoices',Number(id)),products=dialog._products||[];$$('#invoiceReviewRows [data-review-index]').forEach((row,index)=>{const line=invoice?.lines?.[index],select=row.querySelector('[data-review-product]');if(select&&!select.value&&line?.suggestedProductId&&Number(line.matchScore)>=.52)select.value=line.suggestedProductId;const product=products.find(product=>String(product.productId)===String(select?.value||line?.productId));const pack=row.querySelector('[data-review-pack]');if(product&&String(product.unit).toUpperCase().includes('DISPLAY')&&pack)pack.value=Core.packFromUnit(product.unit,product.description)})},160)}
+
+  function ensureNewOrder(){const actions=$('.top-actions'),generate=$('#generateOrder');if(!actions||!generate)return;let button=$('#newOrderV20');if(!button){button=document.createElement('button');button.id='newOrderV20';button.className='btn new-order-btn';button.type='button';button.innerHTML='<span>＋</span> Nuevo pedido';actions.insertBefore(button,generate);button.addEventListener('click',openNewOrder)}if($('#clearDraft'))$('#clearDraft').textContent='Vaciar lista';const sync=()=>button.classList.toggle('hidden',generate.classList.contains('hidden'));sync();new MutationObserver(sync).observe(generate,{attributes:true,attributeFilter:['class']})}
+  function newOrderDialog(){let dialog=$('#newOrderDialogV20');if(dialog)return dialog;dialog=document.createElement('dialog');dialog.id='newOrderDialogV20';dialog.className='new-order-dialog';dialog.innerHTML=`<div class="new-order-modal"><div class="new-order-icon">＋</div><span class="new-order-kicker">CICLO DE COMPRA</span><h2>Comenzar un nuevo pedido</h2><p id="newOrderMessage"></p><div class="new-order-summary"><span>Folio actual</span><b id="newOrderFolio"></b></div><div class="new-order-actions"><button class="btn" type="button" data-cancel>Cancelar</button><button class="btn primary" type="button" data-confirm>Cerrar y comenzar</button></div></div>`;document.body.appendChild(dialog);dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()});dialog.querySelector('[data-confirm]').onclick=closeCurrentOrder;return dialog}
+  function openNewOrder(){const dialog=newOrderDialog(),folio=State.value.currentOrderFolio,count=State.draftRows().length;$('#newOrderFolio').textContent=folio||'Sin folio emitido';$('#newOrderMessage').textContent=folio?`El folio ${folio} quedará cerrado en el historial y se vaciarán ${count} ítems de la lista.`:`Se vaciarán ${count} ítems. El próximo pedido recibirá un folio nuevo.`;dialog.showModal()}
+  async function closeCurrentOrder(){const button=$('#newOrderDialogV20 [data-confirm]');button.disabled=true;button.textContent='Preparando…';try{const folio=State.value.currentOrderFolio;if(folio){const order=await Orders.get(folio);if(order){order.closed=true;order.lifecycle='closed';order.closedAt=new Date().toISOString();await Orders.save(order)}}State.value.draft={};State.value.currentOrderFolio=null;State.persist();sessionStorage.setItem('pedidos:new-order','1');location.reload()}catch(error){button.disabled=false;button.textContent='Cerrar y comenzar';toast(error.message||'No se pudo crear el nuevo pedido')}}
+
+  document.addEventListener('change',event=>{if(event.target?.id!=='invoiceInput')return;event.preventDefault();event.stopImmediatePropagation();const files=[...(event.target.files||[])];event.target.value='';processFiles(files)},true);
+  document.addEventListener('click',event=>{const retry=event.target.closest?.('[data-invoice-retry]');if(retry){event.preventDefault();event.stopImmediatePropagation();retryInvoice(retry.dataset.invoiceRetry);return}const review=event.target.closest?.('[data-invoice-review]');if(review)enhanceReview(review.dataset.invoiceReview)},true);
+  document.addEventListener('input',event=>{if(event.target.matches?.('[data-qty]'))setTimeout(correctDraftUnits)},true);document.addEventListener('change',event=>{if(event.target.matches?.('[data-unit]'))setTimeout(correctDraftUnits)},true);
+
+  const start=()=>{ensureLoader();ensureNewOrder();newOrderDialog();const observer=new MutationObserver(()=>{queueDecorate();correctDraftUnits()});if($('#receptionContent'))observer.observe($('#receptionContent'),{childList:true,subtree:true});if($('#orderList'))observer.observe($('#orderList'),{childList:true,subtree:true});queueDecorate();correctDraftUnits();if($('#buildVersion'))$('#buildVersion').textContent='v10.0.0';if(sessionStorage.getItem('pedidos:new-order')){sessionStorage.removeItem('pedidos:new-order');setTimeout(()=>toast('Nuevo pedido listo · folio anterior cerrado'),500)}};
   document.readyState==='loading'?document.addEventListener('DOMContentLoaded',start,{once:true}):start();
 })(globalThis);
