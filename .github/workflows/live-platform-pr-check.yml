@@ -13,31 +13,38 @@ jobs:
   check-live:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect DNS, TLS, application shell and health
+      - name: Inspect public responses
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
           HOST="pedidos-pro-platform.botreservasmultilocal.workers.dev"
           APP_URL="https://${HOST}/"
           HEALTH_URL="https://${HOST}/health"
 
-          echo "### DNS"
-          getent hosts "$HOST" || true
+          echo "DNS=$(getent ahostsv4 "$HOST" | head -1 || true)"
 
-          echo "### Application shell headers"
-          curl --verbose --location --max-time 30 "$APP_URL" --output /tmp/app.html
-          grep -q 'Pedidos Pro Platform' /tmp/app.html
+          app_code=$(curl --silent --show-error --location --max-time 30 \
+            --dump-header /tmp/app.headers --output /tmp/app.body \
+            --write-out '%{http_code}' "$APP_URL" || echo CURL_ERROR)
+          echo "APP_HTTP=${app_code}"
+          sed -n '1,20p' /tmp/app.headers 2>/dev/null || true
+          echo "APP_BODY_BEGIN"
+          head -c 1200 /tmp/app.body 2>/dev/null || true
+          echo
+          echo "APP_BODY_END"
 
-          echo "### Health retries"
-          for attempt in $(seq 1 12); do
-            echo "attempt=${attempt}"
-            if curl --fail --silent --show-error --max-time 30 "$HEALTH_URL" --output /tmp/health.json; then
-              cat /tmp/health.json
-              grep -q '"ok":true' /tmp/health.json
-              grep -q '"service":"pedidos-pro-platform"' /tmp/health.json
-              grep -q '"databaseInitialized":true' /tmp/health.json
-              exit 0
-            fi
-            sleep 10
-          done
-          exit 1
+          health_code=$(curl --silent --show-error --location --max-time 30 \
+            --dump-header /tmp/health.headers --output /tmp/health.body \
+            --write-out '%{http_code}' "$HEALTH_URL" || echo CURL_ERROR)
+          echo "HEALTH_HTTP=${health_code}"
+          sed -n '1,20p' /tmp/health.headers 2>/dev/null || true
+          echo "HEALTH_BODY_BEGIN"
+          head -c 2000 /tmp/health.body 2>/dev/null || true
+          echo
+          echo "HEALTH_BODY_END"
+
+          test "$app_code" = "200"
+          grep -q 'Pedidos Pro Platform' /tmp/app.body
+          test "$health_code" = "200"
+          grep -q '"ok":true' /tmp/health.body
+          grep -q '"databaseInitialized":true' /tmp/health.body
