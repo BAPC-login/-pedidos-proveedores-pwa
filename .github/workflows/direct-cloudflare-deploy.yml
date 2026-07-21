@@ -9,20 +9,28 @@ permissions:
   contents: read
 
 jobs:
-  diagnose-release:
+  verify-release:
     runs-on: ubuntu-latest
     steps:
-      - name: Read release 2026.07.21.4 diagnostic
+      - name: Verify release 2026.07.21.5 D1 and owner
         shell: bash
         run: |
           set -u
           BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
-          code=$(curl --silent --show-error --max-time 30 \
-            --output /tmp/diagnostic.json --write-out '%{http_code}' \
-            "$BASE/api/platform-diagnostics" || echo CURL_ERROR)
-          echo "DIAGNOSTIC_HTTP=$code"
-          cat /tmp/diagnostic.json 2>/dev/null || true
-          echo
-          test "$code" = "200"
-          grep -q '"release":"2026.07.21.4"' /tmp/diagnostic.json
-          grep -q '"ok":true' /tmp/diagnostic.json
+          for attempt in $(seq 1 18); do
+            code=$(curl --silent --show-error --max-time 30 \
+              --output /tmp/diagnostic.json --write-out '%{http_code}' \
+              "$BASE/api/platform-diagnostics" || echo CURL_ERROR)
+            echo "attempt=${attempt} http=${code}"
+            cat /tmp/diagnostic.json 2>/dev/null || true
+            echo
+            if [ "$code" = "200" ] \
+              && grep -q '"release":"2026.07.21.5"' /tmp/diagnostic.json \
+              && grep -q '"ok":true' /tmp/diagnostic.json \
+              && grep -q '"users":1' /tmp/diagnostic.json \
+              && grep -q '"organizations":1' /tmp/diagnostic.json; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
