@@ -91,6 +91,99 @@ export async function listInvoices(env, actor, url) {
   }));
 }
 
+export async function createInvoice(request, env, actor) {
+  assertMinimumRole(actor.role, ROLES.RECEIVER);
+  const body = await readJson(request);
+  const supplierId = String(body.supplierId || '');
+  const supplier = await env.DB.prepare('SELECT id, name FROM suppliers WHERE id = ? AND org_id = ? AND active = 1')
+    .bind(supplierId, actor.orgId).first();
+  if (!supplier) throw new HttpError(400, 'Proveedor inválido', 'invalid_supplier');
+  const invoiceNumber = requireText(body.invoiceNumber, 'Número de factura', {max: 80});
+  const documentType = optionalText(body.documentType || '33', {max: 10});
+  const invoiceDate = requireText(body.invoiceDate, 'Fecha de factura', {max: 20});
+  const duplicate = await env.DB.prepare(`
+    SELECT id FROM invoices WHERE org_id = ? AND supplier_id = ? AND document_type = ? AND invoice_number = ?
+  `).bind(actor.orgId, supplierId, documentType, invoiceNumber).first();
+  if (duplicate) throw new HttpError(409, 'Esta factura ya fue registrada', 'duplicate_invoice');
+  const sourceLines = Array.isArray(body.lines) ? body.lines : [];
+  if (!sourceLines.length) throw new HttpError(400, 'La factura no contiene líneas', 'empty_invoice');
+  if (sourceLines.length > 1000) throw new HttpError(400, 'La factura supera 1.000 líneas', 'too_many_items');
+  const totals = body.totals || {};
+  const invoiceId = uuid();
+  const timestamp = nowIso();
+  const statements = [env.DB.prepare(`
+    INSERT INTO invoices
+      (id, org_id, supplier_id, invoice_number, document_type, invoice_date, currency,
+       net_total, tax_total, additional_tax_total, freight_total, gross_total, status,
+       ai_model, ai_confidence, reviewed_by, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'review', ?, ?, ?, ?, ?)
+  `).bind(
+    invoiceId, actor.orgId, supplierId, invoiceNumber, documentType, invoiceDate,
+    optionalText(body.currency || 'CLP', {max: 10}),
+    integer(totals.net, {min: 0, max: 9999999999}),
+    integer(totals.vat ?? totals.tax, {min: 0, max: 9999999999}),
+    integer(totals.additionalTax, {min: 0, max: 9999999999}),
+    integer(totals.freight, {min: 0, max: 9999999999}),
+    integer(totals.total, {min: 0, max: 9999999999}),
+    optionalText(body.aiModel, {max: 100}),
+    number(body.aiConfidence, {min: 0, max: 1}), actor.userId, timestamp, timestamp
+  )];
+  for (const [index, raw] of sourceLines.entries()) {
+    const lineId = uuid();
+    const productId = raw.productId ? String(raw.productId) : null;
+    if (productId) {
+      const product = await env.DB.prepare('SELECT id FROM products WHERE id = ? AND org_id = ?').bind(productId, actor.orgId).first();
+      if (!product) throw new HttpError(400, `Producto inválido en línea ${index + 1}`, 'invalid_product');
+    }
+    const totalUnits = number(raw.units ?? raw.totalUnits, {min: 0, max: 10000000});
+    const grossLineTotal = integer(raw.grossLineTotal, {min: 0, max: 9999999999});
+    const grossUnitPrice = integer(raw.grossUnitPrice || (totalUnits ? grossLineTotal / totalUnits : 0), {min: 0, max: 999999999});
+    const reviewStatus = productId ? 'confirmed' : 'unmatched';
+    statements.push(env.DB.prepare(`
+      INSERT INTO invoice_lines
+        (id, invoice_id, supplier_product_id, product_id, source_description, supplier_sku,
+         package_quantity, units_per_package, total_units, net_line_total, tax_line_total,
+         additional_tax_line_total, gross_line_total, gross_unit_price, match_confidence,
+         match_method, review_status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      lineId, invoiceId, raw.supplierProductId || null, productId,
+      requireText(raw.sourceDescription || raw.sourceLine || raw.descriptionOriginal || raw.description, `Descripción línea ${index + 1}`, {max: 500}),
+      optionalText(raw.supplierSku || raw.code, {max: 100}),
+      number(raw.packageQty ?? raw.invoiceQuantity, {min: 0, max: 1000000}),
+      number(raw.packSize, {min: 0.001, max: 100000, fallback: 1}), totalUnits,
+      integer(raw.netLineTotal, {min: 0, max: 9999999999}),
+      integer(raw.vatLine ?? raw.taxLineTotal, {min: 0, max: 9999999999}),
+      integer(raw.additionalTaxLine ?? raw.additionalTaxLineTotal, {min: 0, max: 9999999999}),
+      grossLineTotal, grossUnitPrice,
+      number(raw.confidence ?? raw.matchConfidence, {min: 0, max: 1}),
+      optionalText(raw.matchMethod || 'manual-review', {max: 80}), reviewStatus, timestamp, timestamp
+    ));
+    if (productId && grossUnitPrice > 0) {
+      statements.push(env.DB.prepare(`
+        INSERT INTO price_history (id, org_id, supplier_id, product_id, invoice_id, gross_unit_price, currency, observed_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(uuid(), actor.orgId, supplierId, productId, invoiceId, grossUnitPrice, optionalText(body.currency || 'CLP', {max: 10}), invoiceDate, timestamp));
+      statements.push(env.DB.prepare(`
+        UPDATE supplier_products SET last_gross_unit_price = ?, last_purchased_at = ?, updated_at = ?
+        WHERE org_id = ? AND supplier_id = ? AND product_id = ?
+      `).bind(grossUnitPrice, invoiceDate, timestamp, actor.orgId, supplierId, productId));
+    }
+  }
+  const orderIds = [...new Set((Array.isArray(body.orderIds) ? body.orderIds : []).map(String).filter(Boolean))];
+  for (const orderId of orderIds) {
+    const order = await env.DB.prepare('SELECT id FROM orders WHERE id = ? AND org_id = ? AND supplier_id = ?')
+      .bind(orderId, actor.orgId, supplierId).first();
+    if (!order) throw new HttpError(400, 'Pedido relacionado inválido', 'invalid_order');
+    statements.push(env.DB.prepare(`
+      INSERT INTO invoice_order_links (id, org_id, invoice_id, order_id, created_at) VALUES (?, ?, ?, ?, ?)
+    `).bind(uuid(), actor.orgId, invoiceId, orderId, timestamp));
+  }
+  await env.DB.batch(statements);
+  await writeAudit(env, actor, request, 'invoice.create', 'invoice', invoiceId, {supplierId, invoiceNumber, lines: sourceLines.length, orderIds});
+  return {id: invoiceId, supplierId, supplierName: supplier.name, invoiceNumber, invoiceDate, status: 'review', grossTotal: integer(totals.total, {min: 0}), lineCount: sourceLines.length};
+}
+
 export async function analyzeInvoice(request, env, actor) {
   assertMinimumRole(actor.role, ROLES.RECEIVER);
   const limits = planFor(actor.organization.plan);
