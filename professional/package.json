@@ -1,0 +1,19 @@
+{
+  "name": "pedidos-pro-platform",
+  "version": "2.0.0-alpha.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check worker/src/core.js && node --check worker/src/auth.js && node --check worker/src/api.js && node --check worker/src/index.js && node --check web/app.js",
+    "test": "node tests/core.test.mjs",
+    "verify": "npm run check && npm test",
+    "dev": "npx wrangler dev --config wrangler.toml",
+    "deploy": "npx wrangler deploy --config wrangler.toml",
+    "db:create": "npx wrangler d1 create pedidos-pro-platform",
+    "db:migrate:local": "npx wrangler d1 migrations apply pedidos-pro-platform --local --config wrangler.toml",
+    "db:migrate:remote": "npx wrangler d1 migrations apply pedidos-pro-platform --remote --config wrangler.toml"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
