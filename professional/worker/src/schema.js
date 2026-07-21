@@ -1,8 +1,9 @@
 import identitySchemaModule from '../../migrations/0001_identity.sql';
 import procurementSchemaModule from '../../migrations/0002_procurement.sql';
 import invoiceSchemaModule from '../../migrations/0003_invoices.sql';
+import fileChunkSchemaModule from '../../migrations/0004_file_chunks.sql';
 
-const SCHEMA_VERSION = '6';
+const SCHEMA_VERSION = '7';
 const DEFAULT_ORG_ID = 'e73d2d6e-dae8-46c6-87df-43ae05ca81fa';
 const DEFAULT_LOCATION_ID = 'e263b119-d0bb-484e-b65c-abe2c57f9e86';
 const DEFAULT_USER_ID = '80a9afe9-4751-4181-b816-eb78c94619ef';
@@ -46,6 +47,7 @@ async function executeSchema(db, sql, label) {
 const identitySchema = normalizeSql(identitySchemaModule, 'identity');
 const procurementSchema = normalizeSql(procurementSchemaModule, 'procurement');
 const invoiceSchema = normalizeSql(invoiceSchemaModule, 'invoices');
+const fileChunkSchema = normalizeSql(fileChunkSchemaModule, 'file-chunks');
 
 async function seedDefaultWorkspace(db) {
   const existing = await db.prepare('SELECT COUNT(*) AS total FROM users').first();
@@ -126,6 +128,7 @@ export async function ensureSchema(env) {
     const identityStatements = await executeSchema(env.DB, identitySchema, 'identity');
     const procurementStatements = await executeSchema(env.DB, procurementSchema, 'procurement');
     const invoiceStatements = await executeSchema(env.DB, invoiceSchema, 'invoices');
+    const fileChunkStatements = await executeSchema(env.DB, fileChunkSchema, 'file-chunks');
     const seeded = await seedDefaultWorkspace(env.DB);
     const ownerPasswordMigrated = await migrateSeededOwnerPassword(env.DB);
 
@@ -134,7 +137,7 @@ export async function ensureSchema(env) {
       seeded,
       ownerPasswordMigrated,
       version: SCHEMA_VERSION,
-      statements: identityStatements + procurementStatements + invoiceStatements
+      statements: identityStatements + procurementStatements + invoiceStatements + fileChunkStatements
     };
   })().catch(error => {
     initializationPromise = null;
