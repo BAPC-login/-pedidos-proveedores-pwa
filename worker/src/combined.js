@@ -33,7 +33,7 @@ export default {
     }
 
     // Temporary deployment diagnostic. It exposes no credentials or user data.
-    if (url.pathname === '/platform/diagnostics') {
+    if (url.pathname === '/platform/diagnostics' || url.pathname === '/api/platform-diagnostics') {
       try {
         const schema = await ensureSchema(env);
         const tableResult = await env.DB.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name").all();
