@@ -9,32 +9,55 @@ permissions:
   contents: read
 
 jobs:
-  verify-authentication:
+  verify-production:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify release 2026.07.21.9 authentication
+      - name: Verify clean release 2026.07.21.10
         shell: bash
         run: |
           set -u
           BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
           for attempt in $(seq 1 24); do
-            selftest_code=$(curl --silent --show-error --max-time 60 --output /tmp/selftest.json --write-out '%{http_code}' \
-              -X POST "$BASE/api/platform-auth-selftest" || true)
-            invalid_code=$(curl --silent --show-error --max-time 60 --output /tmp/invalid.json --write-out '%{http_code}' \
+            app_code=$(curl --silent --show-error --max-time 30 --dump-header /tmp/app.headers --output /tmp/app.html --write-out '%{http_code}' "$BASE/" || true)
+            js_code=$(curl --silent --show-error --max-time 30 --output /tmp/app.js --write-out '%{http_code}' "$BASE/app.js" || true)
+            ai_code=$(curl --silent --show-error --max-time 30 --output /tmp/ai.json --write-out '%{http_code}' "$BASE/health" || true)
+            platform_code=$(curl --silent --show-error --max-time 30 --dump-header /tmp/platform.headers --output /tmp/platform.json --write-out '%{http_code}' "$BASE/platform/health" || true)
+            me_code=$(curl --silent --show-error --max-time 30 --output /tmp/me.json --write-out '%{http_code}' "$BASE/api/me" || true)
+            invalid_code=$(curl --silent --show-error --max-time 30 --output /tmp/invalid.json --write-out '%{http_code}' \
               -H 'Content-Type: application/json' \
               --data '{"email":"admin@pedidospro.local","password":"contraseña-incorrecta","organizationSlug":"pedidos-pro"}' \
               "$BASE/api/auth/login" || true)
-            echo "attempt=${attempt} selftest=${selftest_code} invalid_login=${invalid_code}"
-            cat /tmp/selftest.json 2>/dev/null || true
+            bootstrap_code=$(curl --silent --show-error --max-time 30 --output /tmp/bootstrap.json --write-out '%{http_code}' \
+              -H 'Content-Type: application/json' \
+              --data '{"organizationName":"Blocked","locationName":"Blocked","displayName":"Blocked","email":"blocked@example.com","password":"blocked-password"}' \
+              "$BASE/api/bootstrap" || true)
+            selftest_code=$(curl --silent --show-error --max-time 30 --output /tmp/selftest.json --write-out '%{http_code}' \
+              -X POST "$BASE/api/platform-auth-selftest" || true)
+
+            echo "attempt=${attempt} app=${app_code} js=${js_code} ai=${ai_code} platform=${platform_code} me=${me_code} invalid=${invalid_code} bootstrap=${bootstrap_code} selftest=${selftest_code}"
+            cat /tmp/platform.json 2>/dev/null || true
             echo
             cat /tmp/invalid.json 2>/dev/null || true
             echo
-            if [ "$selftest_code" = "200" ] \
-              && grep -q '"release":"2026.07.21.9"' /tmp/selftest.json \
-              && grep -q '"ok":true' /tmp/selftest.json \
-              && grep -q '"sessionIssued":true' /tmp/selftest.json \
-              && grep -q '"userResolved":true' /tmp/selftest.json \
-              && [ "$invalid_code" = "401" ]; then
+
+            if [ "$app_code" = "200" ] \
+              && grep -qi '^x-pedidos-pro-release: 2026.07.21.10' /tmp/app.headers \
+              && [ "$js_code" = "200" ] \
+              && grep -q 'Pedidos Pro Platform' /tmp/app.html \
+              && grep -q 'admin@pedidospro.local' /tmp/app.js \
+              && grep -q 'Cambiar contraseña' <(curl --silent --show-error --max-time 30 "$BASE/app-actions.js") \
+              && [ "$ai_code" = "200" ] \
+              && grep -q '"service":"pedidos-pro-ai"' /tmp/ai.json \
+              && grep -q '"geminiConfigured":true' /tmp/ai.json \
+              && [ "$platform_code" = "200" ] \
+              && grep -qi '^x-pedidos-pro-release: 2026.07.21.10' /tmp/platform.headers \
+              && grep -q '"service":"pedidos-pro-platform"' /tmp/platform.json \
+              && grep -q '"databaseInitialized":true' /tmp/platform.json \
+              && grep -q '"schemaVersion":"6"' /tmp/platform.json \
+              && [ "$me_code" = "401" ] \
+              && [ "$invalid_code" = "401" ] \
+              && [ "$bootstrap_code" = "403" ] \
+              && [ "$selftest_code" = "401" ]; then
               exit 0
             fi
             sleep 10
