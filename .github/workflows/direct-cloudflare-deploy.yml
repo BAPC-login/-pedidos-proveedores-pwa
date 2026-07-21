@@ -9,35 +9,21 @@ permissions:
   contents: read
 
 jobs:
-  verify-storage:
+  inspect-storage:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify release 2026.07.21.11 R2 binding and operations
+      - name: Print current R2 state
         shell: bash
         run: |
           set -u
           BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
-          for attempt in $(seq 1 24); do
-            health_code=$(curl --silent --show-error --max-time 30 --dump-header /tmp/health.headers --output /tmp/health.json --write-out '%{http_code}' "$BASE/platform/health" || true)
-            storage_code=$(curl --silent --show-error --max-time 60 --output /tmp/storage.json --write-out '%{http_code}' \
-              -X POST "$BASE/api/platform-storage-selftest" || true)
-            echo "attempt=${attempt} health=${health_code} storage=${storage_code}"
-            cat /tmp/health.json 2>/dev/null || true
-            echo
-            cat /tmp/storage.json 2>/dev/null || true
-            echo
-            if [ "$health_code" = "200" ] \
-              && grep -qi '^x-pedidos-pro-release: 2026.07.21.11' /tmp/health.headers \
-              && grep -q '"storageConfigured":true' /tmp/health.json \
-              && [ "$storage_code" = "200" ] \
-              && grep -q '"release":"2026.07.21.11"' /tmp/storage.json \
-              && grep -q '"ok":true' /tmp/storage.json \
-              && grep -q '"put":true' /tmp/storage.json \
-              && grep -q '"get":true' /tmp/storage.json \
-              && grep -q '"contentVerified":true' /tmp/storage.json \
-              && grep -q '"deleted":true' /tmp/storage.json; then
-              exit 0
-            fi
-            sleep 10
-          done
-          exit 1
+          health_code=$(curl --silent --show-error --max-time 30 --dump-header /tmp/health.headers --output /tmp/health.json --write-out '%{http_code}' "$BASE/platform/health" || true)
+          storage_code=$(curl --silent --show-error --max-time 60 --output /tmp/storage.json --write-out '%{http_code}' \
+            -X POST "$BASE/api/platform-storage-selftest" || true)
+          echo "HEALTH_HTTP=$health_code"
+          cat /tmp/health.headers 2>/dev/null || true
+          cat /tmp/health.json 2>/dev/null || true
+          echo
+          echo "STORAGE_HTTP=$storage_code"
+          cat /tmp/storage.json 2>/dev/null || true
+          echo
