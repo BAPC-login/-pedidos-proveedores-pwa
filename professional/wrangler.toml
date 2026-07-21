@@ -2,7 +2,7 @@ name = "pedidos-pro-platform"
 account_id = "f1adc1e73490ce30fe3c1588d2ca57fb"
 main = "worker/src/index.js"
 compatibility_date = "2026-07-21"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 workers_dev = true
 
 [observability]
@@ -12,7 +12,8 @@ head_sampling_rate = 1
 [assets]
 directory = "./web"
 binding = "ASSETS"
-run_worker_first = true
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/health"]
 
 [vars]
 ENVIRONMENT = "production"
