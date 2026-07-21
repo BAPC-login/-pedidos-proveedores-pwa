@@ -21,8 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Wait for Cloudflare and verify production
-        id: verify
+      - name: Wait for Cloudflare and verify R2 multibrand production
         shell: bash
         run: |
           set -u
@@ -31,27 +30,26 @@ jobs:
           app_ok="false"
           ai_health=""
           platform_health=""
-          me_status=""
-          login_status=""
-          bootstrap_status=""
-          selftest_status=""
 
           for attempt in $(seq 1 36); do
             echo "Production verification attempt ${attempt}/36"
             app=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/" 2>/dev/null || true)
             ai_health=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/health" 2>/dev/null || true)
             platform_health=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/platform/health" 2>/dev/null || true)
-            app_js=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app.js" 2>/dev/null || true)
             app_actions=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-actions.js" 2>/dev/null || true)
+            app_views=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-views.js" 2>/dev/null || true)
 
             if echo "$app" | grep -q 'Pedidos Pro Platform' \
-              && echo "$app_js" | grep -q 'admin@pedidospro.local' \
-              && echo "$app_actions" | grep -q 'Cambiar contraseña' \
+              && echo "$app_actions" | grep -q 'Nueva marca' \
+              && echo "$app_actions" | grep -q 'Locales permitidos' \
+              && echo "$app_views" | grep -q 'Archivo documental R2' \
               && echo "$ai_health" | grep -q '"service":"pedidos-pro-ai"' \
               && echo "$ai_health" | grep -q '"geminiConfigured":true' \
               && echo "$platform_health" | grep -q '"service":"pedidos-pro-platform"' \
               && echo "$platform_health" | grep -q '"databaseInitialized":true' \
-              && echo "$platform_health" | grep -q '"schemaVersion":"6"'; then
+              && echo "$platform_health" | grep -q '"schemaVersion":"7"' \
+              && echo "$platform_health" | grep -q '"storageConfigured":true' \
+              && echo "$platform_health" | grep -q '"storageBackend":"r2"'; then
               app_ok="true"
               status="healthy"
               break
@@ -60,61 +58,41 @@ jobs:
           done
 
           me_status=$(curl --silent --show-error --max-time 20 --output /tmp/me.json --write-out '%{http_code}' "$BASE_URL/api/me" || true)
-          login_status=$(curl --silent --show-error --max-time 20 --output /tmp/login.json --write-out '%{http_code}' \
-            -H 'Content-Type: application/json' \
-            --data '{"email":"admin@pedidospro.local","password":"contraseña-incorrecta","organizationSlug":"pedidos-pro"}' \
-            "$BASE_URL/api/auth/login" || true)
-          bootstrap_status=$(curl --silent --show-error --max-time 20 --output /tmp/bootstrap.json --write-out '%{http_code}' \
-            -H 'Content-Type: application/json' \
-            --data '{"organizationName":"Unauthorized","locationName":"Unauthorized","displayName":"Unauthorized","email":"unauthorized@example.com","password":"unauthorized-password"}' \
-            "$BASE_URL/api/bootstrap" || true)
-          selftest_status=$(curl --silent --show-error --max-time 20 --output /tmp/selftest.json --write-out '%{http_code}' \
-            -X POST "$BASE_URL/api/platform-auth-selftest" || true)
+          login_status=$(curl --silent --show-error --max-time 20 --output /tmp/login.json --write-out '%{http_code}' -H 'Content-Type: application/json' --data '{"email":"admin@pedidospro.local","password":"incorrecta","organizationSlug":"pedidos-pro"}' "$BASE_URL/api/auth/login" || true)
+          bootstrap_status=$(curl --silent --show-error --max-time 20 --output /tmp/bootstrap.json --write-out '%{http_code}' -H 'Content-Type: application/json' --data '{"organizationName":"Unauthorized","locationName":"Unauthorized","displayName":"Unauthorized","email":"unauthorized@example.com","password":"unauthorized-password"}' "$BASE_URL/api/bootstrap" || true)
 
-          if [ "$me_status" != "401" ] || [ "$login_status" != "401" ] || [ "$bootstrap_status" != "403" ] || [ "$selftest_status" != "401" ]; then
-            status="failed"
-          fi
+          if [ "$me_status" != "401" ] || [ "$login_status" != "401" ] || [ "$bootstrap_status" != "403" ]; then status="failed"; fi
 
           mkdir -p deployment
-          STATUS="$status" APP_OK="$app_ok" AI_HEALTH="$ai_health" PLATFORM_HEALTH="$platform_health" \
-          ME_STATUS="$me_status" LOGIN_STATUS="$login_status" BOOTSTRAP_STATUS="$bootstrap_status" SELFTEST_STATUS="$selftest_status" python - <<'PY'
+          STATUS="$status" APP_OK="$app_ok" AI_HEALTH="$ai_health" PLATFORM_HEALTH="$platform_health" ME_STATUS="$me_status" LOGIN_STATUS="$login_status" BOOTSTRAP_STATUS="$bootstrap_status" python - <<'PY'
           import datetime, json, os
           def load(name):
-              raw = os.environ.get(name, '')
-              try:
-                  return json.loads(raw) if raw else None
-              except json.JSONDecodeError:
-                  return {'raw': raw[:1000]}
-          payload = {
-              'status': os.environ.get('STATUS', 'failed'),
-              'application_shell': os.environ.get('APP_OK') == 'true',
-              'checked_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-              'url': 'https://pedidos-pro-ai.botreservasmultilocal.workers.dev/',
-              'release': '2026.07.21.10',
-              'ai_health': load('AI_HEALTH'),
-              'platform_health': load('PLATFORM_HEALTH'),
-              'security_checks': {
-                  'unauthenticated_me_http': int(os.environ.get('ME_STATUS') or 0),
-                  'invalid_login_http': int(os.environ.get('LOGIN_STATUS') or 0),
-                  'bootstrap_without_token_http': int(os.environ.get('BOOTSTRAP_STATUS') or 0),
-                  'temporary_selftest_route_http': int(os.environ.get('SELFTEST_STATUS') or 0),
-              },
+              raw=os.environ.get(name,'')
+              try:return json.loads(raw) if raw else None
+              except json.JSONDecodeError:return {'raw':raw[:1000]}
+          payload={
+            'status':os.environ.get('STATUS','failed'),
+            'application_shell':os.environ.get('APP_OK')=='true',
+            'checked_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'url':'https://pedidos-pro-ai.botreservasmultilocal.workers.dev/',
+            'release':'r2-multibrand-schema-7',
+            'ai_health':load('AI_HEALTH'),
+            'platform_health':load('PLATFORM_HEALTH'),
+            'security_checks':{
+              'unauthenticated_me_http':int(os.environ.get('ME_STATUS') or 0),
+              'invalid_login_http':int(os.environ.get('LOGIN_STATUS') or 0),
+              'bootstrap_without_token_http':int(os.environ.get('BOOTSTRAP_STATUS') or 0),
+            }
           }
-          with open('deployment/live-health.json', 'w', encoding='utf-8') as file:
-              json.dump(payload, file, ensure_ascii=False, indent=2)
-              file.write('\n')
+          with open('deployment/live-health.json','w',encoding='utf-8') as f:json.dump(payload,f,ensure_ascii=False,indent=2);f.write('\n')
           PY
-
           cat deployment/live-health.json
-          if [ "$status" != "healthy" ]; then
-            echo "Production verification failed"
-            exit 1
-          fi
+          test "$status" = "healthy"
       - name: Publish health verification result
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add deployment/live-health.json
-          git commit -m "chore(deploy): record live platform health [skip ci]" || exit 0
+          git commit -m "chore(deploy): record R2 multibrand health [skip ci]" || exit 0
           git push
