@@ -1,7 +1,7 @@
 import aiWorker from './index.js';
 import platformWorker from '../../professional/worker/src/index.js';
 
-const PLATFORM_RELEASE = '2026.07.21.12';
+const PLATFORM_RELEASE = '2026.07.21.13';
 
 function rewritePath(request, pathname) {
   const url = new URL(request.url);
@@ -27,17 +27,14 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // Preserve the existing Gemini contract used by the current PWA.
     if (isAiRoute(url.pathname)) {
       return aiWorker.fetch(request, env, ctx);
     }
 
-    // Independent health endpoint for the professional platform and D1.
     if (url.pathname === '/platform/health') {
       return withPlatformRelease(await platformWorker.fetch(rewritePath(request, '/health'), env, ctx));
     }
 
-    // Pedidos Pro Platform owns /api/* and the application shell/assets.
     return withPlatformRelease(await platformWorker.fetch(request, env, ctx));
   }
 };
