@@ -1,7 +1,7 @@
 {
   "status": "failed",
   "application_shell": true,
-  "checked_at": "2026-07-21T22:05:23.953898+00:00",
+  "checked_at": "2026-07-21T22:06:24.341839+00:00",
   "url": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/",
   "ai_health": {
     "ok": true,
@@ -20,7 +20,7 @@
     "storageConfigured": false,
     "aiEndpoint": true,
     "environment": "production",
-    "timestamp": "2026-07-21T22:05:22.688Z"
+    "timestamp": "2026-07-21T22:06:23.193Z"
   },
   "security_checks": {
     "unauthenticated_me_http": 401,
