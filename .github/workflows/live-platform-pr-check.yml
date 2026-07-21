@@ -13,11 +13,12 @@ jobs:
   check-live:
     runs-on: ubuntu-latest
     steps:
-      - name: Compare deployed and nonexistent workers.dev hosts
+      - name: Inspect target and existing Cloudflare Worker
         shell: bash
         run: |
           set -u
-          HOST="pedidos-pro-platform.botreservasmultilocal.workers.dev"
+          TARGET="pedidos-pro-platform.botreservasmultilocal.workers.dev"
+          EXISTING="pedidos-pro-ai.botreservasmultilocal.workers.dev"
           RANDOM_HOST="pedidos-pro-does-not-exist-7261.botreservasmultilocal.workers.dev"
 
           probe() {
@@ -27,22 +28,15 @@ jobs:
               --output "/tmp/${label}.body" --write-out '%{http_code}' "$url" || echo CURL_ERROR)
             echo "${label}_HTTP=${code}"
             printf '%s_BODY=' "$label"
-            head -c 500 "/tmp/${label}.body" 2>/dev/null || true
+            head -c 1200 "/tmp/${label}.body" 2>/dev/null || true
             echo
           }
 
-          echo "TARGET_DNS=$(getent ahostsv4 "$HOST" | head -1 || true)"
-          echo "RANDOM_DNS=$(getent ahostsv4 "$RANDOM_HOST" | head -1 || true)"
-          probe APP "https://${HOST}/"
-          probe HEALTH "https://${HOST}/health"
+          probe TARGET_ROOT "https://${TARGET}/"
+          probe TARGET_HEALTH "https://${TARGET}/health"
+          probe EXISTING_ROOT "https://${EXISTING}/"
+          probe EXISTING_HEALTH "https://${EXISTING}/health"
+          probe EXISTING_AI "https://${EXISTING}/v1/models"
           probe RANDOM "https://${RANDOM_HOST}/"
 
-          app_code=$(curl --silent --show-error --location --max-time 30 \
-            --output /tmp/final-app.body --write-out '%{http_code}' "https://${HOST}/" || true)
-          health_code=$(curl --silent --show-error --location --max-time 30 \
-            --output /tmp/final-health.body --write-out '%{http_code}' "https://${HOST}/health" || true)
-          test "$app_code" = "200"
-          grep -q 'Pedidos Pro Platform' /tmp/final-app.body
-          test "$health_code" = "200"
-          grep -q '"ok":true' /tmp/final-health.body
-          grep -q '"databaseInitialized":true' /tmp/final-health.body
+          exit 1
