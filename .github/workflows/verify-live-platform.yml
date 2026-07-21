@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: verify-live-platform
@@ -20,26 +20,65 @@ jobs:
   verify-live:
     runs-on: ubuntu-latest
     steps:
-      - name: Wait for Cloudflare deployment and verify health
+      - uses: actions/checkout@v4
+      - name: Wait for Cloudflare deployment and verify endpoints
+        id: verify
         shell: bash
         run: |
-          set -euo pipefail
-          URL="https://pedidos-pro-platform.botreservasmultilocal.workers.dev/health"
+          set -u
+          HEALTH_URL="https://pedidos-pro-platform.botreservasmultilocal.workers.dev/health"
+          APP_URL="https://pedidos-pro-platform.botreservasmultilocal.workers.dev/"
+          status="failed"
+          response=""
+          shell_ok="false"
+
           for attempt in $(seq 1 36); do
             echo "Health check attempt ${attempt}/36"
-            if response=$(curl --fail --silent --show-error --max-time 20 "$URL"); then
-              echo "$response"
-              echo "$response" | grep -q '"ok":true'
-              echo "$response" | grep -q '"databaseInitialized":true'
-              echo "$response" | grep -q '"service":"pedidos-pro-platform"'
-              exit 0
+            response=$(curl --fail --silent --show-error --max-time 20 "$HEALTH_URL" 2>/dev/null || true)
+            if echo "$response" | grep -q '"ok":true' \
+              && echo "$response" | grep -q '"databaseInitialized":true' \
+              && echo "$response" | grep -q '"service":"pedidos-pro-platform"'; then
+              status="healthy"
+              break
             fi
             sleep 10
           done
-          echo "Platform did not become healthy within six minutes"
-          exit 1
-      - name: Verify application shell
+
+          if curl --fail --silent --show-error --max-time 20 "$APP_URL" | grep -q 'Pedidos Pro Platform'; then
+            shell_ok="true"
+          else
+            status="failed"
+          fi
+
+          mkdir -p deployment
+          STATUS="$status" RESPONSE="$response" SHELL_OK="$shell_ok" python - <<'PY'
+          import datetime, json, os
+          raw = os.environ.get('RESPONSE', '')
+          try:
+              health = json.loads(raw) if raw else None
+          except json.JSONDecodeError:
+              health = {'raw': raw[:1000]}
+          payload = {
+              'status': os.environ.get('STATUS', 'failed'),
+              'application_shell': os.environ.get('SHELL_OK') == 'true',
+              'checked_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'url': 'https://pedidos-pro-platform.botreservasmultilocal.workers.dev/',
+              'health': health,
+          }
+          with open('deployment/live-health.json', 'w', encoding='utf-8') as file:
+              json.dump(payload, file, ensure_ascii=False, indent=2)
+              file.write('\n')
+          PY
+
+          if [ "$status" != "healthy" ]; then
+            echo "Platform did not become healthy within six minutes"
+            exit 1
+          fi
+      - name: Publish health verification result
+        if: always()
         run: |
-          curl --fail --silent --show-error --max-time 20 \
-            https://pedidos-pro-platform.botreservasmultilocal.workers.dev/ \
-            | grep -q 'Pedidos Pro Platform'
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployment/live-health.json
+          git commit -m "chore(deploy): record live platform health [skip ci]" || exit 0
+          git push
