@@ -1,0 +1,40 @@
+name: Deploy Pedidos Pro AI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'worker/**'
+      - '.github/workflows/deploy-ai-worker.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GEMINI_SECRET: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate Worker
+        working-directory: worker
+        run: npm install && npm run check
+      - name: Deploy Worker
+        if: env.CF_API_TOKEN != '' && env.CF_ACCOUNT_ID != '' && env.GEMINI_SECRET != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          command: deploy
+          secrets: |
+            GEMINI_API_KEY
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: Explain skipped deployment
+        if: env.CF_API_TOKEN == '' || env.CF_ACCOUNT_ID == '' || env.GEMINI_SECRET == ''
+        run: echo "Worker validado. El despliegue se omitió porque faltan secretos de Cloudflare o Gemini."
