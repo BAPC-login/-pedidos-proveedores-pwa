@@ -5,7 +5,7 @@ $('#loginForm').addEventListener('submit',async event=>{event.preventDefault();c
 $('#openBootstrap').onclick=openBootstrap;
 $('#logoutButton').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST',json:{}})}catch{}logoutLocal()};
 $$('[data-view]').forEach(button=>button.addEventListener('click',()=>navigate(button.dataset.view)));
-$('#primaryAction').onclick=()=>handleAction(state.view==='catalog'?'new-product':state.view==='suppliers'?'new-supplier':state.view==='team'?'new-user':'new-order');
+$('#primaryAction').onclick=()=>handleAction(state.view==='invoices'?'analyze-invoice':state.view==='catalog'?'new-product':state.view==='suppliers'?'new-supplier':state.view==='team'?'new-user':'new-order');
 $('#mobileCreate').onclick=()=>openOrder();
 $('#themeButton').onclick=()=>{const current=document.documentElement.dataset.theme;setTheme(current==='system'?'light':current==='light'?'dark':'system')};
 $('#syncChip').onclick=syncMutations;
@@ -16,7 +16,7 @@ function openCommand(){
 }
 function renderCommands(){
   const query=$('#commandInput').value.toLowerCase();
-  const commands=[['dashboard','Ir a Resumen'],['orders','Ir a Pedidos'],['catalog','Ir a Catálogo'],['suppliers','Ir a Proveedores'],['settings','Ir a Configuración']].filter(([,label])=>label.toLowerCase().includes(query));
+  const commands=[['dashboard','Ir a Resumen'],['orders','Ir a Pedidos'],['invoices','Ir a Facturas'],['catalog','Ir a Catálogo'],['suppliers','Ir a Proveedores'],['settings','Ir a Configuración']].filter(([,label])=>label.toLowerCase().includes(query));
   $('#commandResults').innerHTML=commands.map(([view,label])=>`<button class="command-result" data-command="${view}"><span>${label}</span><span>↵</span></button>`).join('');
   $$('[data-command]').forEach(node=>node.onclick=()=>{$('#commandMenu').classList.add('hidden');navigate(node.dataset.command)})
 }
