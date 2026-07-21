@@ -104,7 +104,7 @@
   }
   async function decorateRow(row){
     const review=row.querySelector('[data-invoice-review]');if(!review)return;
-    const id=Number(review.dataset.invoiceReview);if(!id||row.dataset.v18Decorating==='1')return;
+    const id=Number(review.dataset.invoiceReview);if(!id||row.dataset.v18Ready==='1'||row.dataset.v18Decorating==='1')return;
     row.dataset.v18Decorating='1';
     try{
       const invoice=await DB.get('invoices',id);if(!invoice)return;
