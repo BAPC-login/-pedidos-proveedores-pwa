@@ -1,5 +1,5 @@
-checked_at=2026-07-21T23:51:15Z
-commit=ff6da57ef3424da91ac1758bf6b6b664528fd5b0
+checked_at=2026-07-21T23:52:47Z
+commit=e1013cad189f3fd85df3c1ae42923d6e027e3962
 --- professional verify ---
 
 > pedidos-pro-platform@2.0.0-alpha.4 verify
@@ -15,31 +15,37 @@ commit=ff6da57ef3424da91ac1758bf6b6b664528fd5b0
 
 professional core tests: OK
 verify_status=0
---- npm ci ---
-npm error code EUSAGE
-npm error
-npm error The `npm ci` command can only install with an existing package-lock.json or
-npm error npm-shrinkwrap.json with lockfileVersion >= 1. Run an install with npm@5 or
-npm error later to generate a package-lock.json file, then try again.
-npm error
-npm error Clean install a project
-npm error
-npm error Usage:
-npm error npm ci
-npm error
-npm error Options:
-npm error [--install-strategy <hoisted|nested|shallow|linked>] [--legacy-bundling]
-npm error [--global-style] [--omit <dev|optional|peer> [--omit <dev|optional|peer> ...]]
-npm error [--include <prod|dev|optional|peer> [--include <prod|dev|optional|peer> ...]]
-npm error [--strict-peer-deps] [--foreground-scripts] [--ignore-scripts] [--no-audit]
-npm error [--no-bin-links] [--no-fund] [--dry-run]
-npm error [-w|--workspace <workspace-name> [-w|--workspace <workspace-name> ...]]
-npm error [-ws|--workspaces] [--include-workspace-root] [--install-links]
-npm error
-npm error aliases: clean-install, ic, install-clean, isntall-clean
-npm error
-npm error Run "npm help ci" for more info
-npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-07-21T23_51_16_554Z-debug-0.log
-npm_status=1
 --- wrangler dry run ---
-wrangler_status=99
+
+ ⛅️ wrangler 4.67.0 (update available 4.113.0)
+──────────────────────────────────────────────
+
+Cloudflare collects anonymous telemetry about your usage of Wrangler. Learn more at https://github.com/cloudflare/workers-sdk/tree/main/packages/wrangler/telemetry.md
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 3 errors:[0m
+
+  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mNo matching export in "../professional/worker/src/core.js" for import "applySecurityHeaders"[0m
+  
+      ../professional/worker/src/index.js:2:2:
+  [37m      2 │   [32mapplySecurityHeaders[37m,
+          ╵   [32m~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mNo matching export in "../professional/worker/src/core.js" for import "preflight"[0m
+  
+      ../professional/worker/src/index.js:5:2:
+  [37m      5 │   [32mpreflight[37m,
+          ╵   [32m~~~~~~~~~[0m
+  
+  
+  [31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mNo matching export in "../professional/worker/src/auth.js" for import "changePassword"[0m
+  
+      ../professional/worker/src/index.js:12:2:
+  [37m      12 │   [32mchangePassword[37m,
+           ╵   [32m~~~~~~~~~~~~~~[0m
+  
+  
+
+
+🪵  Logs were written to "/home/runner/.config/.wrangler/logs/wrangler-2026-07-21_23-53-02_657.log"
+wrangler_status=1
