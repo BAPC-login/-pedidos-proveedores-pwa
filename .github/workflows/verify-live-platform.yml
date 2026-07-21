@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Wait for Cloudflare and verify R2 multibrand production
+      - name: Wait for Cloudflare and verify persistent multibrand production
         shell: bash
         run: |
           set -u
@@ -42,14 +42,14 @@ jobs:
             if echo "$app" | grep -q 'Pedidos Pro Platform' \
               && echo "$app_actions" | grep -q 'Nueva marca' \
               && echo "$app_actions" | grep -q 'Locales permitidos' \
-              && echo "$app_views" | grep -q 'Archivo documental R2' \
+              && echo "$app_views" | grep -q 'Archivo documental' \
               && echo "$ai_health" | grep -q '"service":"pedidos-pro-ai"' \
               && echo "$ai_health" | grep -q '"geminiConfigured":true' \
               && echo "$platform_health" | grep -q '"service":"pedidos-pro-platform"' \
               && echo "$platform_health" | grep -q '"databaseInitialized":true' \
               && echo "$platform_health" | grep -q '"schemaVersion":"7"' \
               && echo "$platform_health" | grep -q '"storageConfigured":true' \
-              && echo "$platform_health" | grep -q '"storageBackend":"r2"'; then
+              && echo "$platform_health" | grep -Eq '"storageBackend":"(r2|d1-chunks)"'; then
               app_ok="true"
               status="healthy"
               break
@@ -75,7 +75,7 @@ jobs:
             'application_shell':os.environ.get('APP_OK')=='true',
             'checked_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
             'url':'https://pedidos-pro-ai.botreservasmultilocal.workers.dev/',
-            'release':'r2-multibrand-schema-7',
+            'release':'multibrand-schema-7-persistent-archive',
             'ai_health':load('AI_HEALTH'),
             'platform_health':load('PLATFORM_HEALTH'),
             'security_checks':{
@@ -94,5 +94,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add deployment/live-health.json
-          git commit -m "chore(deploy): record R2 multibrand health [skip ci]" || exit 0
+          git commit -m "chore(deploy): record persistent archive health [skip ci]" || exit 0
           git push
