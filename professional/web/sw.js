@@ -1,4 +1,4 @@
-const VERSION = 'pedidos-pro-platform-v2-alpha2';
+const VERSION = 'pedidos-pro-platform-v2-alpha4';
 const SHELL = [
   './', './index.html', './styles.css', './app.js', './app-core.js', './app-views.js', './app-actions.js',
   './app-modal.js', './app-order-detail.js', './app-invoices.js', './manifest.webmanifest', './icon.svg'
