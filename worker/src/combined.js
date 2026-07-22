@@ -2,7 +2,7 @@ import aiWorker from './index.js';
 import platformWorker from '../../professional/worker/src/index.js';
 import {ensureSchema} from '../../professional/worker/src/schema.js';
 
-const PLATFORM_RELEASE = '2026.07.21.15';
+const PLATFORM_RELEASE = '2026.07.21.16';
 
 function rewritePath(request, pathname) {
   const url = new URL(request.url);
