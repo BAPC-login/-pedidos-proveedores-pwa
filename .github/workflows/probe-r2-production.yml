@@ -12,20 +12,18 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Print live production diagnostic
+      - name: Print release 16 health diagnostic
         shell: bash
         run: |
           set -u
           BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
           for attempt in $(seq 1 18); do
             health_code=$(curl --silent --show-error --max-time 30 --dump-header /tmp/health.headers --output /tmp/health.json --write-out '%{http_code}' "$BASE/platform/health" || true)
-            diagnostic_code=$(curl --silent --show-error --max-time 30 --output /tmp/diagnostic.json --write-out '%{http_code}' "$BASE/api/platform-diagnostics" || true)
-            echo "attempt=${attempt} health=${health_code} diagnostic=${diagnostic_code}"
+            echo "attempt=${attempt} health=${health_code}"
+            cat /tmp/health.headers 2>/dev/null || true
             cat /tmp/health.json 2>/dev/null || true
             echo
-            cat /tmp/diagnostic.json 2>/dev/null || true
-            echo
-            if grep -qi '^x-pedidos-pro-release: 2026.07.21.15' /tmp/health.headers 2>/dev/null || grep -q '"release":"2026.07.21.15"' /tmp/diagnostic.json 2>/dev/null; then exit 0; fi
+            if grep -qi '^x-pedidos-pro-release: 2026.07.21.16' /tmp/health.headers 2>/dev/null; then exit 0; fi
             sleep 10
           done
           exit 1
