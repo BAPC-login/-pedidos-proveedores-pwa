@@ -130,6 +130,7 @@ export async function ensureSchema(env) {
     const identityStatements = await executeSchema(env.DB, identitySchema, 'identity');
     const procurementStatements = await executeSchema(env.DB, procurementSchema, 'procurement');
     const invoiceStatements = await executeSchema(env.DB, invoiceSchema, 'invoices');
+    const platformStatements = await executeSchema(env.DB, platformSchema, 'platform-r2-history');
     const fileChunkStatements = await executeSchema(env.DB, fileChunkSchema, 'file-chunks');
     const seeded = await seedDefaultWorkspace(env.DB);
     const ownerPasswordMigrated = await migrateSeededOwnerPassword(env.DB);
