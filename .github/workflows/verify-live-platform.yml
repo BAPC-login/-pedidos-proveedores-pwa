@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Wait for Cloudflare and verify cost centers production
+      - name: Wait for Cloudflare and verify professional production
         shell: bash
         run: |
           set -u
@@ -32,8 +32,8 @@ jobs:
           platform_health=""
           release_header=""
 
-          for attempt in $(seq 1 42); do
-            echo "Production verification attempt ${attempt}/42"
+          for attempt in $(seq 1 48); do
+            echo "Production verification attempt ${attempt}/48"
             app=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/" 2>/dev/null || true)
             ai_health=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/health" 2>/dev/null || true)
             platform_health=$(curl --fail --silent --show-error --max-time 20 --dump-header /tmp/platform.headers "$BASE_URL/platform/health" 2>/dev/null || true)
@@ -43,20 +43,29 @@ jobs:
             release_header=$(grep -i '^x-pedidos-pro-release:' /tmp/platform.headers 2>/dev/null | tr -d '\r' | awk '{print $2}' || true)
 
             if echo "$app" | grep -q 'Pedidos Pro Platform' \
+              && echo "$app_actions" | grep -q 'openWorkspaceSwitcher' \
+              && echo "$app_actions" | grep -q 'Crear usuario' \
+              && echo "$app_actions" | grep -q 'Crear pedido y PDF' \
               && echo "$app_actions" | grep -q 'Nuevo centro de costo' \
-              && echo "$app_actions" | grep -q 'Locales permitidos' \
-              && echo "$app_actions" | grep -q 'costCenterId' \
-              && echo "$app_views" | grep -q 'Catálogo por centro de costo' \
-              && echo "$app_views" | grep -q 'Información útil sin paneles de relleno' \
+              && echo "$app_views" | grep -q 'Base operativa disponible' \
+              && echo "$app_views" | grep -q 'Catálogo de compras' \
+              && echo "$app_views" | grep -q 'Administrar usuarios' \
+              && echo "$app_index" | grep -q 'id="modalClose"' \
+              && echo "$app_index" | grep -q 'novalidate' \
               && ! echo "$app_index" | grep -q 'loginOrg' \
               && echo "$ai_health" | grep -q '"service":"pedidos-pro-ai"' \
               && echo "$ai_health" | grep -q '"geminiConfigured":true' \
               && echo "$platform_health" | grep -q '"service":"pedidos-pro-platform"' \
               && echo "$platform_health" | grep -q '"databaseInitialized":true' \
-              && echo "$platform_health" | grep -q '"schemaVersion":"8"' \
+              && echo "$platform_health" | grep -q '"schemaVersion":"9"' \
+              && echo "$platform_health" | grep -q '"catalogReady":true' \
+              && echo "$platform_health" | grep -q '"catalogProducts":194' \
+              && echo "$platform_health" | grep -q '"catalogSuppliers":12' \
+              && echo "$platform_health" | grep -q '"platformOwnerReady":true' \
+              && echo "$platform_health" | grep -q '"activeLocations":1' \
               && echo "$platform_health" | grep -q '"storageConfigured":true' \
               && echo "$platform_health" | grep -Eq '"storageBackend":"(r2|d1-chunks)"' \
-              && [ "$release_header" = "2026.07.22.20" ]; then
+              && [ "$release_header" = "2026.07.22.21" ]; then
               app_ok="true"
               status="healthy"
               break
@@ -101,5 +110,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add deployment/live-health.json
-          git commit -m "chore(deploy): record cost centers health [skip ci]" || exit 0
+          git commit -m "chore(deploy): record professional catalog health [skip ci]" || exit 0
           git push
