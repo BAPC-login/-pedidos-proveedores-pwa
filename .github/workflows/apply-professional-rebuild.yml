@@ -48,7 +48,8 @@ jobs:
           grep -q "SCHEMA_VERSION = '9'" professional/worker/src/schema.js
           grep -q "LEGACY_CATALOG_SIZE = LEGACY_ITEMS.length" professional/worker/src/legacyCatalog.js
           grep -q "openWorkspaceSwitcher" professional/web/app-actions.js
-          grep -q "data-modal-close" professional/web/index.html
+          grep -q 'id="modalClose"' professional/web/index.html
+          grep -q 'novalidate' professional/web/index.html
           grep -q "catalogReady" professional/worker/src/index-scoped.js
           grep -q "2026.07.22.21" worker/src/combined.js
       - name: Bundle Cloudflare worker
