@@ -1,6 +1,13 @@
 name: Apply professional rebuild
 
 on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'tools/apply-professional-rebuild.mjs'
+      - 'tools/professional-rebuild-chunks/**'
+      - '.github/workflows/apply-professional-rebuild.yml'
   push:
     branches: [main]
     paths:
@@ -12,7 +19,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: professional-rebuild
+  group: professional-rebuild-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -20,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
       - name: Apply professional release
         run: node tools/apply-professional-rebuild.mjs
       - name: Verify source and tests
@@ -46,6 +55,7 @@ jobs:
         working-directory: worker
         run: npx --yes wrangler@4.67.0 deploy --dry-run --outdir /tmp/pedidos-pro-professional-release
       - name: Commit generated release
+        if: github.event_name == 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "4189826+github-actions[bot]@users.noreply.github.com"
