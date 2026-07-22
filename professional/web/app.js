@@ -2,10 +2,12 @@ import {$,$$,state,api,toast,setBusy,setTheme,syncMutations,updateSyncChip,showA
 import {navigate} from './app-views.js';
 import {openBootstrap,openOrder,openWorkspaceSwitcher,handleAction} from './app-actions.js';
 import {initializeBrandingFeatures,refreshBranding} from './app-branding.js';
+import {initializeOrderCore} from './app-order-core.js';
 import {initializeStabilityPass} from './app-stability.js';
 import {initializeCompanyLogoUploader} from './app-company-logo.js';
 
 initializeBrandingFeatures();
+initializeOrderCore();
 initializeStabilityPass();
 initializeCompanyLogoUploader();
 
@@ -21,7 +23,7 @@ $('#loginForm').addEventListener('submit',async event=>{
     state.token=response.token;
     localStorage.setItem('pp:token',state.token);
     state.me=await api('/api/me');
-    await refreshBranding(true);
+    try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}
     showApp();
     await navigate('dashboard');
     toast('Sesión iniciada');
@@ -100,13 +102,14 @@ async function initialize(){
   }
   try{
     state.me=await api('/api/me');
-    await refreshBranding(true);
-    showApp();
-    await navigate('dashboard');
-    syncMutations();
   }catch(error){
-    console.error(error);
-    logoutLocal();
+    if(error.status===401)logoutLocal();
+    else{showAuth();toast('No se pudo validar la sesión. Revisa tu conexión.','error')}
+    return;
   }
+  try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}
+  showApp();
+  try{await navigate('dashboard')}catch(error){console.warn('dashboard_load_failed',error);toast('La sesión sigue activa. Reintenta cargar el panel.','error')}
+  syncMutations();
 }
 initialize();
