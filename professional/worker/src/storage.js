@@ -102,10 +102,17 @@ export async function recordSnapshot(env,actor,{entityType,entityId,locationId=n
 }
 
 export async function archiveOrderPdf(env,actor,order){
+  const requesterId=String(order.requestedById||'');
+  const requesterName=String(order.requestedBy||'');
   const [organization,location,requester]=await Promise.all([
     env.DB.prepare('SELECT name, settings_json FROM organizations WHERE id = ?').bind(actor.orgId).first(),
     env.DB.prepare('SELECT id, name, details_json FROM locations WHERE id = ? AND org_id = ?').bind(order.locationId,actor.orgId).first(),
-    env.DB.prepare('SELECT display_name, profile_json FROM users WHERE id = ?').bind(order.requestedById||actor.userId).first()
+    env.DB.prepare(`
+      SELECT display_name, profile_json FROM users
+      WHERE id = ? OR (? = '' AND display_name = ?)
+      ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END
+      LIMIT 1
+    `).bind(requesterId,requesterId,requesterName,requesterId).first()
   ]);
   const settings=safeJson(organization?.settings_json,{});
   const business=settings.business||{};

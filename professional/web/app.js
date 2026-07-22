@@ -3,9 +3,11 @@ import {navigate} from './app-views.js';
 import {openBootstrap,openOrder,openWorkspaceSwitcher,handleAction} from './app-actions.js';
 import {initializeBrandingFeatures,refreshBranding} from './app-branding.js';
 import {initializeStabilityPass} from './app-stability.js';
+import {initializeCompanyLogoUploader} from './app-company-logo.js';
 
 initializeBrandingFeatures();
 initializeStabilityPass();
+initializeCompanyLogoUploader();
 
 $('#loginForm').addEventListener('submit',async event=>{
   event.preventDefault();

@@ -43,6 +43,10 @@ import {
   transitionOrder,
   updateOrder
 } from './api/orders.js';
+import {createOrderBatch, deleteDraftOrder} from './api/order-batches.js';
+import {importCatalog, listSupplierAssets, updateSupplierIdentity} from './api/catalog-admin.js';
+import {getDashboardAnalytics} from './api/analytics.js';
+import {getGeminiDashboardInsights} from './api/analytics-ai.js';
 import {
   analyzeInvoice,
   auditLog,
@@ -55,7 +59,7 @@ import {getSettings, updateSettings} from './api/settings.js';
 import {createBrand, listBrands, switchBrand} from './platform.js';
 import {listDocuments} from './storage.js';
 
-const APP_VERSION = '2.0.0-alpha.6';
+const APP_VERSION = '2.0.0-alpha.7';
 
 function addPlatformHeaders(response, request, env) {
   const headers = new Headers(response.headers);
@@ -95,6 +99,7 @@ async function handleRequest(request, env, ctx) {
       storageBackend: env.FILES ? 'r2' : 'd1-chunks',
       r2Configured: Boolean(env.FILES),
       aiEndpoint: Boolean(env.AI_ENDPOINT),
+      geminiConfigured: Boolean(env.GEMINI_API_KEY),
       environment: env.ENVIRONMENT || 'development',
       timestamp: new Date().toISOString()
     }, request, env);
@@ -115,6 +120,8 @@ async function handleRequest(request, env, ctx) {
   if (method === 'POST' && path === '/api/auth/logout') return ok(await logout(request, env, actor), request, env);
   if (method === 'GET' && path === '/api/me') return ok(await me(env, actor), request, env);
   if (method === 'GET' && path === '/api/dashboard') return ok(await dashboard(env, actor), request, env);
+  if (method === 'GET' && path === '/api/dashboard/analytics') return ok({analytics: await getDashboardAnalytics(env, actor, url)}, request, env);
+  if (method === 'POST' && path === '/api/dashboard/insights') return ok(await getGeminiDashboardInsights(request, env, actor, url), request, env);
   if (method === 'GET' && path === '/api/settings') return ok(await getSettings(env, actor), request, env);
   if (method === 'PATCH' && path === '/api/settings') return ok(await updateSettings(request, env, actor), request, env);
 
@@ -130,6 +137,10 @@ async function handleRequest(request, env, ctx) {
   if (method === 'GET' && path === '/api/categories') return ok({categories: await listCategories(env, actor)}, request, env);
   if (method === 'GET' && path === '/api/suppliers') return ok({suppliers: await listSuppliers(env, actor, url)}, request, env);
   if (method === 'POST' && path === '/api/suppliers') return ok({supplier: await createSupplier(request, env, actor)}, request, env);
+  if (method === 'GET' && path === '/api/supplier-assets') return ok({assets: await listSupplierAssets(env, actor)}, request, env);
+  const supplierIdentityParams = routeMatch(path, '/api/suppliers/:id/identity');
+  if (supplierIdentityParams && method === 'PATCH') return ok({identity: await updateSupplierIdentity(request, env, actor, supplierIdentityParams.id)}, request, env);
+  if (method === 'POST' && path === '/api/catalog/import') return ok({result: await importCatalog(request, env, actor)}, request, env);
   if (method === 'GET' && path === '/api/products') return ok({products: await listProducts(env, actor, url)}, request, env);
   if (method === 'POST' && path === '/api/products') return ok({product: await createProduct(request, env, actor)}, request, env);
   const productCostCenterParams = routeMatch(path, '/api/products/:id/cost-centers');
@@ -139,9 +150,11 @@ async function handleRequest(request, env, ctx) {
 
   if (method === 'GET' && path === '/api/orders') return ok({orders: await listOrders(env, actor, url)}, request, env);
   if (method === 'POST' && path === '/api/orders') return ok({order: await createOrder(request, env, actor)}, request, env);
+  if (method === 'POST' && path === '/api/order-batches') return ok({batch: await createOrderBatch(request, env, actor)}, request, env);
   const orderParams = routeMatch(path, '/api/orders/:id');
   if (orderParams && method === 'GET') return ok({order: await getOrder(env, actor, orderParams.id)}, request, env);
   if (orderParams && method === 'PATCH') return ok({order: await updateOrder(request, env, actor, orderParams.id)}, request, env);
+  if (orderParams && method === 'DELETE') return ok(await deleteDraftOrder(request, env, actor, orderParams.id), request, env);
   const transitionParams = routeMatch(path, '/api/orders/:id/transition');
   if (transitionParams && method === 'POST') return ok({order: await transitionOrder(request, env, actor, transitionParams.id)}, request, env);
   const receptionParams = routeMatch(path, '/api/orders/:id/receptions');
