@@ -1,22 +1,24 @@
-name: Validate final cost centers release
+name: Finalize and validate cost centers release
 
 on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
     paths:
-      - 'tools/validate-cost-centers-final.txt'
+      - 'tools/finalize-cost-centers-trigger.txt'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  validate:
+  finalize:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
+      - name: Apply final scope fixes
+        run: node tools/finalize-cost-centers.mjs
       - name: Run platform tests
         working-directory: professional
         run: npm run verify
@@ -40,15 +42,20 @@ jobs:
           grep -q "'Barra', 'BARRA'" professional/migrations/0005_cost_centers.sql
           grep -q "'Salón', 'SALON'" professional/migrations/0005_cost_centers.sql
           grep -q "'Cocina', 'COCINA'" professional/migrations/0005_cost_centers.sql
-          grep -q "costCenterId" professional/web/app-actions.js
-          grep -q "new-cost-center" professional/web/app-views.js
-          grep -q "isPlatformOwner" professional/web/app-core.js
+          grep -q "costCenterName:order.cost_center_name" professional/worker/src/api/catalog.js
+          grep -q "pccscope" professional/worker/src/api/catalog.js
+          grep -q "const PLATFORM_RELEASE = '2026.07.22.20'" worker/src/combined.js
           ! grep -q "loginOrg" professional/web/index.html
           ! grep -q "loginOrg" professional/web/app.js
           ! grep -q "freeUsageText\|freeUsageBar" professional/web/app-core.js
-          ! test -e tools/apply-cost-centers-login-ui.mjs
-          ! test -e tools/fix-cost-centers-applicator.mjs
-          ! test -e tools/apply-cost-centers-error.txt
       - name: Bundle exact Cloudflare worker
         working-directory: worker
         run: npx --yes wrangler@4.67.0 deploy --dry-run --outdir /tmp/pedidos-pro-cost-centers-final
+      - name: Commit final release to PR branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "4189826+github-actions[bot]@users.noreply.github.com"
+          rm -f tools/finalize-cost-centers.mjs tools/finalize-cost-centers-trigger.txt tools/validate-cost-centers-final.txt
+          git add -A
+          git commit -m "fix: scope dashboard and products by cost center"
+          git push origin HEAD:${{ github.head_ref }}
