@@ -1,0 +1,1 @@
+Validate final Madriguera Clubhaus cost centers release after manual UI runtime review.
