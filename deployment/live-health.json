@@ -1,9 +1,9 @@
 {
   "status": "healthy",
   "application_shell": true,
-  "checked_at": "2026-07-22T07:41:54.881986+00:00",
+  "checked_at": "2026-07-22T16:12:51.919534+00:00",
   "url": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/",
-  "release": "2026.07.22.23",
+  "release": "2026.07.22.24",
   "ai_health": {
     "ok": true,
     "service": "pedidos-pro-ai",
@@ -14,7 +14,7 @@
   "platform_health": {
     "ok": true,
     "service": "pedidos-pro-platform",
-    "version": "2.0.0-alpha.7",
+    "version": "2.0.0-alpha.8",
     "databaseConfigured": true,
     "databaseInitialized": true,
     "schemaVersion": "10",
@@ -30,8 +30,9 @@
     "r2Configured": false,
     "aiEndpoint": true,
     "geminiConfigured": true,
+    "orderCore": true,
     "environment": "production",
-    "timestamp": "2026-07-22T07:41:53.933Z"
+    "timestamp": "2026-07-22T16:12:47.869Z"
   },
   "security_checks": {
     "unauthenticated_me_http": 401,
