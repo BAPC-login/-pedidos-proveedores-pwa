@@ -28,6 +28,11 @@ const currentSchemaPatch = `replace('professional/worker/src/schema.js',
 if (!source.includes(oldSchemaPatch)) throw new Error('Schema applicator patch block was not found');
 source = source.replace(oldSchemaPatch, currentSchemaPatch);
 
+const oldStoragePatch = "replace('professional/worker/src/storage.js',\n`    \\`Local: ${order.locationName || ''}\\`,\n    \\`Proveedor: ${order.supplierName || ''}\\`,` ,\n`    \\`Local: ${order.locationName || ''}\\`,\n    \\`Centro de costo: ${order.costCenterName || 'Barra'}\\`,\n    \\`Proveedor: ${order.supplierName || ''}\\`,`);".replace("`,` ,", "`,`");
+const currentStoragePatch = "replace('professional/worker/src/storage.js',\n  \"`Local: ${order.locationName||''}`,`Proveedor: ${order.supplierName||''}`\",\n  \"`Local: ${order.locationName||''}`,`Centro de costo: ${order.costCenterName||'Barra'}`,`Proveedor: ${order.supplierName||''}`\");";
+if (!source.includes(oldStoragePatch)) throw new Error('Storage applicator patch block was not found');
+source = source.replace(oldStoragePatch, currentStoragePatch);
+
 // Normalize zero, one or multiple slashes before ${...} to exactly one escape.
 source = source.replace(/\\*\$\{/g, '\\${');
 // This is the only interpolation that belongs to the applicator itself.
@@ -50,4 +55,4 @@ literalizeWriteBlock('professional/web/app-actions.js', "write('professional/web
 literalizeWriteBlock('professional/web/app-views.js', "replace('professional/web/app-order-detail.js',");
 
 fs.writeFileSync(path, source);
-console.log('Schema order, generated expressions and frontend templates normalized.');
+console.log('Schema order, storage marker, generated expressions and frontend templates normalized.');
