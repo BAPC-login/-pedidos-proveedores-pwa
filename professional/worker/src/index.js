@@ -164,6 +164,17 @@ export default {
     try {
       return addPlatformHeaders(await handleRequest(request, env, ctx), request, env);
     } catch (error) {
+      const pathname = new URL(request.url).pathname;
+      if (pathname === '/health') {
+        return addPlatformHeaders(new Response(JSON.stringify({
+          ok: false,
+          diagnostic: true,
+          name: String(error?.name || 'Error'),
+          code: error?.code ?? null,
+          error: String(error?.message || error),
+          stack: String(error?.stack || '').slice(0, 1800)
+        }), {status: 500, headers: {'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store'}}), request, env);
+      }
       if (Number(error?.status || 500) >= 500) console.error('request_failed', error);
       return errorResponse(error, request, env);
     }
