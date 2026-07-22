@@ -22,7 +22,7 @@ jobs:
           {
             echo "checked_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "commit=$GITHUB_SHA"
-            echo "router_fix=fde81c393955c42b04cb2369901a456c26632ef0"
+            echo "schema_fix=2b6494cde437653041f0e3bc567d5d5b5bfbac60"
             echo "--- professional verify ---"
             (cd professional && npm run verify)
             verify_status=$?
