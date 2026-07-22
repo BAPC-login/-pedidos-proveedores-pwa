@@ -1,76 +1,56 @@
-import {$,$$,esc,state,api,toast} from './app-core.js';
+import {$,$$,esc,state,api,toast,money} from './app-core.js';
 import {openModal} from './app-modal.js';
 
 const navigate=async view=>(await import('./app-views.js')).navigate(view);
 
 async function ensureSources(){
-  if(!state.cache.suppliers.length)state.cache.suppliers=(await api('/api/suppliers')).suppliers;
-  if(!state.cache.orders.length)state.cache.orders=(await api('/api/orders')).orders;
-  if(!state.cache.products.length)state.cache.products=(await api('/api/products')).products;
-  if(!state.cache.locations.length)state.cache.locations=(await api('/api/locations')).locations;
+  const requests=[];
+  if(!state.cache.suppliers.length)requests.push(api('/api/suppliers').then(payload=>state.cache.suppliers=payload.suppliers||[]));
+  if(!state.cache.orders.length)requests.push(api('/api/orders').then(payload=>state.cache.orders=payload.orders||[]));
+  if(!state.cache.products.length)requests.push(api('/api/products').then(payload=>state.cache.products=payload.products||[]));
+  if(!state.cache.locations.length)requests.push(api('/api/locations').then(payload=>state.cache.locations=payload.locations||[]));
+  await Promise.all(requests);
 }
 
+async function archivedOrderPdf(orderId){
+  const payload=await api(`/api/documents?entityType=order&entityId=${encodeURIComponent(orderId)}&kind=order_pdf`);
+  const document=(payload.documents||[]).sort((a,b)=>Number(b.revision||0)-Number(a.revision||0))[0];
+  if(!document?.key)return null;
+  const response=await fetch(`/api/files/${encodeURIComponent(document.key)}`,{headers:{Authorization:`Bearer ${state.token}`}});
+  if(!response.ok)return null;
+  return new File([await response.blob()],document.name||'pedido.pdf',{type:'application/pdf'});
+}
+
+function confidenceLabel(value){const number=Number(value||0);return number>=.8?'Alta':number>=.55?'Media':'Revisar'}
+
 async function openInvoiceReview(analysis,supplierId,orderId='',locationId=''){
-  const invoice=analysis.invoice||{};
-  const lines=Array.isArray(invoice.lines)?invoice.lines:[];
-  const today=new Date().toISOString().slice(0,10);
+  const invoice=analysis.invoice||{};const lines=Array.isArray(invoice.lines)?invoice.lines:[];const warnings=invoice.warnings||[];const today=new Date().toISOString().slice(0,10);
   openModal({
-    eyebrow:'REVISIÓN DE FACTURA',title:`${lines.length} líneas detectadas`,
-    subtitle:`Modelo ${analysis.model||'IA'} · confirma antes de guardar`,
-    body:`<div class="form-grid"><label class="field"><span>Número de factura</span><input name="invoiceNumber" value="${esc(invoice.invoiceNumber||'')}" required></label><label class="field"><span>Fecha</span><input name="invoiceDate" type="date" value="${esc(invoice.invoiceDate||today)}" required></label><label class="field"><span>Neto</span><input name="net" type="number" min="0" value="${Number(invoice.totals?.net||0)}"></label><label class="field"><span>IVA</span><input name="vat" type="number" min="0" value="${Number(invoice.totals?.vat||invoice.totals?.tax||0)}"></label><label class="field"><span>Impuesto adicional</span><input name="additionalTax" type="number" min="0" value="${Number(invoice.totals?.additionalTax||0)}"></label><label class="field"><span>Total</span><input name="total" type="number" min="0" value="${Number(invoice.totals?.total||0)}"></label><div class="full table-card"><table class="data-table"><thead><tr><th>Texto leído</th><th>Producto</th><th>Cajas</th><th>Pack</th><th>Total línea</th></tr></thead><tbody>${lines.map((line,index)=>`<tr data-invoice-line="${index}"><td><strong>${esc(line.sourceLine||line.descriptionOriginal||line.description||`Línea ${index+1}`)}</strong></td><td><select class="input" name="productId"><option value="">Sin vincular</option>${state.cache.products.map(product=>`<option value="${esc(product.id)}" ${String(product.id)===String(line.productId)?'selected':''}>${esc(product.name)}</option>`).join('')}</select></td><td><input class="input" name="packageQty" type="number" min="0" step="0.001" value="${Number(line.packageQty??line.invoiceQuantity??0)}"></td><td><input class="input" name="packSize" type="number" min="0.001" step="0.001" value="${Number(line.packSize||1)}"></td><td><input class="input" name="grossLineTotal" type="number" min="0" value="${Number(line.grossLineTotal||0)}"></td></tr>`).join('')}</tbody></table></div></div>`,
-    submitLabel:'Guardar factura',
+    eyebrow:'COTEJO IA',title:`${lines.length} líneas detectadas`,subtitle:`Gemini ${analysis.model||''} · revisa coincidencias, cajas y precios finales antes de guardar`,size:'large',
+    body:`${warnings.length?`<section class="security-note"><strong>Advertencias de lectura</strong><p>${warnings.map(esc).join(' · ')}</p></section>`:''}<div class="form-grid"><label class="field"><span>Número de factura</span><input name="invoiceNumber" value="${esc(invoice.invoiceNumber||'')}" required></label><label class="field"><span>Fecha</span><input name="invoiceDate" type="date" value="${esc(invoice.invoiceDate||today)}" required></label><label class="field"><span>Neto</span><input name="net" type="number" min="0" value="${Number(invoice.totals?.net||0)}"></label><label class="field"><span>IVA</span><input name="vat" type="number" min="0" value="${Number(invoice.totals?.vat||invoice.totals?.tax||0)}"></label><label class="field"><span>Impuesto adicional</span><input name="additionalTax" type="number" min="0" value="${Number(invoice.totals?.additionalTax||0)}"></label><label class="field"><span>Total</span><input name="total" type="number" min="0" value="${Number(invoice.totals?.total||0)}"></label><div class="full table-card"><div class="responsive-table"><table class="data-table"><thead><tr><th>Texto leído</th><th>Producto cotejado</th><th>Confianza</th><th>Cajas</th><th>Unid./caja</th><th>Unidades</th><th>Total línea</th><th>Precio final unit.</th></tr></thead><tbody>${lines.map((line,index)=>`<tr data-invoice-line="${index}"><td><strong>${esc(line.sourceLine||line.descriptionOriginal||line.description||`Línea ${index+1}`)}</strong><br><small>${esc(line.matchReason||'')}</small></td><td><select class="input" name="productId"><option value="">Sin vincular</option>${state.cache.products.map(product=>`<option value="${esc(product.id)}" ${String(product.id)===String(line.productId)?'selected':''}>${esc(product.name)}</option>`).join('')}</select></td><td><span class="status ${Number(line.confidence||0)>=.55?'active':'requested'}">${confidenceLabel(line.confidence)} · ${Math.round(Number(line.confidence||0)*100)}%</span></td><td><input class="input" name="packageQty" type="number" min="0" step="0.001" value="${Number(line.packageQty??line.invoiceQuantity??0)}" inputmode="decimal"></td><td><input class="input" name="packSize" type="number" min="0.001" step="0.001" value="${Number(line.packSize||1)}" inputmode="decimal"></td><td data-calculated-units>${Number(line.units||0)}</td><td><input class="input" name="grossLineTotal" type="number" min="0" value="${Number(line.grossLineTotal||0)}" inputmode="numeric"></td><td data-calculated-price>${money(line.grossUnitPrice||0)}</td></tr>`).join('')}</tbody></table></div></div></div>`,
+    submitLabel:'Confirmar y guardar factura',
     onSubmit:async form=>{
-      const reviewedLines=$$('[data-invoice-line]').map((row,index)=>{
-        const original=lines[index]||{};
-        const packageQty=Number(row.querySelector('[name=packageQty]').value||0);
-        const packSize=Number(row.querySelector('[name=packSize]').value||1);
-        const grossLineTotal=Number(row.querySelector('[name=grossLineTotal]').value||0);
-        const units=packageQty*packSize;
-        return {...original,productId:row.querySelector('[name=productId]').value,sourceDescription:original.sourceLine||original.descriptionOriginal||original.description||`Línea ${index+1}`,packageQty,packSize,units,grossLineTotal,grossUnitPrice:units?Math.round(grossLineTotal/units):0};
-      });
-      await api('/api/invoices',{method:'POST',json:{
-        supplierId,locationId,orderIds:orderId?[orderId]:[],
-        invoiceNumber:form.get('invoiceNumber'),invoiceDate:form.get('invoiceDate'),currency:'CLP',documentType:'33',
-        totals:{net:Number(form.get('net')||0),vat:Number(form.get('vat')||0),additionalTax:Number(form.get('additionalTax')||0),total:Number(form.get('total')||0)},
-        aiModel:analysis.model||'',sourceFileId:analysis.sourceFile?.id||'',
-        aiConfidence:invoice.matchSummary?.matched&&lines.length?invoice.matchSummary.matched/lines.length:0,
-        lines:reviewedLines
-      }});
-      toast('Factura y original archivados');
-      await navigate('invoices');
+      const reviewedLines=$$('[data-invoice-line]').map((row,index)=>{const original=lines[index]||{};const packageQty=Number(row.querySelector('[name=packageQty]').value||0);const packSize=Number(row.querySelector('[name=packSize]').value||1);const grossLineTotal=Number(row.querySelector('[name=grossLineTotal]').value||0);const units=packageQty*packSize;return {...original,productId:row.querySelector('[name=productId]').value,sourceDescription:original.sourceLine||original.descriptionOriginal||original.description||`Línea ${index+1}`,packageQty,packSize,units,grossLineTotal,grossUnitPrice:units?Math.round(grossLineTotal/units):0}});
+      await api('/api/invoices',{method:'POST',json:{supplierId,locationId,orderIds:orderId?[orderId]:[],invoiceNumber:form.get('invoiceNumber'),invoiceDate:form.get('invoiceDate'),currency:'CLP',documentType:'33',totals:{net:Number(form.get('net')||0),vat:Number(form.get('vat')||0),additionalTax:Number(form.get('additionalTax')||0),total:Number(form.get('total')||0)},aiModel:analysis.model||'',sourceFileId:analysis.sourceFile?.id||'',aiConfidence:invoice.matchSummary?.matched&&lines.length?invoice.matchSummary.matched/lines.length:0,lines:reviewedLines}});
+      toast('Factura, original, cotejo y precios históricos guardados');await navigate('invoices');
     }
   });
+  function recalculate(row){const boxes=Number(row.querySelector('[name=packageQty]').value||0);const pack=Number(row.querySelector('[name=packSize]').value||1);const total=Number(row.querySelector('[name=grossLineTotal]').value||0);const units=boxes*pack;row.querySelector('[data-calculated-units]').textContent=units;row.querySelector('[data-calculated-price]').textContent=money(units?Math.round(total/units):0)}
+  $$('[data-invoice-line]').forEach(row=>row.querySelectorAll('[name=packageQty],[name=packSize],[name=grossLineTotal]').forEach(input=>input.oninput=()=>recalculate(row)));
 }
 
 export async function openInvoiceAnalysis(){
-  await ensureSources();
-  if(!state.cache.suppliers.length)return toast('Primero debes crear un proveedor','error');
-  if(!state.cache.locations.length)return toast('Primero debes crear un local','error');
-  const eligibleOrders=state.cache.orders.filter(order=>!['draft','cancelled','closed'].includes(order.status));
+  await ensureSources();if(!state.cache.suppliers.length)return toast('Primero debes crear un proveedor','error');if(!state.cache.locations.length)return toast('Primero debes crear un local','error');const eligibleOrders=state.cache.orders.filter(order=>!['cancelled','closed'].includes(order.status));
   openModal({
-    eyebrow:'LECTURA INTELIGENTE',title:'Analizar factura',
-    subtitle:'La factura original se archiva en R2 antes del análisis.',
-    body:`<div class="form-grid"><label class="field"><span>Proveedor</span><select name="supplierId">${state.cache.suppliers.map(supplier=>`<option value="${esc(supplier.id)}">${esc(supplier.name)}</option>`).join('')}</select></label><label class="field"><span>Local</span><select name="locationId">${state.cache.locations.map(location=>`<option value="${esc(location.id)}">${esc(location.name)}</option>`).join('')}</select></label><label class="field"><span>Pedido relacionado <small>opcional</small></span><select name="orderId"><option value="">Sin pedido</option>${eligibleOrders.map(order=>`<option value="${esc(order.id)}">${esc(order.folio)} · ${esc(order.supplierName)} · ${esc(order.locationName)}</option>`).join('')}</select></label><label class="field full"><span>Factura PDF o imagen</span><input name="file" type="file" accept="application/pdf,image/*" required></label></div><div class="auth-note">La IA propone el cotejo. El documento original, su hash y la revisión humana permanecen guardados.</div>`,
-    submitLabel:'Archivar y analizar',
+    eyebrow:'MOTOR DE COTEJO',title:'Analizar factura con Gemini',subtitle:'Selecciona el proveedor. Puedes cotejar contra un pedido específico o contra todo el catálogo del proveedor.',size:'large',
+    body:`<div class="master-steps"><div class="master-step"><b>1</b><span>Selecciona proveedor y pedido</span></div><div class="master-step"><b>2</b><span>Adjunta factura PDF o fotografía</span></div></div><div class="form-grid"><label class="field"><span>Proveedor</span><select name="supplierId" id="invoiceSupplier">${state.cache.suppliers.map(supplier=>`<option value="${esc(supplier.id)}">${esc(supplier.name)}</option>`).join('')}</select></label><label class="field"><span>Local</span><select name="locationId" id="invoiceLocation">${state.cache.locations.map(location=>`<option value="${esc(location.id)}">${esc(location.name)}</option>`).join('')}</select></label><label class="field full"><span>Pedido relacionado</span><select name="orderId" id="invoiceOrder"><option value="">Sin pedido específico: cotejar con catálogo</option></select></label><label class="field full"><span>Factura PDF o imagen</span><input name="file" type="file" accept="application/pdf,image/*" required></label></div><section class="security-note"><strong>Qué hará la IA</strong><p>Leerá cantidades, detectará caja/display y unidades, calculará precio final después de impuestos, propondrá coincidencias y adjuntará el PDF del pedido cuando exista.</p></section>`,
+    submitLabel:'Analizar y cotejar con IA',
     onSubmit:async form=>{
-      const file=form.get('file');
-      if(!(file instanceof File)||!file.size)throw new Error('Adjunta una factura');
-      const supplierId=String(form.get('supplierId')||'');
-      const orderId=String(form.get('orderId')||'');
-      let locationId=String(form.get('locationId')||'');
-      let products=state.cache.products.map(product=>({productId:product.id,description:product.name,unit:product.baseUnit||'unidad',orderedQty:0,unitsPerOrderUnit:1}));
-      let providerName=state.cache.suppliers.find(supplier=>supplier.id===supplierId)?.name||'';
-      let folio='';
-      if(orderId){
-        const order=(await api(`/api/orders/${orderId}`)).order;
-        folio=order.folio;providerName=order.supplierName;locationId=order.locationId;
-        products=order.items.map(item=>({productId:item.productId,description:item.description,unit:item.orderUnit,orderedQty:item.quantityOrdered,unitsPerOrderUnit:item.unitsPerOrderUnit}));
-      }
-      const upload=new FormData();
-      upload.append('file',file,file.name);
-      upload.append('context',JSON.stringify({providerName,folio,products,locationId}));
-      const response=await api('/api/invoices/analyze',{method:'POST',body:upload});
-      setTimeout(()=>openInvoiceReview(response.analysis,supplierId,orderId,locationId),0);
+      const file=form.get('file');if(!(file instanceof File)||!file.size)throw new Error('Adjunta una factura');const supplierId=String(form.get('supplierId')||'');const orderId=String(form.get('orderId')||'');let locationId=String(form.get('locationId')||'');let products=state.cache.products.filter(product=>(product.suppliers||[]).some(relation=>relation.supplierId===supplierId)).map(product=>{const relation=(product.suppliers||[]).find(item=>item.supplierId===supplierId);return {productId:product.id,description:product.name,unit:relation?.orderUnit||product.baseUnit||'unidad',orderedQty:0,unitsPerOrderUnit:Number(relation?.unitsPerOrderUnit||1)}});let providerName=state.cache.suppliers.find(supplier=>supplier.id===supplierId)?.name||'';let folio='';let orderFile=null;
+      if(orderId){const order=(await api(`/api/orders/${orderId}`)).order;folio=order.folio;providerName=order.supplierName;locationId=order.locationId;products=order.items.map(item=>({productId:item.productId,description:item.description,unit:item.orderUnit,orderedQty:item.quantityOrdered,unitsPerOrderUnit:item.unitsPerOrderUnit}));orderFile=await archivedOrderPdf(orderId)}
+      const upload=new FormData();upload.append('file',file,file.name);if(orderFile)upload.append('orderFile',orderFile,orderFile.name);upload.append('context',JSON.stringify({providerName,folio,products,locationId}));const response=await api('/api/invoices/analyze',{method:'POST',body:upload});setTimeout(()=>openInvoiceReview(response.analysis,supplierId,orderId,locationId),0);
     }
   });
+  function refreshOrders(){const supplierId=$('#invoiceSupplier').value;const locationId=$('#invoiceLocation').value;const orders=eligibleOrders.filter(order=>order.supplierId===supplierId&&(!locationId||order.locationId===locationId));$('#invoiceOrder').innerHTML='<option value="">Sin pedido específico: cotejar con catálogo</option>'+orders.map(order=>`<option value="${esc(order.id)}">${esc(order.folio)} · ${esc(order.status)} · ${esc(order.costCenterName||'')}</option>`).join('')}
+  $('#invoiceSupplier').onchange=refreshOrders;$('#invoiceLocation').onchange=refreshOrders;refreshOrders();
 }
