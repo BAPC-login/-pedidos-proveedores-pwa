@@ -22,13 +22,13 @@ jobs:
           app=$(curl --silent --show-error --max-time 20 "$BASE_URL/" || true)
           actions=$(curl --silent --show-error --max-time 20 "$BASE_URL/app-actions.js" || true)
           views=$(curl --silent --show-error --max-time 20 "$BASE_URL/app-views.js" || true)
-          index=$(curl --silent --show-error --max-time 20 "$BASE_URL/index.html" || true)
           health=$(curl --silent --show-error --max-time 20 --dump-header /tmp/headers "$BASE_URL/platform/health" || true)
           release=$(grep -i '^x-pedidos-pro-release:' /tmp/headers 2>/dev/null | tr -d '\r' | awk '{print $2}' || true)
-          HEALTH="$health" RELEASE="$release" APP="$app" ACTIONS="$actions" VIEWS="$views" INDEX="$index" python - <<'PY'
+          HEALTH="$health" RELEASE="$release" APP="$app" ACTIONS="$actions" VIEWS="$views" python - <<'PY'
           import json, os
           try:h=json.loads(os.environ.get('HEALTH',''))
           except Exception:h={'raw':os.environ.get('HEALTH','')[:500]}
+          app=os.environ.get('APP','')
           checks={
             'release': os.environ.get('RELEASE')=='2026.07.22.21',
             'service': h.get('service')=='pedidos-pro-platform',
@@ -39,16 +39,16 @@ jobs:
             'purchase_formats': int(h.get('catalogPurchaseFormats',0))>=194,
             'owner': h.get('platformOwnerReady') is True,
             'locations': int(h.get('activeLocations',0))>=1,
-            'app_shell': 'Pedidos Pro Platform' in os.environ.get('APP',''),
+            'app_shell': '<title>Pedidos Pro</title>' in app and 'id="appShell"' in app,
             'workspace_switcher': 'openWorkspaceSwitcher' in os.environ.get('ACTIONS',''),
             'create_user': 'Crear usuario' in os.environ.get('ACTIONS',''),
             'create_order': 'Crear pedido y PDF' in os.environ.get('ACTIONS',''),
             'catalog_status': 'Base operativa disponible' in os.environ.get('VIEWS',''),
             'catalog_view': 'Catálogo de compras' in os.environ.get('VIEWS',''),
             'user_admin': 'Administrar usuarios' in os.environ.get('VIEWS',''),
-            'cancel_button': 'id="modalClose"' in os.environ.get('INDEX',''),
-            'novalidate': 'novalidate' in os.environ.get('INDEX',''),
-            'no_brand_login': 'loginOrg' not in os.environ.get('INDEX',''),
+            'cancel_button': 'id="modalClose"' in app,
+            'novalidate': 'novalidate' in app,
+            'no_brand_login': 'loginOrg' not in app,
           }
           print(json.dumps({'release_header':os.environ.get('RELEASE'),'health':h,'checks':checks},ensure_ascii=False,indent=2))
           raise SystemExit(0 if all(checks.values()) else 1)
