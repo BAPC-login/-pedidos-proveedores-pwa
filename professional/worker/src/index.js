@@ -44,6 +44,7 @@ import {
   updateOrder
 } from './api/orders.js';
 import {createOrderBatch, deleteDraftOrder} from './api/order-batches.js';
+import {createOrderBatchV2,ensureOrderPdf,listOrderInvoices} from './api/order-core.js';
 import {importCatalog, listSupplierAssets, updateSupplierIdentity} from './api/catalog-admin.js';
 import {getDashboardAnalytics} from './api/analytics.js';
 import {getGeminiDashboardInsights} from './api/analytics-ai.js';
@@ -59,7 +60,7 @@ import {getSettings, updateSettings} from './api/settings.js';
 import {createBrand, listBrands, switchBrand} from './platform.js';
 import {listDocuments} from './storage.js';
 
-const APP_VERSION = '2.0.0-alpha.7';
+const APP_VERSION = '2.0.0-alpha.8';
 
 function addPlatformHeaders(response, request, env) {
   const headers = new Headers(response.headers);
@@ -151,6 +152,11 @@ async function handleRequest(request, env, ctx) {
   if (method === 'GET' && path === '/api/orders') return ok({orders: await listOrders(env, actor, url)}, request, env);
   if (method === 'POST' && path === '/api/orders') return ok({order: await createOrder(request, env, actor)}, request, env);
   if (method === 'POST' && path === '/api/order-batches') return ok({batch: await createOrderBatch(request, env, actor)}, request, env);
+  if (method === 'POST' && path === '/api/order-batches/v2') return ok({batch: await createOrderBatchV2(request, env, actor, ctx)}, request, env);
+  const orderPdfParams = routeMatch(path, '/api/orders/:id/pdf');
+  if (orderPdfParams && method === 'POST') return ok({document: await ensureOrderPdf(request, env, actor, orderPdfParams.id)}, request, env);
+  const orderInvoiceParams = routeMatch(path, '/api/orders/:id/invoices');
+  if (orderInvoiceParams && method === 'GET') return ok({invoices: await listOrderInvoices(env, actor, orderInvoiceParams.id)}, request, env);
   const orderParams = routeMatch(path, '/api/orders/:id');
   if (orderParams && method === 'GET') return ok({order: await getOrder(env, actor, orderParams.id)}, request, env);
   if (orderParams && method === 'PATCH') return ok({order: await updateOrder(request, env, actor, orderParams.id)}, request, env);
