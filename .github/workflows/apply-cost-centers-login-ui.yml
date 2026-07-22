@@ -23,7 +23,15 @@ jobs:
           set +e
           node tools/apply-cost-centers-login-ui.mjs > /tmp/apply.log 2>&1
           status=$?
-          tail -n 40 /tmp/apply.log
+          if [ "$status" -ne 0 ]; then
+            tail -n 60 /tmp/apply.log > tools/apply-cost-centers-error.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "4189826+github-actions[bot]@users.noreply.github.com"
+            git add tools/apply-cost-centers-error.txt
+            git commit -m "chore(ci): record cost centers applicator error" || true
+            git push origin HEAD:${{ github.head_ref }} || true
+          fi
+          tail -n 60 /tmp/apply.log
           exit $status
       - name: Verify platform
         working-directory: professional
@@ -47,6 +55,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "4189826+github-actions[bot]@users.noreply.github.com"
+          rm -f tools/apply-cost-centers-error.txt
           git add -A
           git commit -m "feat: Madriguera cost centers and direct login"
           git push origin HEAD:${{ github.head_ref }}
