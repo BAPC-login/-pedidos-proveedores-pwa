@@ -42,3 +42,4 @@ jobs:
           git add -A
           git commit -m "feat: Madriguera cost centers and direct login"
           git push
+# trigger-main: 2026-07-22T01:20
