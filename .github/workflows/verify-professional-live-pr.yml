@@ -1,0 +1,63 @@
+name: Verify professional live PR
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/verify-professional-live-pr.yml'
+      - 'tools/verify-professional-live-trigger.txt'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify public release, catalog and mobile assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_URL="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
+          for attempt in $(seq 1 30); do
+            echo "attempt=${attempt}"
+            app=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/")
+            actions=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-actions.js")
+            views=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-views.js")
+            index=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/index.html")
+            health=$(curl --fail --silent --show-error --max-time 20 --dump-header /tmp/headers "$BASE_URL/platform/health")
+            release=$(grep -i '^x-pedidos-pro-release:' /tmp/headers | tr -d '\r' | awk '{print $2}')
+            HEALTH="$health" RELEASE="$release" APP="$app" ACTIONS="$actions" VIEWS="$views" INDEX="$index" python - <<'PY'
+          import json, os, sys
+          h=json.loads(os.environ['HEALTH'])
+          checks={
+            'release': os.environ['RELEASE']=='2026.07.22.21',
+            'service': h.get('service')=='pedidos-pro-platform',
+            'schema': str(h.get('schemaVersion'))=='9',
+            'catalog_ready': h.get('catalogReady') is True,
+            'products': int(h.get('catalogProducts',0))>=193,
+            'suppliers': int(h.get('catalogSuppliers',0))>=12,
+            'purchase_formats': int(h.get('catalogPurchaseFormats',0))>=194,
+            'owner': h.get('platformOwnerReady') is True,
+            'locations': int(h.get('activeLocations',0))>=1,
+            'app_shell': 'Pedidos Pro Platform' in os.environ['APP'],
+            'workspace_switcher': 'openWorkspaceSwitcher' in os.environ['ACTIONS'],
+            'create_user': 'Crear usuario' in os.environ['ACTIONS'],
+            'create_order': 'Crear pedido y PDF' in os.environ['ACTIONS'],
+            'catalog_status': 'Base operativa disponible' in os.environ['VIEWS'],
+            'catalog_view': 'Catálogo de compras' in os.environ['VIEWS'],
+            'user_admin': 'Administrar usuarios' in os.environ['VIEWS'],
+            'cancel_button': 'id="modalClose"' in os.environ['INDEX'],
+            'novalidate': 'novalidate' in os.environ['INDEX'],
+            'no_brand_login': 'loginOrg' not in os.environ['INDEX'],
+          }
+          print(json.dumps({'health':h,'checks':checks},ensure_ascii=False,indent=2))
+          sys.exit(0 if all(checks.values()) else 1)
+          PY
+            result=$?
+            if [ "$result" = 0 ]; then exit 0; fi
+            sleep 10
+          done
+          exit 1
