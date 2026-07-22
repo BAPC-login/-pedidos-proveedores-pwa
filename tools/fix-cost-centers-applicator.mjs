@@ -33,6 +33,11 @@ const storageBlockPattern = /replace\('professional\/worker\/src\/storage\.js',[
 if (!storageBlockPattern.test(source)) throw new Error('Storage applicator patch block was not found');
 source = source.replace(storageBlockPattern, currentStoragePatch);
 
+const currentOrderDetailPatch = "replace('professional/web/app-order-detail.js',\n  \"    eyebrow:order.folio,title:order.supplierName,subtitle:`${order.locationName} · ${statusLabel(order.status)}`,\",\n  \"    eyebrow:order.folio,title:order.supplierName,subtitle:`${order.locationName} · ${order.costCenterName||'Barra'} · ${statusLabel(order.status)}`,\");\n\nfs.appendFileSync";
+const orderDetailBlockPattern = /replace\('professional\/web\/app-order-detail\.js',[\s\S]*?\);\n\nfs\.appendFileSync/;
+if (!orderDetailBlockPattern.test(source)) throw new Error('Order detail applicator patch block was not found');
+source = source.replace(orderDetailBlockPattern, currentOrderDetailPatch);
+
 source = source.replace(/\\*\$\{/g, '\\${');
 source = source.replace('\\${costCenterApi}', '${costCenterApi}');
 source = source.replace("throw new Error(`Missing marker in \\${path}: \\${needle.slice(0, 100)}`)", "throw new Error('Missing marker in ' + path + ': ' + needle.slice(0, 100))");
@@ -55,4 +60,4 @@ literalizeWriteBlock('professional/web/app-actions.js', "write('professional/web
 literalizeWriteBlock('professional/web/app-views.js', "replace('professional/web/app-order-detail.js',");
 
 fs.writeFileSync(path, source);
-console.log('Schema order, storage marker, diagnostics, generated expressions and frontend templates normalized.');
+console.log('Schema order, storage, order detail, diagnostics and frontend templates normalized.');
