@@ -1,0 +1,1 @@
+Verify release 2026.07.22.21, schema 9, restored catalog and professional mobile assets.
