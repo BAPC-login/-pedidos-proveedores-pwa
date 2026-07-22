@@ -4,8 +4,9 @@ import invoiceSchemaModule from '../../migrations/0003_invoices.sql';
 import platformSchemaModule from '../../migrations/0004_multibrand_r2_history.sql';
 import fileChunkSchemaModule from '../../migrations/0004_file_chunks.sql';
 import costCenterSchemaModule from '../../migrations/0005_cost_centers.sql';
+import {seedLegacyCatalog} from './legacyCatalog.js';
 
-const SCHEMA_VERSION = '8';
+const SCHEMA_VERSION = '9';
 const DEFAULT_ORG_ID = 'e73d2d6e-dae8-46c6-87df-43ae05ca81fa';
 const DEFAULT_LOCATION_ID = 'e263b119-d0bb-484e-b65c-abe2c57f9e86';
 const DEFAULT_USER_ID = '80a9afe9-4751-4181-b816-eb78c94619ef';
@@ -59,20 +60,20 @@ async function seedDefaultWorkspace(db) {
 
   const timestamp = new Date().toISOString();
   const categories = [
-    'Bebidas sin alcohol', 'Cervezas', 'Vinos', 'Espumantes', 'Destilados',
-    'Licores', 'Insumos', 'Abarrotes', 'Otros'
+    'Bebidas sin alcohol', 'Cervezas', 'Vinos', 'Espumantes', 'Pisco', 'Ron', 'Vodka',
+    'Gin', 'Whisky', 'Tequila', 'Licores', 'Insumos', 'Abarrotes', 'Otros'
   ];
 
   const statements = [
     db.prepare(`
       INSERT OR IGNORE INTO organizations
         (id, name, slug, plan, status, settings_json, created_at, updated_at)
-      VALUES (?, 'Pedidos Pro', 'pedidos-pro', 'free', 'active', '{}', ?, ?)
+      VALUES (?, 'Madriguera', 'pedidos-pro', 'free', 'active', '{"brand":true,"source":"legacy-catalog"}', ?, ?)
     `).bind(DEFAULT_ORG_ID, timestamp, timestamp),
     db.prepare(`
       INSERT OR IGNORE INTO locations
         (id, org_id, name, code, timezone, active, created_at, updated_at)
-      VALUES (?, ?, 'Principal', 'PRINCIPAL', 'America/Santiago', 1, ?, ?)
+      VALUES (?, ?, 'Madriguera Clubhaus', 'MDR', 'America/Santiago', 1, ?, ?)
     `).bind(DEFAULT_LOCATION_ID, DEFAULT_ORG_ID, timestamp, timestamp),
     db.prepare(`
       INSERT OR IGNORE INTO users
@@ -90,7 +91,11 @@ async function seedDefaultWorkspace(db) {
       INSERT OR IGNORE INTO memberships
         (id, org_id, user_id, role, location_scope, active, created_at, updated_at)
       VALUES (?, ?, ?, 'owner', '["*"]', 1, ?, ?)
-    `).bind(DEFAULT_MEMBERSHIP_ID, DEFAULT_ORG_ID, DEFAULT_USER_ID, timestamp, timestamp)
+    `).bind(DEFAULT_MEMBERSHIP_ID, DEFAULT_ORG_ID, DEFAULT_USER_ID, timestamp, timestamp),
+    db.prepare(`
+      INSERT OR IGNORE INTO platform_owners (user_id, created_at)
+      VALUES (?, ?)
+    `).bind(DEFAULT_USER_ID, timestamp)
   ];
 
   categories.forEach((name, index) => {
@@ -137,11 +142,13 @@ export async function ensureSchema(env) {
     const seeded = await seedDefaultWorkspace(env.DB);
     const costCenterStatements = await executeSchema(env.DB, costCenterSchema, 'cost-centers');
     const ownerPasswordMigrated = await migrateSeededOwnerPassword(env.DB);
+    const legacyCatalog = await seedLegacyCatalog(env.DB);
 
     return {
       initialized: true,
       seeded,
       ownerPasswordMigrated,
+      legacyCatalog,
       version: SCHEMA_VERSION,
       statements: identityStatements + procurementStatements + invoiceStatements + platformStatements + fileChunkStatements + costCenterStatements
     };

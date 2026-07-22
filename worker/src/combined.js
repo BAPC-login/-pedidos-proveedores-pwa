@@ -1,7 +1,7 @@
 import aiWorker from './index.js';
 import platformWorker from '../../professional/worker/src/index-scoped.js';
 
-const PLATFORM_RELEASE = '2026.07.22.20';
+const PLATFORM_RELEASE = '2026.07.22.21';
 
 function rewritePath(request, pathname) {
   const url = new URL(request.url);
@@ -16,23 +16,16 @@ function isAiRoute(pathname) {
 function withPlatformRelease(response) {
   const headers = new Headers(response.headers);
   headers.set('X-Pedidos-Pro-Release', PLATFORM_RELEASE);
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers
-  });
+  return new Response(response.body, {status: response.status, statusText: response.statusText, headers});
 }
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-
     if (isAiRoute(url.pathname)) return aiWorker.fetch(request, env, ctx);
-
     if (url.pathname === '/platform/health') {
       return withPlatformRelease(await platformWorker.fetch(rewritePath(request, '/health'), env, ctx));
     }
-
     return withPlatformRelease(await platformWorker.fetch(request, env, ctx));
   }
 };

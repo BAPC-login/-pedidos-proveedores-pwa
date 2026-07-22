@@ -4,10 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1020">
-  <meta name="description" content="Pedidos Pro Platform: compras, recepción, facturas y control de proveedores.">
+  <meta name="description" content="Pedidos Pro: compras, proveedores, facturas y centros de costo.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="stylesheet" href="./styles.css">
-  <title>Pedidos Pro Platform</title>
+  <link rel="stylesheet" href="./pro-ui.css">
+  <title>Pedidos Pro</title>
 </head>
 <body>
   <div class="ambient ambient-a"></div>
@@ -18,19 +19,20 @@
       <div class="brand-mark" aria-hidden="true">P</div>
       <div><strong>Pedidos Pro</strong><span>PLATFORM</span></div>
     </div>
+    <div class="auth-copy">
+      <span class="eyebrow">GESTIÓN DE COMPRAS</span>
+      <h1>Pedidos, facturas y proveedores en un solo lugar.</h1>
+      <p>Cada usuario entra con su propio correo y accede únicamente a las marcas y locales asignados.</p>
+    </div>
     <div class="auth-card glass">
-      <div class="auth-intro"><span class="eyebrow">ACCESO A PEDIDOS PRO</span><h1>Gestiona compras, facturas y centros de costo.</h1><p>Ingresa con tu correo. La app abrirá automáticamente la marca y los locales que tienes asignados.</p></div>
-      <div class="auth-card-head">
-        <span class="status-dot"></span>
-        <span>Acceso seguro</span>
-      </div>
+      <div class="auth-card-head"><span class="status-dot"></span><span>Acceso seguro</span></div>
       <form id="loginForm" class="stack">
         <label class="field"><span>Correo</span><input id="loginEmail" name="email" type="email" autocomplete="username" required placeholder="nombre@empresa.cl"></label>
         <label class="field"><span>Contraseña</span><input id="loginPassword" name="password" type="password" autocomplete="current-password" required minlength="10" placeholder="••••••••••"></label>
         <button class="btn primary wide" type="submit"><span>Ingresar</span><span aria-hidden="true">→</span></button>
       </form>
-      <button class="link-btn" id="openBootstrap" type="button">Primera instalación</button>
-      <div class="auth-note">Las cuentas no vencen automáticamente. Un administrador puede revocar usuarios o sesiones cuando sea necesario.</div>
+      <button class="link-btn hidden" id="openBootstrap" type="button">Primera instalación</button>
+      <div class="auth-note">Las cuentas son individuales. Un administrador puede crear usuarios, cambiar roles y restablecer contraseñas.</div>
     </div>
   </section>
 
@@ -40,9 +42,9 @@
         <div class="brand-mark small">P</div>
         <div><strong>Pedidos Pro</strong><span>PLATFORM</span></div>
       </div>
-      <button class="workspace-card" id="workspaceCard" type="button">
-        <span class="workspace-avatar" id="workspaceAvatar">PP</span>
-        <span class="workspace-copy"><strong id="workspaceName">Empresa</strong><small id="workspacePlan">Plan gratuito</small></span>
+      <button class="workspace-card selectable" id="workspaceCard" type="button">
+        <span class="workspace-avatar" id="workspaceAvatar">MD</span>
+        <span class="workspace-copy"><strong id="workspaceName">Madriguera</strong><small id="workspacePlan">Owner de plataforma</small></span>
         <span class="chevron" id="workspaceChevron">⌄</span>
       </button>
       <nav class="side-nav" aria-label="Navegación principal">
@@ -51,12 +53,12 @@
         <button class="nav-item" data-view="invoices"><span class="nav-icon">▧</span><span>Facturas</span></button>
         <button class="nav-item" data-view="catalog"><span class="nav-icon">◫</span><span>Catálogo</span></button>
         <button class="nav-item" data-view="suppliers"><span class="nav-icon">◇</span><span>Proveedores</span></button>
-        <button class="nav-item admin-only" data-view="team"><span class="nav-icon">◎</span><span>Equipo</span></button>
+        <button class="nav-item admin-only" data-view="team"><span class="nav-icon">◎</span><span>Usuarios</span></button>
         <button class="nav-item admin-only" data-view="audit"><span class="nav-icon">◷</span><span>Auditoría</span></button>
       </nav>
       <div class="sidebar-spacer"></div>
       <nav class="side-nav lower">
-        <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>Configuración</span></button>
+        <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>Administración</span></button>
         <button class="nav-item danger-text" id="logoutButton"><span class="nav-icon">↪</span><span>Cerrar sesión</span></button>
       </nav>
       <div class="user-mini">
@@ -66,12 +68,17 @@
     </aside>
 
     <header class="topbar">
-      <div class="mobile-brand"><div class="brand-mark tiny">P</div><strong>Pedidos Pro</strong></div>
+      <button class="mobile-workspace-button" id="mobileWorkspaceButton" type="button" aria-label="Cambiar marca y abrir administración">
+        <div class="brand-mark tiny">P</div>
+        <span><strong>Pedidos Pro</strong><small id="mobileWorkspaceName">Madriguera</small></span>
+        <b>⌄</b>
+      </button>
       <div class="page-heading"><span class="eyebrow" id="pageEyebrow">OPERACIÓN</span><h1 id="pageTitle">Resumen</h1></div>
-      <label class="global-search"><span>⌕</span><input id="globalSearch" placeholder="Buscar folio, producto o proveedor" autocomplete="off"><kbd>⌘ K</kbd></label>
+      <label class="global-search"><span>⌕</span><input id="globalSearch" placeholder="Buscar o ir a una sección" autocomplete="off"><kbd>⌘ K</kbd></label>
       <div class="top-actions">
         <button class="sync-chip" id="syncChip"><i></i><span>Sincronizado</span></button>
         <button class="icon-button" id="themeButton" aria-label="Cambiar apariencia">◐</button>
+        <button class="mobile-user-button" id="mobileUserButton" type="button" aria-label="Abrir cuenta"><span id="mobileUserAvatar">BP</span></button>
         <button class="btn primary" id="primaryAction"><span>＋</span><span>Nuevo pedido</span></button>
       </div>
     </header>
@@ -81,22 +88,28 @@
     <nav class="bottom-nav" aria-label="Navegación móvil">
       <button class="bottom-item active" data-view="dashboard"><span>⌂</span><small>Resumen</small></button>
       <button class="bottom-item" data-view="orders"><span>▤</span><small>Pedidos</small></button>
-      <button class="bottom-create" id="mobileCreate" aria-label="Nuevo pedido">＋</button>
+      <button class="bottom-create" id="mobileCreate" type="button" aria-label="Nuevo pedido">＋</button>
       <button class="bottom-item" data-view="catalog"><span>◫</span><small>Catálogo</small></button>
       <button class="bottom-item" data-view="suppliers"><span>◇</span><small>Proveedores</small></button>
     </nav>
   </div>
 
   <dialog class="modal" id="modal">
-    <form method="dialog" class="modal-frame" id="modalFrame">
-      <header class="modal-head"><div><span class="eyebrow" id="modalEyebrow">PEDIDOS PRO</span><h2 id="modalTitle">Título</h2><p id="modalSubtitle"></p></div><button class="icon-button" value="cancel" aria-label="Cerrar">×</button></header>
+    <form class="modal-frame" id="modalFrame" novalidate>
+      <header class="modal-head">
+        <div><span class="eyebrow" id="modalEyebrow">PEDIDOS PRO</span><h2 id="modalTitle">Título</h2><p id="modalSubtitle"></p></div>
+        <button class="icon-button" id="modalClose" type="button" aria-label="Cerrar">×</button>
+      </header>
       <div class="modal-body" id="modalBody"></div>
       <footer class="modal-foot" id="modalFoot"></footer>
     </form>
   </dialog>
 
   <div class="command-menu hidden" id="commandMenu">
-    <div class="command-box glass"><label><span>⌕</span><input id="commandInput" placeholder="Ir a una sección o buscar..."></label><div id="commandResults"></div><small>Esc para cerrar · Enter para abrir</small></div>
+    <div class="command-box glass">
+      <label><span>⌕</span><input id="commandInput" placeholder="Ir a una sección..."></label>
+      <div id="commandResults"></div><small>Esc para cerrar · Enter para abrir</small>
+    </div>
   </div>
 
   <div class="toast-region" id="toastRegion" aria-live="polite"></div>

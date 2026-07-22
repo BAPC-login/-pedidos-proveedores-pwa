@@ -8,7 +8,7 @@ const state = {
   token: localStorage.getItem('pp:token') || '',
   me: null,
   view: 'dashboard',
-  cache: {dashboard:null,orders:[],invoices:[],products:[],suppliers:[],categories:[],locations:[],costCenters:[],users:[],audit:[],brands:[]},
+  cache: {dashboard:null,orders:[],invoices:[],products:[],suppliers:[],categories:[],locations:[],costCenters:[],users:[],audit:[],brands:[],sessions:[]},
   online: navigator.onLine,
   pending: []
 };
@@ -23,7 +23,7 @@ const api = async (path, options={}) => {
   const response = await fetch(path,{...options,headers});
   const payload = await response.json().catch(()=>({ok:false,error:`HTTP ${response.status}`}));
   if (response.status === 401 && state.token) logoutLocal();
-  if (!response.ok || payload.ok === false) throw Object.assign(new Error(payload.error || 'No se pudo completar la operación'),{code:payload.code,status:response.status});
+  if (!response.ok || payload.ok === false) throw Object.assign(new Error(payload.error || 'No se pudo completar la operación'),{code:payload.code,status:response.status,details:payload.details});
   return payload;
 };
 
@@ -31,7 +31,7 @@ function toast(message,type='ok') {
   const node=document.createElement('div');
   node.className=`toast ${type==='error'?'error':''}`;
   node.textContent=message;
-  $('#toastRegion').append(node);
+  $('#toastRegion')?.append(node);
   setTimeout(()=>node.remove(),4200);
 }
 
@@ -40,7 +40,14 @@ function isAdmin(){return ['owner','admin'].includes(state.me?.user?.role)}
 function canBuy(){return ['owner','admin','purchaser','approver'].includes(state.me?.user?.role)}
 function setBusy(button,busy,label='Guardando…'){
   if(!button)return;
-  if(busy){button.dataset.label=button.textContent;button.textContent=label;button.disabled=true}else{button.textContent=button.dataset.label||button.textContent;button.disabled=false}
+  if(busy){
+    button.dataset.label=button.innerHTML;
+    button.textContent=label;
+    button.disabled=true;
+  }else{
+    button.innerHTML=button.dataset.label||button.innerHTML;
+    button.disabled=false;
+  }
 }
 
 function setTheme(theme){
@@ -75,35 +82,43 @@ async function removeMutation(id){
 async function syncMutations(){
   if(!navigator.onLine||!state.token)return;
   for(const mutation of await readMutations()){
-    try{await api(mutation.path,{method:mutation.method,json:mutation.json,headers:{'Idempotency-Key':mutation.id}});await removeMutation(mutation.id)}catch(error){if(error.status===401)break;console.warn('sync_failed',mutation,error)}
+    try{
+      await api(mutation.path,{method:mutation.method,json:mutation.json,headers:{'Idempotency-Key':mutation.id}});
+      await removeMutation(mutation.id);
+    }catch(error){
+      if(error.status===401)break;
+      console.warn('sync_failed',mutation,error);
+    }
   }
   await updateSyncChip();
 }
 async function updateSyncChip(){
   const count=(await readMutations().catch(()=>[])).length;
   const chip=$('#syncChip');
+  if(!chip)return;
   chip.querySelector('span').textContent=!navigator.onLine?'Sin conexión':count?`${count} pendiente${count===1?'':'s'}`:'Sincronizado';
   chip.classList.toggle('pending',count>0||!navigator.onLine);
 }
 
 function showAuth(){
-  $('#authScreen').classList.remove('hidden');
-  $('#appShell').classList.add('hidden');
+  $('#authScreen')?.classList.remove('hidden');
+  $('#appShell')?.classList.add('hidden');
 }
 function showApp(){
-  $('#authScreen').classList.add('hidden');
-  $('#appShell').classList.remove('hidden');
+  $('#authScreen')?.classList.add('hidden');
+  $('#appShell')?.classList.remove('hidden');
   const {user,organization,plan}=state.me;
   $('#workspaceName').textContent=organization.name;
-  $('#workspacePlan').textContent=`Plan ${plan.name==='free'?'gratuito':plan.name}`;
+  $('#workspacePlan').textContent=user.isPlatformOwner?'Owner de plataforma':`Plan ${plan.name==='free'?'gratuito':plan.name}`;
   $('#workspaceAvatar').textContent=initials(organization.name);
-  const platformOwner=Boolean(user.isPlatformOwner);
-  $('#workspaceCard').disabled=!platformOwner;
-  $('#workspaceCard').classList.toggle('selectable',platformOwner);
-  $('#workspaceChevron').classList.toggle('hidden',!platformOwner);
+  $('#workspaceCard').disabled=false;
+  $('#workspaceCard').classList.add('selectable');
+  $('#workspaceChevron').classList.remove('hidden');
   $('#userName').textContent=user.displayName;
   $('#userRole').textContent=roleNames[user.role]||user.role;
   $('#userAvatar').textContent=initials(user.displayName);
+  $('#mobileWorkspaceName') && ($('#mobileWorkspaceName').textContent=organization.name);
+  $('#mobileUserAvatar') && ($('#mobileUserAvatar').textContent=initials(user.displayName));
   $$('.admin-only').forEach(node=>node.classList.toggle('hidden',!isAdmin()));
 }
 function logoutLocal(){
