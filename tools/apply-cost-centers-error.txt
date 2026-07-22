@@ -1,9 +1,10 @@
-file:///home/runner/work/-pedidos-proveedores-pwa/-pedidos-proveedores-pwa/tools/fix-cost-centers-applicator.mjs:33
-if (!source.includes(oldStoragePatch)) throw new Error('Storage applicator patch block was not found');
-                                             ^
+file:///home/runner/work/-pedidos-proveedores-pwa/-pedidos-proveedores-pwa/tools/apply-cost-centers-login-ui.mjs:7
+  if (!source.includes(needle)) throw new Error(`Missing marker in \${path}: \${needle.slice(0, 100)}`);
+                                      ^
 
-Error: Storage applicator patch block was not found
-    at file:///home/runner/work/-pedidos-proveedores-pwa/-pedidos-proveedores-pwa/tools/fix-cost-centers-applicator.mjs:33:46
+Error: Missing marker in ${path}: ${needle.slice(0, 100)}
+    at replace (file:///home/runner/work/-pedidos-proveedores-pwa/-pedidos-proveedores-pwa/tools/apply-cost-centers-login-ui.mjs:7:39)
+    at file:///home/runner/work/-pedidos-proveedores-pwa/-pedidos-proveedores-pwa/tools/apply-cost-centers-login-ui.mjs:514:1
     at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
