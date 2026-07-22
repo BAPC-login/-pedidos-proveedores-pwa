@@ -2,7 +2,7 @@ name: Apply cost centers and login UI
 
 on:
   push:
-    branches: [agent/cost-centers-login-ui]
+    branches: [main]
     paths:
       - 'tools/apply-cost-centers-login-ui.mjs'
       - '.github/workflows/apply-cost-centers-login-ui.yml'
@@ -42,4 +42,3 @@ jobs:
           git add -A
           git commit -m "feat: Madriguera cost centers and direct login"
           git push
-# trigger: 2026-07-22-cost-centers
