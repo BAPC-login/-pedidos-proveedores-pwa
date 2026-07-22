@@ -100,7 +100,7 @@ export async function recordSnapshot(env,actor,{entityType,entityId,locationId=n
 }
 
 export async function archiveOrderPdf(env,actor,order){
-  const lines=['PEDIDOS PRO',`Folio: ${order.folio}`,`Marca: ${actor.organization?.name||''}`,`Local: ${order.locationName||''}`,`Proveedor: ${order.supplierName||''}`,`Estado: ${order.status}`,`Revision: ${order.revision}`,`Entrega: ${order.deliveryDate||'-'}`,`Total: CLP ${Number(order.grossTotal||0).toLocaleString('es-CL')}`,'','Productos:'];
+  const lines=['PEDIDOS PRO',`Folio: ${order.folio}`,`Marca: ${actor.organization?.name||''}`,`Local: ${order.locationName||''}`,`Centro de costo: ${order.costCenterName||'Barra'}`,`Proveedor: ${order.supplierName||''}`,`Estado: ${order.status}`,`Revision: ${order.revision}`,`Entrega: ${order.deliveryDate||'-'}`,`Total: CLP ${Number(order.grossTotal||0).toLocaleString('es-CL')}`,'','Productos:'];
   (order.items||[]).forEach((item,index)=>lines.push(`${index+1}. ${item.description} | ${item.quantityOrdered} ${item.orderUnit} | CLP ${Number(item.expectedGrossTotal||0).toLocaleString('es-CL')}`));
   if(order.notes)lines.push('',`Notas: ${order.notes}`);lines.push('',`Generado: ${new Date().toISOString()}`);
   const file=await storeBytes(env,actor,{bytes:minimalPdf(lines),fileName:`${order.folio}-r${order.revision}-${order.status}.pdf`,contentType:'application/pdf',purpose:'order-pdf',entityType:'order',entityId:order.id,documentKind:'order_pdf',revision:order.revision,metadata:{folio:order.folio,status:order.status,locationId:order.locationId}});

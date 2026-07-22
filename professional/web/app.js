@@ -1,7 +1,7 @@
 import {$,$$,state,api,toast,setBusy,setTheme,syncMutations,updateSyncChip,showAuth,showApp,logoutLocal} from './app-core.js';
 import {navigate} from './app-views.js';
 import {openBootstrap,openOrder,handleAction} from './app-actions.js';
-$('#loginForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;setBusy(button,true,'Ingresando…');try{const response=await api('/api/auth/login',{method:'POST',json:{email:$('#loginEmail').value,password:$('#loginPassword').value,organizationSlug:$('#loginOrg').value}});state.token=response.token;localStorage.setItem('pp:token',state.token);state.me=await api('/api/me');showApp();await navigate('dashboard');toast('Sesión iniciada')}catch(error){toast(error.message,'error')}finally{setBusy(button,false)}});
+$('#loginForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;setBusy(button,true,'Ingresando…');try{const response=await api('/api/auth/login',{method:'POST',json:{email:$('#loginEmail').value,password:$('#loginPassword').value}});state.token=response.token;localStorage.setItem('pp:token',state.token);state.me=await api('/api/me');showApp();await navigate('dashboard');toast('Sesión iniciada')}catch(error){toast(error.message,'error')}finally{setBusy(button,false)}});
 $('#openBootstrap').onclick=openBootstrap;
 $('#logoutButton').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST',json:{}})}catch{}logoutLocal()};
 $$('[data-view]').forEach(button=>button.addEventListener('click',()=>navigate(button.dataset.view)));
@@ -9,6 +9,7 @@ $('#primaryAction').onclick=()=>handleAction(state.view==='invoices'?'analyze-in
 $('#mobileCreate').onclick=()=>openOrder();
 $('#themeButton').onclick=()=>{const current=document.documentElement.dataset.theme;setTheme(current==='system'?'light':current==='light'?'dark':'system')};
 $('#syncChip').onclick=syncMutations;
+$('#workspaceCard').addEventListener('click',()=>{if(state.me?.user?.isPlatformOwner)navigate('settings')});
 $('#globalSearch').addEventListener('focus',()=>openCommand());
 $('#globalSearch').addEventListener('keydown',event=>{if(event.key==='Enter')openCommand()});
 function openCommand(){
@@ -31,7 +32,6 @@ async function initialize(){
   await updateSyncChip();
   if(!state.token){
     $('#loginEmail').value='admin@pedidospro.local';
-    $('#loginOrg').value='pedidos-pro';
     $('#openBootstrap').classList.add('hidden');
     showAuth();
     return;

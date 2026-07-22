@@ -40,6 +40,13 @@ async function requireLocation(env, actor, locationId) {
   return location;
 }
 
+async function requireCostCenter(env, actor, costCenterId, locationId) {
+  const center = await env.DB.prepare('SELECT id, name, code, location_id FROM cost_centers WHERE id = ? AND org_id = ? AND location_id = ? AND active = 1')
+    .bind(costCenterId, actor.orgId, locationId).first();
+  if (!center || !locationAllowed(actor, center.location_id)) throw new HttpError(400, 'Centro de costo inválido para este local', 'invalid_cost_center');
+  return center;
+}
+
 async function incrementUsage(env, orgId, metric, amount = 1) {
   const key = monthKey();
   await env.DB.prepare(`
@@ -96,25 +103,30 @@ function orderItemPayload(item) {
 export async function listOrders(env, actor, url) {
   const status = String(url.searchParams.get('status') || '');
   const query = String(url.searchParams.get('q') || '').trim();
+  const costCenterId = String(url.searchParams.get('costCenterId') || '');
   const result = await env.DB.prepare(`
     SELECT o.id, o.folio, o.status, o.delivery_date, o.notes, o.currency, o.net_total, o.tax_total, o.gross_total,
       o.created_at, o.updated_at, o.sent_at, o.revision,
       s.id AS supplier_id, s.name AS supplier_name,
       l.id AS location_id, l.name AS location_name,
+      cc.id AS cost_center_id, cc.name AS cost_center_name,
       u.display_name AS requested_by_name,
       COUNT(oi.id) AS item_count
     FROM orders o
     JOIN suppliers s ON s.id = o.supplier_id
     JOIN locations l ON l.id = o.location_id
     LEFT JOIN users u ON u.id = o.requested_by
+    LEFT JOIN order_cost_centers occ ON occ.order_id = o.id
+    LEFT JOIN cost_centers cc ON cc.id = occ.cost_center_id
     LEFT JOIN order_items oi ON oi.order_id = o.id
     WHERE o.org_id = ?
       AND (? = '' OR o.status = ?)
       AND (? = '' OR o.folio LIKE '%' || ? || '%' OR s.name LIKE '%' || ? || '%')
+      AND (? = '' OR occ.cost_center_id = ?)
     GROUP BY o.id
     ORDER BY o.created_at DESC
     LIMIT 500
-  `).bind(actor.orgId, status, status, query, query, query).all();
+  `).bind(actor.orgId, status, status, query, query, query, costCenterId, costCenterId).all();
   return rows(result).filter(order => locationAllowed(actor, order.location_id)).map(order => ({
     id: order.id,
     folio: order.folio,
@@ -123,6 +135,8 @@ export async function listOrders(env, actor, url) {
     supplierName: order.supplier_name,
     locationId: order.location_id,
     locationName: order.location_name,
+    costCenterId: order.cost_center_id,
+    costCenterName: order.cost_center_name || 'Barra',
     requestedBy: order.requested_by_name,
     deliveryDate: order.delivery_date,
     notes: order.notes,
@@ -141,10 +155,13 @@ export async function listOrders(env, actor, url) {
 export async function getOrder(env, actor, orderId) {
   const order = await env.DB.prepare(`
     SELECT o.*, s.name AS supplier_name, l.name AS location_name,
+      cc.id AS cost_center_id, cc.name AS cost_center_name,
       requester.display_name AS requested_by_name, approver.display_name AS approved_by_name
     FROM orders o
     JOIN suppliers s ON s.id = o.supplier_id
     JOIN locations l ON l.id = o.location_id
+    LEFT JOIN order_cost_centers occ ON occ.order_id = o.id
+    LEFT JOIN cost_centers cc ON cc.id = occ.cost_center_id
     LEFT JOIN users requester ON requester.id = o.requested_by
     LEFT JOIN users approver ON approver.id = o.approved_by
     WHERE o.id = ? AND o.org_id = ?
@@ -163,6 +180,8 @@ export async function getOrder(env, actor, orderId) {
     supplierName: order.supplier_name,
     locationId: order.location_id,
     locationName: order.location_name,
+    costCenterId: order.cost_center_id,
+    costCenterName: order.cost_center_name || 'Barra',
     requestedBy: order.requested_by_name,
     approvedBy: order.approved_by_name,
     deliveryDate: order.delivery_date,
@@ -205,6 +224,7 @@ export async function createOrder(request, env, actor) {
   if (used >= limits.ordersPerMonth) throw new HttpError(402, 'Límite mensual de pedidos alcanzado', 'plan_limit');
   const body = await readJson(request);
   const location = await requireLocation(env, actor, String(body.locationId || ''));
+  const costCenter = await requireCostCenter(env, actor, String(body.costCenterId || ''), location.id);
   const supplier = await env.DB.prepare('SELECT id, name FROM suppliers WHERE id = ? AND org_id = ? AND active = 1')
     .bind(String(body.supplierId || ''), actor.orgId).first();
   if (!supplier) throw new HttpError(400, 'Proveedor inválido', 'invalid_supplier');
@@ -223,7 +243,8 @@ export async function createOrder(request, env, actor) {
       VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, 'CLP', ?, 1, ?, ?)
     `).bind(id, actor.orgId, location.id, supplier.id, folio, actor.userId, body.deliveryDate || null, optionalText(body.notes, {max: 2000}), grossTotal, timestamp, timestamp),
     env.DB.prepare(`INSERT INTO order_events (id, org_id, order_id, actor_user_id, from_status, to_status, reason, created_at) VALUES (?, ?, ?, ?, '', 'draft', 'Pedido creado', ?)`) 
-      .bind(uuid(), actor.orgId, id, actor.userId, timestamp)
+      .bind(uuid(), actor.orgId, id, actor.userId, timestamp),
+    env.DB.prepare('INSERT INTO order_cost_centers (order_id, org_id, cost_center_id, created_at) VALUES (?, ?, ?, ?)').bind(id, actor.orgId, costCenter.id, timestamp)
   ];
   items.forEach((item, index) => {
     statements.push(env.DB.prepare(`
@@ -239,7 +260,7 @@ export async function createOrder(request, env, actor) {
   });
   await env.DB.batch(statements);
   await incrementUsage(env, actor.orgId, 'orders_created', 1);
-  await writeAudit(env, actor, request, 'order.create', 'order', id, {folio, supplierId: supplier.id, items: items.length});
+  await writeAudit(env, actor, request, 'order.create', 'order', id, {folio, supplierId: supplier.id, costCenterId: costCenter.id, items: items.length});
   const created = await getOrder(env, actor, id);
   created.pdfDocument = await archiveOrderPdf(env, actor, created);
   if (idempotencyKey) {
@@ -257,7 +278,9 @@ export async function updateOrder(request, env, actor, orderId) {
   const body = await readJson(request);
   const items = Array.isArray(body.items) ? body.items.map(orderItemPayload) : null;
   if (items && !items.length) throw new HttpError(400, 'El pedido no puede quedar sin productos', 'empty_order');
+  const costCenter = body.costCenterId === undefined ? null : await requireCostCenter(env, actor, String(body.costCenterId || ''), current.location_id);
   const statements = [];
+  if (costCenter) statements.push(env.DB.prepare(`INSERT INTO order_cost_centers (order_id, org_id, cost_center_id, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(order_id) DO UPDATE SET cost_center_id = excluded.cost_center_id`).bind(orderId, actor.orgId, costCenter.id, nowIso()));
   let grossTotal = Number(current.gross_total || 0);
   if (items) {
     grossTotal = items.reduce((sum, item) => sum + Math.round(item.quantity * item.unitsPerOrderUnit * item.expectedGrossUnitPrice), 0);
