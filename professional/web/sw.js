@@ -1,4 +1,4 @@
-const VERSION = 'pedidos-pro-platform-v8-order-core';
+const VERSION = 'pedidos-pro-platform-v9-warehouses-units';
 const SHELL = [
   './','./index.html','./styles.css','./pro-ui.css','./app.js','./app-core.js','./app-views.js','./app-actions.js',
   './app-modal.js','./app-order-detail.js','./app-invoices.js','./app-branding.js','./app-order-core.js','./app-stability.js','./app-company-logo.js',

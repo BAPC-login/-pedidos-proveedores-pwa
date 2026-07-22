@@ -74,6 +74,41 @@ function normalizedLocationDetails(raw = {}, previous = {}) {
   };
 }
 
+function normalizeUnit(raw = {}) {
+  const name = text(raw.name || raw.label || 'UNIDAD', 80).toUpperCase() || 'UNIDAD';
+  return {
+    id: text(raw.id || name.replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '') || 'UNIDAD', 90),
+    name,
+    unitsPerFormat: Math.max(0.001, Math.min(100000, Number(raw.unitsPerFormat ?? raw.units ?? raw.pack ?? 1) || 1)),
+    active: raw.active === undefined ? true : Boolean(raw.active)
+  };
+}
+
+function normalizeWarehouse(raw = {}, index = 0) {
+  const name = text(raw.name || `Bodega ${index + 1}`, 120) || `Bodega ${index + 1}`;
+  const categories = Array.isArray(raw.categories) ? raw.categories.map(item => text(item, 120)).filter(Boolean) : [];
+  return {
+    id: text(raw.id || name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase(), 100),
+    name,
+    sortOrder: Math.max(0, Math.min(999, Number(raw.sortOrder ?? index) || index)),
+    categories,
+    active: raw.active === undefined ? true : Boolean(raw.active)
+  };
+}
+
+function normalizedProcurement(raw = {}, previous = {}) {
+  const sourceCenters = raw.costCenters || previous.costCenters || {};
+  const costCenters = {};
+  for (const [costCenterId, config] of Object.entries(sourceCenters || {})) {
+    const units = Array.isArray(config?.units) ? config.units.map(normalizeUnit).filter(unit => unit.active) : [];
+    const warehouses = Array.isArray(config?.warehouses)
+      ? config.warehouses.map(normalizeWarehouse).filter(warehouse => warehouse.active).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'es'))
+      : [];
+    costCenters[String(costCenterId)] = {units, warehouses};
+  }
+  return {costCenters};
+}
+
 async function verifyLogo(env, actor, logoKey) {
   if (!logoKey) return;
   const record = await env.DB.prepare(`
@@ -113,7 +148,8 @@ export async function getSettings(env, actor) {
       slug: organization.slug,
       plan: organization.plan,
       business: normalizedBusiness(settings.business || {}),
-      branding: normalizedBranding(settings.branding || {})
+      branding: normalizedBranding(settings.branding || {}),
+      procurement: normalizedProcurement(settings.procurement || {})
     },
     locations,
     user: {
@@ -134,11 +170,12 @@ export async function updateSettings(request, env, actor) {
   const current = safeJson(organization.settings_json, {});
   const business = normalizedBusiness(body.business || {}, current.business || {});
   const branding = normalizedBranding(body.branding || {}, current.branding || {});
+  const procurement = normalizedProcurement(body.procurement || {}, current.procurement || {});
   await verifyLogo(env, actor, branding.logoKey);
   const organizationName = body.organizationName === undefined
     ? organization.name
     : requireText(body.organizationName, 'Nombre de la marca', {max: 120});
-  const settings = {...current, business, branding};
+  const settings = {...current, business, branding, procurement};
   const timestamp = nowIso();
   const statements = [
     env.DB.prepare('UPDATE organizations SET name = ?, settings_json = ?, updated_at = ? WHERE id = ?')
@@ -160,7 +197,8 @@ export async function updateSettings(request, env, actor) {
   await writeAudit(env, actor, request, 'settings.update', 'organization', actor.orgId, {
     locationId: body.location?.id || null,
     logoConfigured: Boolean(branding.logoKey),
-    primaryColor: branding.primaryColor
+    primaryColor: branding.primaryColor,
+    procurementConfigured: Object.keys(procurement.costCenters || {}).length
   });
   return getSettings(env, actor);
 }

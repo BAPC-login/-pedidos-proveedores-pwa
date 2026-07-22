@@ -60,7 +60,7 @@ import {getSettings, updateSettings} from './api/settings.js';
 import {createBrand, listBrands, switchBrand} from './platform.js';
 import {listDocuments} from './storage.js';
 
-const APP_VERSION = '2.0.0-alpha.8';
+const APP_VERSION = '2.0.0-alpha.9';
 
 function addPlatformHeaders(response, request, env) {
   const headers = new Headers(response.headers);
@@ -101,6 +101,8 @@ async function handleRequest(request, env, ctx) {
       r2Configured: Boolean(env.FILES),
       aiEndpoint: Boolean(env.AI_ENDPOINT),
       geminiConfigured: Boolean(env.GEMINI_API_KEY),
+      orderCore: true,
+      warehouseUnits: true,
       environment: env.ENVIRONMENT || 'development',
       timestamp: new Date().toISOString()
     }, request, env);
