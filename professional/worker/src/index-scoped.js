@@ -29,7 +29,7 @@ async function health(env, schema) {
   const catalogPurchaseFormats = Number(purchaseFormats?.total || 0);
   return {
     service: 'pedidos-pro-platform',
-    version: '2.0.0-alpha.6',
+    version: '2.0.0-alpha.7',
     databaseConfigured: Boolean(env.DB),
     databaseInitialized: true,
     schemaVersion: schema.version,
@@ -47,6 +47,7 @@ async function health(env, schema) {
     storageBackend: env.FILES ? 'r2' : 'd1-chunks',
     r2Configured: Boolean(env.FILES),
     aiEndpoint: Boolean(env.AI_ENDPOINT),
+    geminiConfigured: Boolean(env.GEMINI_API_KEY),
     environment: env.ENVIRONMENT || 'development',
     timestamp: new Date().toISOString()
   };
