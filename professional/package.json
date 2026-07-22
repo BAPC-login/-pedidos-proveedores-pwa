@@ -1,10 +1,10 @@
 {
   "name": "pedidos-pro-platform",
-  "version": "2.0.0-alpha.4",
+  "version": "2.0.0-alpha.6",
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node --check worker/src/core.js && node --check worker/src/password.js && node --check worker/src/schema.js && node --check worker/src/auth.js && node --check worker/src/api/catalog.js && node --check worker/src/api/orders.js && node --check worker/src/api/documents.js && node --check worker/src/index.js && node --check ../worker/src/combined.js && node --check web/app-core.js && node --check web/app-views.js && node --check web/app-actions.js && node --check web/app-modal.js && node --check web/app-order-detail.js && node --check web/app-invoices.js && node --check web/app.js && node --check web/sw.js",
+    "check": "node --check worker/src/core.js && node --check worker/src/password.js && node --check worker/src/schema.js && node --check worker/src/auth.js && node --check worker/src/pdf.js && node --check worker/src/api/catalog.js && node --check worker/src/api/orders.js && node --check worker/src/api/documents.js && node --check worker/src/api/settings.js && node --check worker/src/index.js && node --check ../worker/src/combined.js && node --check web/app-core.js && node --check web/app-views.js && node --check web/app-actions.js && node --check web/app-modal.js && node --check web/app-order-detail.js && node --check web/app-invoices.js && node --check web/app-branding.js && node --check web/app-stability.js && node --check web/app.js && node --check web/sw.js",
     "test": "node tests/core.test.mjs",
     "verify": "npm run check && npm test",
     "dev": "npx wrangler dev --config wrangler.toml",

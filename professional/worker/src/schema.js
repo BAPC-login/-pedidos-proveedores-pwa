@@ -6,7 +6,7 @@ import fileChunkSchemaModule from '../../migrations/0004_file_chunks.sql';
 import costCenterSchemaModule from '../../migrations/0005_cost_centers.sql';
 import {seedLegacyCatalog} from './legacyCatalog.js';
 
-const SCHEMA_VERSION = '9';
+const SCHEMA_VERSION = '10';
 const DEFAULT_ORG_ID = 'e73d2d6e-dae8-46c6-87df-43ae05ca81fa';
 const DEFAULT_LOCATION_ID = 'e263b119-d0bb-484e-b65c-abe2c57f9e86';
 const DEFAULT_USER_ID = '80a9afe9-4751-4181-b816-eb78c94619ef';
@@ -45,6 +45,13 @@ async function executeSchema(db, sql, label) {
   const statements = prepareSchemaStatements(db, sql, label);
   await db.batch(statements);
   return statements.length;
+}
+
+async function ensureColumn(db, table, column, definition) {
+  const result = await db.prepare(`PRAGMA table_info(${table})`).all();
+  if ((result.results || []).some(entry => entry.name === column)) return false;
+  await db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`).run();
+  return true;
 }
 
 const identitySchema = normalizeSql(identitySchemaModule, 'identity');
@@ -141,6 +148,8 @@ export async function ensureSchema(env) {
     const fileChunkStatements = await executeSchema(env.DB, fileChunkSchema, 'file-chunks');
     const seeded = await seedDefaultWorkspace(env.DB);
     const costCenterStatements = await executeSchema(env.DB, costCenterSchema, 'cost-centers');
+    const profileColumnAdded = await ensureColumn(env.DB, 'users', 'profile_json', "TEXT NOT NULL DEFAULT '{}'");
+    const locationDetailsColumnAdded = await ensureColumn(env.DB, 'locations', 'details_json', "TEXT NOT NULL DEFAULT '{}'");
     const ownerPasswordMigrated = await migrateSeededOwnerPassword(env.DB);
     const legacyCatalog = await seedLegacyCatalog(env.DB);
 
@@ -148,6 +157,8 @@ export async function ensureSchema(env) {
       initialized: true,
       seeded,
       ownerPasswordMigrated,
+      profileColumnAdded,
+      locationDetailsColumnAdded,
       legacyCatalog,
       version: SCHEMA_VERSION,
       statements: identityStatements + procurementStatements + invoiceStatements + platformStatements + fileChunkStatements + costCenterStatements

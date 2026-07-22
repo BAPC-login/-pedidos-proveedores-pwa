@@ -18,7 +18,8 @@ import {
   me,
   resetPassword as changePassword,
   revokeSession,
-  updateUser
+  updateUser,
+  updateUserProfile
 } from './auth.js';
 import {
   createCostCenter,
@@ -50,10 +51,11 @@ import {
   listInvoices,
   uploadFile
 } from './api/documents.js';
+import {getSettings, updateSettings} from './api/settings.js';
 import {createBrand, listBrands, switchBrand} from './platform.js';
 import {listDocuments} from './storage.js';
 
-const APP_VERSION = '2.0.0-alpha.4';
+const APP_VERSION = '2.0.0-alpha.6';
 
 function addPlatformHeaders(response, request, env) {
   const headers = new Headers(response.headers);
@@ -113,6 +115,8 @@ async function handleRequest(request, env, ctx) {
   if (method === 'POST' && path === '/api/auth/logout') return ok(await logout(request, env, actor), request, env);
   if (method === 'GET' && path === '/api/me') return ok(await me(env, actor), request, env);
   if (method === 'GET' && path === '/api/dashboard') return ok(await dashboard(env, actor), request, env);
+  if (method === 'GET' && path === '/api/settings') return ok(await getSettings(env, actor), request, env);
+  if (method === 'PATCH' && path === '/api/settings') return ok(await updateSettings(request, env, actor), request, env);
 
   if (method === 'GET' && path === '/api/brands') return ok({brands: await listBrands(env, actor)}, request, env);
   if (method === 'POST' && path === '/api/brands') return ok({brand: await createBrand(request, env, actor)}, request, env);
@@ -153,6 +157,8 @@ async function handleRequest(request, env, ctx) {
 
   if (method === 'GET' && path === '/api/users') return ok({users: await listUsers(env, actor)}, request, env);
   if (method === 'POST' && path === '/api/users') return ok({user: await createUser(request, env, actor)}, request, env);
+  const profileParams = routeMatch(path, '/api/users/:id/profile');
+  if (profileParams && method === 'PATCH') return ok({user: await updateUserProfile(request, env, actor, profileParams.id)}, request, env);
   const userParams = routeMatch(path, '/api/users/:id');
   if (userParams && method === 'PATCH') return ok({user: await updateUser(request, env, actor, userParams.id)}, request, env);
   const passwordParams = routeMatch(path, '/api/users/:id/password');

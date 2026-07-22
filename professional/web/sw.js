@@ -1,7 +1,7 @@
-const VERSION = 'pedidos-pro-platform-v4-professional';
+const VERSION = 'pedidos-pro-platform-v6-stability-pass';
 const SHELL = [
   './','./index.html','./styles.css','./pro-ui.css','./app.js','./app-core.js','./app-views.js','./app-actions.js',
-  './app-modal.js','./app-order-detail.js','./app-invoices.js','./manifest.webmanifest','./icon.svg'
+  './app-modal.js','./app-order-detail.js','./app-invoices.js','./app-branding.js','./app-stability.js','./manifest.webmanifest','./icon.svg'
 ];
 
 self.addEventListener('install',event=>{

@@ -1,6 +1,11 @@
 import {$,$$,state,api,toast,setBusy,setTheme,syncMutations,updateSyncChip,showAuth,showApp,logoutLocal,isAdmin} from './app-core.js';
 import {navigate} from './app-views.js';
 import {openBootstrap,openOrder,openWorkspaceSwitcher,handleAction} from './app-actions.js';
+import {initializeBrandingFeatures,refreshBranding} from './app-branding.js';
+import {initializeStabilityPass} from './app-stability.js';
+
+initializeBrandingFeatures();
+initializeStabilityPass();
 
 $('#loginForm').addEventListener('submit',async event=>{
   event.preventDefault();
@@ -14,6 +19,7 @@ $('#loginForm').addEventListener('submit',async event=>{
     state.token=response.token;
     localStorage.setItem('pp:token',state.token);
     state.me=await api('/api/me');
+    await refreshBranding(true);
     showApp();
     await navigate('dashboard');
     toast('Sesión iniciada');
@@ -92,6 +98,7 @@ async function initialize(){
   }
   try{
     state.me=await api('/api/me');
+    await refreshBranding(true);
     showApp();
     await navigate('dashboard');
     syncMutations();
