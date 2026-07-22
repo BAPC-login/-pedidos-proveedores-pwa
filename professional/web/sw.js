@@ -1,7 +1,7 @@
-const VERSION = 'pedidos-pro-platform-v7-master-orders';
+const VERSION = 'pedidos-pro-platform-v8-order-core';
 const SHELL = [
   './','./index.html','./styles.css','./pro-ui.css','./app.js','./app-core.js','./app-views.js','./app-actions.js',
-  './app-modal.js','./app-order-detail.js','./app-invoices.js','./app-branding.js','./app-stability.js','./app-company-logo.js',
+  './app-modal.js','./app-order-detail.js','./app-invoices.js','./app-branding.js','./app-order-core.js','./app-stability.js','./app-company-logo.js',
   './manifest.webmanifest','./icon.svg'
 ];
 
