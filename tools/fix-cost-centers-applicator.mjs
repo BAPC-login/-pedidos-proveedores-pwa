@@ -33,10 +33,10 @@ const storageBlockPattern = /replace\('professional\/worker\/src\/storage\.js',[
 if (!storageBlockPattern.test(source)) throw new Error('Storage applicator patch block was not found');
 source = source.replace(storageBlockPattern, currentStoragePatch);
 
-// Normalize zero, one or multiple slashes before ${...} to exactly one escape.
 source = source.replace(/\\*\$\{/g, '\\${');
-// This is the only interpolation that belongs to the applicator itself.
 source = source.replace('\\${costCenterApi}', '${costCenterApi}');
+source = source.replace("throw new Error(`Missing marker in \\${path}: \\${needle.slice(0, 100)}`)", "throw new Error('Missing marker in ' + path + ': ' + needle.slice(0, 100))");
+source = source.replace("throw new Error(`Missing regex marker in \\${path}: \\${pattern}`)", "throw new Error('Missing regex marker in ' + path + ': ' + String(pattern))");
 
 function literalizeWriteBlock(filePath, nextMarker) {
   const startToken = `write('${filePath}', \``;
@@ -55,4 +55,4 @@ literalizeWriteBlock('professional/web/app-actions.js', "write('professional/web
 literalizeWriteBlock('professional/web/app-views.js', "replace('professional/web/app-order-detail.js',");
 
 fs.writeFileSync(path, source);
-console.log('Schema order, storage marker, generated expressions and frontend templates normalized.');
+console.log('Schema order, storage marker, diagnostics, generated expressions and frontend templates normalized.');
