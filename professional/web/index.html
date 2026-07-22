@@ -18,18 +18,8 @@
       <div class="brand-mark" aria-hidden="true">P</div>
       <div><strong>Pedidos Pro</strong><span>PLATFORM</span></div>
     </div>
-    <div class="auth-copy">
-      <span class="eyebrow">COMPRAS SIN PÉRDIDA DE CONTROL</span>
-      <h1>Del pedido a la factura, con trazabilidad real.</h1>
-      <p>Gestiona proveedores, aprobaciones, recepción y diferencias desde una aplicación rápida, instalable y preparada para crecer.</p>
-      <div class="auth-points">
-        <span>Multiempresa y multilocal</span>
-        <span>Sesiones revocables</span>
-        <span>Operación offline</span>
-        <span>Facturas con IA</span>
-      </div>
-    </div>
     <div class="auth-card glass">
+      <div class="auth-intro"><span class="eyebrow">ACCESO A PEDIDOS PRO</span><h1>Gestiona compras, facturas y centros de costo.</h1><p>Ingresa con tu correo. La app abrirá automáticamente la marca y los locales que tienes asignados.</p></div>
       <div class="auth-card-head">
         <span class="status-dot"></span>
         <span>Acceso seguro</span>
@@ -37,7 +27,6 @@
       <form id="loginForm" class="stack">
         <label class="field"><span>Correo</span><input id="loginEmail" name="email" type="email" autocomplete="username" required placeholder="nombre@empresa.cl"></label>
         <label class="field"><span>Contraseña</span><input id="loginPassword" name="password" type="password" autocomplete="current-password" required minlength="10" placeholder="••••••••••"></label>
-        <label class="field"><span>Empresa <small>opcional</small></span><input id="loginOrg" name="organizationSlug" autocomplete="organization" placeholder="mi-empresa"></label>
         <button class="btn primary wide" type="submit"><span>Ingresar</span><span aria-hidden="true">→</span></button>
       </form>
       <button class="link-btn" id="openBootstrap" type="button">Primera instalación</button>
@@ -51,11 +40,11 @@
         <div class="brand-mark small">P</div>
         <div><strong>Pedidos Pro</strong><span>PLATFORM</span></div>
       </div>
-      <div class="workspace-card">
+      <button class="workspace-card" id="workspaceCard" type="button">
         <span class="workspace-avatar" id="workspaceAvatar">PP</span>
-        <div><strong id="workspaceName">Empresa</strong><small id="workspacePlan">Plan gratuito</small></div>
-        <span class="chevron">⌄</span>
-      </div>
+        <span class="workspace-copy"><strong id="workspaceName">Empresa</strong><small id="workspacePlan">Plan gratuito</small></span>
+        <span class="chevron" id="workspaceChevron">⌄</span>
+      </button>
       <nav class="side-nav" aria-label="Navegación principal">
         <button class="nav-item active" data-view="dashboard"><span class="nav-icon">⌂</span><span>Resumen</span></button>
         <button class="nav-item" data-view="orders"><span class="nav-icon">▤</span><span>Pedidos</span><b class="nav-count" id="pendingCount">0</b></button>
@@ -66,11 +55,6 @@
         <button class="nav-item admin-only" data-view="audit"><span class="nav-icon">◷</span><span>Auditoría</span></button>
       </nav>
       <div class="sidebar-spacer"></div>
-      <div class="free-plan-card">
-        <div><span class="plan-orbit"></span><strong>Plan gratuito</strong></div>
-        <p id="freeUsageText">Preparado para comenzar sin costo.</p>
-        <div class="usage-track"><i id="freeUsageBar"></i></div>
-      </div>
       <nav class="side-nav lower">
         <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>Configuración</span></button>
         <button class="nav-item danger-text" id="logoutButton"><span class="nav-icon">↪</span><span>Cerrar sesión</span></button>

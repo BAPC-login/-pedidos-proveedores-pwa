@@ -8,7 +8,7 @@ const state = {
   token: localStorage.getItem('pp:token') || '',
   me: null,
   view: 'dashboard',
-  cache: {dashboard:null,orders:[],invoices:[],products:[],suppliers:[],categories:[],locations:[],users:[],audit:[],brands:[]},
+  cache: {dashboard:null,orders:[],invoices:[],products:[],suppliers:[],categories:[],locations:[],costCenters:[],users:[],audit:[],brands:[]},
   online: navigator.onLine,
   pending: []
 };
@@ -97,13 +97,14 @@ function showApp(){
   $('#workspaceName').textContent=organization.name;
   $('#workspacePlan').textContent=`Plan ${plan.name==='free'?'gratuito':plan.name}`;
   $('#workspaceAvatar').textContent=initials(organization.name);
+  const platformOwner=Boolean(user.isPlatformOwner);
+  $('#workspaceCard').disabled=!platformOwner;
+  $('#workspaceCard').classList.toggle('selectable',platformOwner);
+  $('#workspaceChevron').classList.toggle('hidden',!platformOwner);
   $('#userName').textContent=user.displayName;
   $('#userRole').textContent=roleNames[user.role]||user.role;
   $('#userAvatar').textContent=initials(user.displayName);
   $$('.admin-only').forEach(node=>node.classList.toggle('hidden',!isAdmin()));
-  const used=Number(plan.usage.orders_created||0),limit=Number(plan.limits.ordersPerMonth||1),pct=Math.min(100,used/limit*100);
-  $('#freeUsageText').textContent=`${used} de ${limit} pedidos utilizados este mes.`;
-  $('#freeUsageBar').style.width=`${Math.max(4,pct)}%`;
 }
 function logoutLocal(){
   state.token='';state.me=null;localStorage.removeItem('pp:token');showAuth();

@@ -84,6 +84,9 @@ export async function createBrand(request, env, actor) {
       INSERT INTO locations (id, org_id, name, code, timezone, active, created_at, updated_at)
       VALUES (?, ?, ?, ?, 'America/Santiago', 1, ?, ?)
     `).bind(locationId, orgId, locationName, locationCode, timestamp, timestamp),
+    env.DB.prepare(`INSERT INTO cost_centers (id, org_id, location_id, name, code, active, created_at, updated_at) VALUES (?, ?, ?, 'Barra', 'BARRA', 1, ?, ?)`).bind(`${locationId}-cc-barra`, orgId, locationId, timestamp, timestamp),
+    env.DB.prepare(`INSERT INTO cost_centers (id, org_id, location_id, name, code, active, created_at, updated_at) VALUES (?, ?, ?, 'Salón', 'SALON', 1, ?, ?)`).bind(`${locationId}-cc-salon`, orgId, locationId, timestamp, timestamp),
+    env.DB.prepare(`INSERT INTO cost_centers (id, org_id, location_id, name, code, active, created_at, updated_at) VALUES (?, ?, ?, 'Cocina', 'COCINA', 1, ?, ?)`).bind(`${locationId}-cc-cocina`, orgId, locationId, timestamp, timestamp),
     env.DB.prepare(`
       INSERT INTO memberships (id, org_id, user_id, role, location_scope, active, created_at, updated_at)
       VALUES (?, ?, ?, 'owner', '["*"]', 1, ?, ?)

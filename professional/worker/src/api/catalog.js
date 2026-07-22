@@ -116,8 +116,13 @@ export async function createLocation(request, env, actor) {
   const name = requireText(body.name, 'Nombre del local', {max: 120});
   const code = requireText(body.code || slugify(name).slice(0, 10).toUpperCase(), 'Código', {max: 12}).toUpperCase();
   const timezone = String(body.timezone || 'America/Santiago').slice(0, 60);
-  await env.DB.prepare(`INSERT INTO locations (id, org_id, name, code, timezone, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)`) 
-    .bind(id, actor.orgId, name, code, timezone, nowIso(), nowIso()).run();
+  const timestamp = nowIso();
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO locations (id, org_id, name, code, timezone, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)`).bind(id, actor.orgId, name, code, timezone, timestamp, timestamp),
+    env.DB.prepare(`INSERT INTO cost_centers (id, org_id, location_id, name, code, active, created_at, updated_at) VALUES (?, ?, ?, 'Barra', 'BARRA', 1, ?, ?)`).bind(`${id}-cc-barra`, actor.orgId, id, timestamp, timestamp),
+    env.DB.prepare(`INSERT INTO cost_centers (id, org_id, location_id, name, code, active, created_at, updated_at) VALUES (?, ?, ?, 'Salón', 'SALON', 1, ?, ?)`).bind(`${id}-cc-salon`, actor.orgId, id, timestamp, timestamp),
+    env.DB.prepare(`INSERT INTO cost_centers (id, org_id, location_id, name, code, active, created_at, updated_at) VALUES (?, ?, ?, 'Cocina', 'COCINA', 1, ?, ?)`).bind(`${id}-cc-cocina`, actor.orgId, id, timestamp, timestamp)
+  ]);
   await writeAudit(env, actor, request, 'location.create', 'location', id, {name, code});
   return {id, name, code, timezone, active: true};
 }
@@ -228,9 +233,80 @@ export async function createCategory(request, env, actor) {
   return {id, name, active: true};
 }
 
+async function validateCostCenterIds(env, actor, requested, {locationId = ''} = {}) {
+  const all = rows(await env.DB.prepare(`
+    SELECT id, location_id, name, code FROM cost_centers
+    WHERE org_id = ? AND active = 1
+    ORDER BY CASE code WHEN 'BARRA' THEN 0 WHEN 'SALON' THEN 1 WHEN 'COCINA' THEN 2 ELSE 3 END, name COLLATE NOCASE
+  `).bind(actor.orgId).all()).filter(center => locationAllowed(actor, center.location_id));
+  const values = [...new Set((Array.isArray(requested) ? requested : []).map(String).filter(Boolean))];
+  if (!values.length) {
+    const preferred = all.find(center => (!locationId || center.location_id === locationId) && center.code === 'BARRA') || all.find(center => !locationId || center.location_id === locationId);
+    if (!preferred) throw new HttpError(400, 'No hay centros de costo disponibles', 'missing_cost_center');
+    return [preferred.id];
+  }
+  const valid = new Set(all.filter(center => !locationId || center.location_id === locationId).map(center => center.id));
+  if (values.some(id => !valid.has(id))) throw new HttpError(400, 'Centro de costo inválido', 'invalid_cost_center');
+  return values;
+}
+
+export async function listCostCenters(env, actor, url) {
+  const locationId = String(url.searchParams.get('locationId') || '');
+  const result = await env.DB.prepare(`
+    SELECT cc.id, cc.location_id, cc.name, cc.code, cc.active, l.name AS location_name,
+      COUNT(DISTINCT pcc.product_id) AS product_count,
+      COUNT(DISTINCT occ.order_id) AS order_count
+    FROM cost_centers cc
+    JOIN locations l ON l.id = cc.location_id
+    LEFT JOIN product_cost_centers pcc ON pcc.cost_center_id = cc.id
+    LEFT JOIN order_cost_centers occ ON occ.cost_center_id = cc.id
+    WHERE cc.org_id = ? AND (? = '' OR cc.location_id = ?)
+    GROUP BY cc.id
+    ORDER BY l.name COLLATE NOCASE, CASE cc.code WHEN 'BARRA' THEN 0 WHEN 'SALON' THEN 1 WHEN 'COCINA' THEN 2 ELSE 3 END, cc.name COLLATE NOCASE
+  `).bind(actor.orgId, locationId, locationId).all();
+  return rows(result).filter(center => locationAllowed(actor, center.location_id)).map(center => ({
+    id: center.id, locationId: center.location_id, locationName: center.location_name, name: center.name, code: center.code,
+    active: Boolean(center.active), productCount: Number(center.product_count || 0), orderCount: Number(center.order_count || 0)
+  }));
+}
+
+export async function createCostCenter(request, env, actor) {
+  assertMinimumRole(actor.role, ROLES.ADMIN);
+  const body = await readJson(request);
+  const location = await requireLocation(env, actor, String(body.locationId || ''));
+  const name = requireText(body.name, 'Nombre del centro de costo', {max: 100});
+  const code = requireText(body.code || slugify(name).replace(/-/g, '').slice(0, 12).toUpperCase(), 'Código', {max: 12}).toUpperCase();
+  const id = uuid();
+  const timestamp = nowIso();
+  try {
+    await env.DB.prepare(`INSERT INTO cost_centers (id, org_id, location_id, name, code, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)`)
+      .bind(id, actor.orgId, location.id, name, code, timestamp, timestamp).run();
+  } catch (error) {
+    if (/UNIQUE/i.test(String(error?.message || error))) throw new HttpError(409, 'Ya existe un centro con ese nombre o código', 'duplicate_cost_center');
+    throw error;
+  }
+  await writeAudit(env, actor, request, 'cost_center.create', 'cost_center', id, {locationId: location.id, name, code});
+  return {id, locationId: location.id, locationName: location.name, name, code, active: true, productCount: 0, orderCount: 0};
+}
+
+export async function setProductCostCenters(request, env, actor, productId) {
+  assertMinimumRole(actor.role, ROLES.PURCHASER);
+  const product = await env.DB.prepare('SELECT id FROM products WHERE id = ? AND org_id = ?').bind(productId, actor.orgId).first();
+  if (!product) throw new HttpError(404, 'Producto no encontrado', 'not_found');
+  const body = await readJson(request);
+  const ids = await validateCostCenterIds(env, actor, body.costCenterIds);
+  const timestamp = nowIso();
+  const statements = [env.DB.prepare('DELETE FROM product_cost_centers WHERE org_id = ? AND product_id = ?').bind(actor.orgId, productId)];
+  ids.forEach(id => statements.push(env.DB.prepare('INSERT INTO product_cost_centers (org_id, product_id, cost_center_id, created_at) VALUES (?, ?, ?, ?)').bind(actor.orgId, productId, id, timestamp)));
+  await env.DB.batch(statements);
+  await writeAudit(env, actor, request, 'product.cost_centers', 'product', productId, {costCenterIds: ids});
+  return {productId, costCenterIds: ids};
+}
+
 export async function listProducts(env, actor, url) {
   const query = String(url.searchParams.get('q') || '').trim();
   const supplierId = String(url.searchParams.get('supplierId') || '');
+  const costCenterId = String(url.searchParams.get('costCenterId') || '');
   const result = await env.DB.prepare(`
     SELECT p.id, p.name, p.brand, p.variant, p.content_value, p.content_unit, p.base_unit, p.barcode, p.active,
       c.id AS category_id, c.name AS category_name,
@@ -244,41 +320,35 @@ export async function listProducts(env, actor, url) {
     WHERE p.org_id = ?
       AND (? = '' OR p.name LIKE '%' || ? || '%' OR p.brand LIKE '%' || ? || '%' OR p.barcode LIKE '%' || ? || '%')
       AND (? = '' OR sp.supplier_id = ?)
+      AND (? = '' OR EXISTS (SELECT 1 FROM product_cost_centers pccf WHERE pccf.product_id = p.id AND pccf.cost_center_id = ?))
     ORDER BY p.active DESC, c.sort_order, p.name COLLATE NOCASE
     LIMIT 1000
-  `).bind(supplierId, supplierId, actor.orgId, query, query, query, query, supplierId, supplierId).all();
+  `).bind(supplierId, supplierId, actor.orgId, query, query, query, query, supplierId, supplierId, costCenterId, costCenterId).all();
   const map = new Map();
   for (const row of rows(result)) {
-    if (!map.has(row.id)) {
-      map.set(row.id, {
-        id: row.id,
-        name: row.name,
-        brand: row.brand,
-        variant: row.variant,
-        categoryId: row.category_id,
-        categoryName: row.category_name,
-        contentValue: Number(row.content_value || 0),
-        contentUnit: row.content_unit,
-        baseUnit: row.base_unit,
-        barcode: row.barcode,
-        active: Boolean(row.active),
-        suppliers: []
-      });
-    }
-    if (row.supplier_product_id) {
-      map.get(row.id).suppliers.push({
-        id: row.supplier_product_id,
-        supplierId: row.supplier_id,
-        supplierName: row.supplier_name_display,
-        supplierSku: row.supplier_sku,
-        supplierProductName: row.supplier_name,
-        orderUnit: row.order_unit,
-        unitsPerOrderUnit: Number(row.units_per_order_unit || 1),
-        minimumQuantity: Number(row.minimum_quantity || 0),
-        quantityMultiple: Number(row.quantity_multiple || 1),
-        lastGrossUnitPrice: Number(row.last_gross_unit_price || 0)
-      });
-    }
+    if (!map.has(row.id)) map.set(row.id, {
+      id: row.id, name: row.name, brand: row.brand, variant: row.variant, categoryId: row.category_id, categoryName: row.category_name,
+      contentValue: Number(row.content_value || 0), contentUnit: row.content_unit, baseUnit: row.base_unit, barcode: row.barcode,
+      active: Boolean(row.active), suppliers: [], costCenters: []
+    });
+    if (row.supplier_product_id) map.get(row.id).suppliers.push({
+      id: row.supplier_product_id, supplierId: row.supplier_id, supplierName: row.supplier_name_display,
+      supplierSku: row.supplier_sku, supplierProductName: row.supplier_name, orderUnit: row.order_unit,
+      unitsPerOrderUnit: Number(row.units_per_order_unit || 1), minimumQuantity: Number(row.minimum_quantity || 0),
+      quantityMultiple: Number(row.quantity_multiple || 1), lastGrossUnitPrice: Number(row.last_gross_unit_price || 0)
+    });
+  }
+  const centerRows = await env.DB.prepare(`
+    SELECT pcc.product_id, cc.id, cc.location_id, cc.name, cc.code, l.name AS location_name
+    FROM product_cost_centers pcc
+    JOIN cost_centers cc ON cc.id = pcc.cost_center_id AND cc.active = 1
+    JOIN locations l ON l.id = cc.location_id
+    WHERE pcc.org_id = ?
+    ORDER BY l.name COLLATE NOCASE, cc.name COLLATE NOCASE
+  `).bind(actor.orgId).all();
+  for (const center of rows(centerRows)) {
+    const product = map.get(center.product_id);
+    if (product && locationAllowed(actor, center.location_id)) product.costCenters.push({id: center.id, locationId: center.location_id, locationName: center.location_name, name: center.name, code: center.code});
   }
   return [...map.values()];
 }
@@ -294,17 +364,21 @@ export async function createProduct(request, env, actor) {
     const category = await env.DB.prepare('SELECT id FROM categories WHERE id = ? AND org_id = ?').bind(categoryId, actor.orgId).first();
     if (!category) throw new HttpError(400, 'Categoría inválida', 'invalid_category');
   }
-  await env.DB.prepare(`
+  const costCenterIds = await validateCostCenterIds(env, actor, body.costCenterIds);
+  const timestamp = nowIso();
+  const statements = [env.DB.prepare(`
     INSERT INTO products
       (id, org_id, category_id, name, brand, variant, content_value, content_unit, base_unit, barcode, active, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
   `).bind(
     id, actor.orgId, categoryId, name, optionalText(body.brand, {max: 100}), optionalText(body.variant, {max: 100}),
     number(body.contentValue, {min: 0, max: 999999}), optionalText(body.contentUnit || 'ml', {max: 20}),
-    optionalText(body.baseUnit || 'unidad', {max: 30}), optionalText(body.barcode, {max: 80}), nowIso(), nowIso()
-  ).run();
-  await writeAudit(env, actor, request, 'product.create', 'product', id, {name});
-  return {id, name, categoryId, active: true};
+    optionalText(body.baseUnit || 'unidad', {max: 30}), optionalText(body.barcode, {max: 80}), timestamp, timestamp
+  )];
+  costCenterIds.forEach(centerId => statements.push(env.DB.prepare('INSERT INTO product_cost_centers (org_id, product_id, cost_center_id, created_at) VALUES (?, ?, ?, ?)').bind(actor.orgId, id, centerId, timestamp)));
+  await env.DB.batch(statements);
+  await writeAudit(env, actor, request, 'product.create', 'product', id, {name, costCenterIds});
+  return {id, name, categoryId, costCenterIds, active: true};
 }
 
 export async function linkSupplierProduct(request, env, actor, productId) {

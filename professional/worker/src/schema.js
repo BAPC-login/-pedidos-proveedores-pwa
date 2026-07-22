@@ -3,8 +3,9 @@ import procurementSchemaModule from '../../migrations/0002_procurement.sql';
 import invoiceSchemaModule from '../../migrations/0003_invoices.sql';
 import platformSchemaModule from '../../migrations/0004_multibrand_r2_history.sql';
 import fileChunkSchemaModule from '../../migrations/0004_file_chunks.sql';
+import costCenterSchemaModule from '../../migrations/0005_cost_centers.sql';
 
-const SCHEMA_VERSION = '7';
+const SCHEMA_VERSION = '8';
 const DEFAULT_ORG_ID = 'e73d2d6e-dae8-46c6-87df-43ae05ca81fa';
 const DEFAULT_LOCATION_ID = 'e263b119-d0bb-484e-b65c-abe2c57f9e86';
 const DEFAULT_USER_ID = '80a9afe9-4751-4181-b816-eb78c94619ef';
@@ -50,6 +51,7 @@ const procurementSchema = normalizeSql(procurementSchemaModule, 'procurement');
 const invoiceSchema = normalizeSql(invoiceSchemaModule, 'invoices');
 const platformSchema = normalizeSql(platformSchemaModule, 'platform-r2-history');
 const fileChunkSchema = normalizeSql(fileChunkSchemaModule, 'file-chunks');
+const costCenterSchema = normalizeSql(costCenterSchemaModule, 'cost-centers');
 
 async function seedDefaultWorkspace(db) {
   const existing = await db.prepare('SELECT COUNT(*) AS total FROM users').first();
@@ -133,6 +135,7 @@ export async function ensureSchema(env) {
     const platformStatements = await executeSchema(env.DB, platformSchema, 'platform-r2-history');
     const fileChunkStatements = await executeSchema(env.DB, fileChunkSchema, 'file-chunks');
     const seeded = await seedDefaultWorkspace(env.DB);
+    const costCenterStatements = await executeSchema(env.DB, costCenterSchema, 'cost-centers');
     const ownerPasswordMigrated = await migrateSeededOwnerPassword(env.DB);
 
     return {
@@ -140,7 +143,7 @@ export async function ensureSchema(env) {
       seeded,
       ownerPasswordMigrated,
       version: SCHEMA_VERSION,
-      statements: identityStatements + procurementStatements + invoiceStatements + platformStatements + fileChunkStatements
+      statements: identityStatements + procurementStatements + invoiceStatements + platformStatements + fileChunkStatements + costCenterStatements
     };
   })().catch(error => {
     initializationPromise = null;

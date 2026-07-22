@@ -21,15 +21,18 @@ import {
   updateUser
 } from './auth.js';
 import {
+  createCostCenter,
   createLocation,
   createProduct,
   createSupplier,
   dashboard,
   linkSupplierProduct,
   listCategories,
+  listCostCenters,
   listLocations,
   listProducts,
-  listSuppliers
+  listSuppliers,
+  setProductCostCenters
 } from './api/catalog.js';
 import {
   createOrder,
@@ -118,11 +121,15 @@ async function handleRequest(request, env, ctx) {
 
   if (method === 'GET' && path === '/api/locations') return ok({locations: await listLocations(env, actor)}, request, env);
   if (method === 'POST' && path === '/api/locations') return ok({location: await createLocation(request, env, actor)}, request, env);
+  if (method === 'GET' && path === '/api/cost-centers') return ok({costCenters: await listCostCenters(env, actor, url)}, request, env);
+  if (method === 'POST' && path === '/api/cost-centers') return ok({costCenter: await createCostCenter(request, env, actor)}, request, env);
   if (method === 'GET' && path === '/api/categories') return ok({categories: await listCategories(env, actor)}, request, env);
   if (method === 'GET' && path === '/api/suppliers') return ok({suppliers: await listSuppliers(env, actor, url)}, request, env);
   if (method === 'POST' && path === '/api/suppliers') return ok({supplier: await createSupplier(request, env, actor)}, request, env);
   if (method === 'GET' && path === '/api/products') return ok({products: await listProducts(env, actor, url)}, request, env);
   if (method === 'POST' && path === '/api/products') return ok({product: await createProduct(request, env, actor)}, request, env);
+  const productCostCenterParams = routeMatch(path, '/api/products/:id/cost-centers');
+  if (productCostCenterParams && method === 'PUT') return ok(await setProductCostCenters(request, env, actor, productCostCenterParams.id), request, env);
   const productSupplierParams = routeMatch(path, '/api/products/:id/suppliers');
   if (productSupplierParams && method === 'POST') return ok({supplierProduct: await linkSupplierProduct(request, env, actor, productSupplierParams.id)}, request, env);
 
