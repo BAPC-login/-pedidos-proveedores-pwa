@@ -13,6 +13,17 @@ const state = {
   pending: []
 };
 
+let sessionValidationPromise=null;
+async function sessionStillValid(){
+  if(!state.token)return false;
+  if(sessionValidationPromise)return sessionValidationPromise;
+  sessionValidationPromise=fetch('/api/me',{method:'GET',cache:'no-store',headers:{Authorization:`Bearer ${state.token}`}})
+    .then(response=>response.ok?true:response.status===401?false:true)
+    .catch(()=>true)
+    .finally(()=>{sessionValidationPromise=null});
+  return sessionValidationPromise;
+}
+
 const api = async (path, options={}) => {
   const headers = new Headers(options.headers || {});
   if (state.token) headers.set('Authorization',`Bearer ${state.token}`);
@@ -20,9 +31,12 @@ const api = async (path, options={}) => {
     headers.set('Content-Type','application/json');
     options.body = JSON.stringify(options.json);
   }
-  const response = await fetch(path,{...options,headers});
+  const response = await fetch(path,{...options,headers,cache:options.cache||'no-store'});
   const payload = await response.json().catch(()=>({ok:false,error:`HTTP ${response.status}`}));
-  if (response.status === 401 && state.token) logoutLocal();
+  if (response.status === 401 && state.token) {
+    const invalid=String(path)==='/api/me'||String(payload.code||'').includes('session_')||!(await sessionStillValid());
+    if(invalid)logoutLocal();
+  }
   if (!response.ok || payload.ok === false) throw Object.assign(new Error(payload.error || 'No se pudo completar la operación'),{code:payload.code,status:response.status,details:payload.details});
   return payload;
 };
@@ -125,4 +139,4 @@ function logoutLocal(){
   state.token='';state.me=null;localStorage.removeItem('pp:token');showAuth();
 }
 
-export {$,$$,esc,money,date,roleNames,state,api,toast,initials,isAdmin,canBuy,setBusy,setTheme,queueMutation,readMutations,syncMutations,updateSyncChip,showAuth,showApp,logoutLocal};
+export {$,$$,esc,money,date,roleNames,state,api,toast,initials,isAdmin,canBuy,setBusy,setTheme,queueMutation,readMutations,syncMutations,updateSyncChip,showAuth,showApp,logoutLocal,sessionStillValid};
