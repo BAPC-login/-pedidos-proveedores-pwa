@@ -18,7 +18,13 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
       - name: Apply requested release
-        run: node tools/apply-cost-centers-login-ui.mjs
+        shell: bash
+        run: |
+          set +e
+          node tools/apply-cost-centers-login-ui.mjs > /tmp/apply.log 2>&1
+          status=$?
+          tail -n 40 /tmp/apply.log
+          exit $status
       - name: Verify platform
         working-directory: professional
         run: npm run verify
