@@ -39,10 +39,13 @@ jobs:
             platform_health=$(curl --fail --silent --show-error --max-time 20 --dump-header /tmp/platform.headers "$BASE_URL/platform/health" 2>/dev/null || true)
             app_actions=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-actions.js" 2>/dev/null || true)
             app_views=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-views.js" 2>/dev/null || true)
-            app_index=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/index.html" 2>/dev/null || true)
             release_header=$(grep -i '^x-pedidos-pro-release:' /tmp/platform.headers 2>/dev/null | tr -d '\r' | awk '{print $2}' || true)
 
-            if echo "$app" | grep -q 'Pedidos Pro Platform' \
+            if echo "$app" | grep -q '<title>Pedidos Pro</title>' \
+              && echo "$app" | grep -q 'id="appShell"' \
+              && echo "$app" | grep -q 'id="modalClose"' \
+              && echo "$app" | grep -q 'novalidate' \
+              && ! echo "$app" | grep -q 'loginOrg' \
               && echo "$app_actions" | grep -q 'openWorkspaceSwitcher' \
               && echo "$app_actions" | grep -q 'Crear usuario' \
               && echo "$app_actions" | grep -q 'Crear pedido y PDF' \
@@ -50,9 +53,6 @@ jobs:
               && echo "$app_views" | grep -q 'Base operativa disponible' \
               && echo "$app_views" | grep -q 'Catálogo de compras' \
               && echo "$app_views" | grep -q 'Administrar usuarios' \
-              && echo "$app_index" | grep -q 'id="modalClose"' \
-              && echo "$app_index" | grep -q 'novalidate' \
-              && ! echo "$app_index" | grep -q 'loginOrg' \
               && echo "$ai_health" | grep -q '"service":"pedidos-pro-ai"' \
               && echo "$ai_health" | grep -q '"geminiConfigured":true' \
               && echo "$platform_health" | grep -q '"service":"pedidos-pro-platform"' \
