@@ -1,0 +1,42 @@
+name: Apply stability pass
+
+on:
+  push:
+    branches:
+      - agent/restore-pdf-branding-profiles
+    paths:
+      - tools/apply-stability-pass.mjs
+      - .github/workflows/apply-stability-pass.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/restore-pdf-branding-profiles
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply deterministic repair
+        run: node tools/apply-stability-pass.mjs
+      - name: Verify application
+        working-directory: professional
+        run: npm run verify
+      - name: Verify Cloudflare bundle
+        working-directory: worker
+        run: |
+          npm install
+          npx wrangler deploy --dry-run
+      - name: Commit generated repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm tools/apply-stability-pass.mjs .github/workflows/apply-stability-pass.yml
+          git add -A
+          git commit -m "fix: restore professional PDFs, branding, profiles and owner protection"
+          git push origin HEAD:agent/restore-pdf-branding-profiles
