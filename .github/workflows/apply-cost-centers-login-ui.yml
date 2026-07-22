@@ -21,17 +21,25 @@ jobs:
         shell: bash
         run: |
           set +e
-          node tools/apply-cost-centers-login-ui.mjs > /tmp/apply.log 2>&1
-          status=$?
+          node tools/fix-cost-centers-applicator.mjs > /tmp/fix.log 2>&1
+          fix_status=$?
+          if [ "$fix_status" -eq 0 ]; then
+            node tools/apply-cost-centers-login-ui.mjs > /tmp/apply.log 2>&1
+            status=$?
+          else
+            cp /tmp/fix.log /tmp/apply.log
+            status=$fix_status
+          fi
           if [ "$status" -ne 0 ]; then
-            tail -n 60 /tmp/apply.log > tools/apply-cost-centers-error.txt
+            tail -n 80 /tmp/apply.log > tools/apply-cost-centers-error.txt
             git config user.name "github-actions[bot]"
             git config user.email "4189826+github-actions[bot]@users.noreply.github.com"
             git add tools/apply-cost-centers-error.txt
             git commit -m "chore(ci): record cost centers applicator error" || true
             git push origin HEAD:${{ github.head_ref }} || true
           fi
-          tail -n 60 /tmp/apply.log
+          cat /tmp/fix.log 2>/dev/null || true
+          tail -n 80 /tmp/apply.log
           exit $status
       - name: Verify platform
         working-directory: professional
@@ -48,6 +56,8 @@ jobs:
           grep -q "SCHEMA_VERSION = '8'" professional/worker/src/schema.js
           grep -q "Madriguera Clubhaus" professional/migrations/0005_cost_centers.sql
           grep -q "storageBackend" professional/worker/src/index.js
+          grep -q "costCenterId" professional/web/app-actions.js
+          ! grep -q "loginOrg" professional/web/index.html
       - name: Bundle Cloudflare Worker
         working-directory: worker
         run: npx --yes wrangler@4.67.0 deploy --dry-run --outdir ../deployment/cost-centers-release
@@ -55,7 +65,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "4189826+github-actions[bot]@users.noreply.github.com"
-          rm -f tools/apply-cost-centers-error.txt
+          rm -f tools/apply-cost-centers-error.txt tools/run-cost-centers-trigger.txt tools/fix-cost-centers-applicator.mjs
           git add -A
           git commit -m "feat: Madriguera cost centers and direct login"
           git push origin HEAD:${{ github.head_ref }}
