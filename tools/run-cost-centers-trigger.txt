@@ -1,2 +1,2 @@
 Apply Madriguera Clubhaus, Barra/Salón/Cocina, custom cost centers, direct login, and compact UI.
-Retry: sanitized frontend templates.
+Retry: schema order aligned.
