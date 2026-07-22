@@ -59,8 +59,10 @@ jobs:
               && echo "$platform_health" | grep -q '"databaseInitialized":true' \
               && echo "$platform_health" | grep -q '"schemaVersion":"9"' \
               && echo "$platform_health" | grep -q '"catalogReady":true' \
-              && echo "$platform_health" | grep -q '"catalogProducts":194' \
+              && echo "$platform_health" | grep -q '"catalogProducts":193' \
               && echo "$platform_health" | grep -q '"catalogSuppliers":12' \
+              && echo "$platform_health" | grep -q '"catalogPurchaseFormats":194' \
+              && echo "$platform_health" | grep -q '"catalogSourceRows":194' \
               && echo "$platform_health" | grep -q '"platformOwnerReady":true' \
               && echo "$platform_health" | grep -q '"activeLocations":1' \
               && echo "$platform_health" | grep -q '"storageConfigured":true' \
