@@ -28,10 +28,10 @@ const currentSchemaPatch = `replace('professional/worker/src/schema.js',
 if (!source.includes(oldSchemaPatch)) throw new Error('Schema applicator patch block was not found');
 source = source.replace(oldSchemaPatch, currentSchemaPatch);
 
-const oldStoragePatch = "replace('professional/worker/src/storage.js',\n`    \\`Local: ${order.locationName || ''}\\`,\n    \\`Proveedor: ${order.supplierName || ''}\\`,` ,\n`    \\`Local: ${order.locationName || ''}\\`,\n    \\`Centro de costo: ${order.costCenterName || 'Barra'}\\`,\n    \\`Proveedor: ${order.supplierName || ''}\\`,`);".replace("`,` ,", "`,`");
-const currentStoragePatch = "replace('professional/worker/src/storage.js',\n  \"`Local: ${order.locationName||''}`,`Proveedor: ${order.supplierName||''}`\",\n  \"`Local: ${order.locationName||''}`,`Centro de costo: ${order.costCenterName||'Barra'}`,`Proveedor: ${order.supplierName||''}`\");";
-if (!source.includes(oldStoragePatch)) throw new Error('Storage applicator patch block was not found');
-source = source.replace(oldStoragePatch, currentStoragePatch);
+const currentStoragePatch = "replace('professional/worker/src/storage.js',\n  \"`Local: ${order.locationName||''}`,`Proveedor: ${order.supplierName||''}`\",\n  \"`Local: ${order.locationName||''}`,`Centro de costo: ${order.costCenterName||'Barra'}`,`Proveedor: ${order.supplierName||''}`\");\n\nreplace('professional/worker/src/api/catalog.js',";
+const storageBlockPattern = /replace\('professional\/worker\/src\/storage\.js',[\s\S]*?\);\n\nreplace\('professional\/worker\/src\/api\/catalog\.js',/;
+if (!storageBlockPattern.test(source)) throw new Error('Storage applicator patch block was not found');
+source = source.replace(storageBlockPattern, currentStoragePatch);
 
 // Normalize zero, one or multiple slashes before ${...} to exactly one escape.
 source = source.replace(/\\*\$\{/g, '\\${');
