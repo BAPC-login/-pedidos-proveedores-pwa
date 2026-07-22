@@ -12,18 +12,25 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Print release 16 health diagnostic
+      - name: Verify release 17 health and schema
         shell: bash
         run: |
           set -u
           BASE="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
-          for attempt in $(seq 1 18); do
+          for attempt in $(seq 1 24); do
             health_code=$(curl --silent --show-error --max-time 30 --dump-header /tmp/health.headers --output /tmp/health.json --write-out '%{http_code}' "$BASE/platform/health" || true)
-            echo "attempt=${attempt} health=${health_code}"
-            cat /tmp/health.headers 2>/dev/null || true
+            diagnostic_code=$(curl --silent --show-error --max-time 30 --output /tmp/diagnostic.json --write-out '%{http_code}' "$BASE/api/platform-diagnostics" || true)
+            echo "attempt=${attempt} health=${health_code} diagnostic=${diagnostic_code}"
             cat /tmp/health.json 2>/dev/null || true
             echo
-            if grep -qi '^x-pedidos-pro-release: 2026.07.21.16' /tmp/health.headers 2>/dev/null; then exit 0; fi
+            cat /tmp/diagnostic.json 2>/dev/null || true
+            echo
+            if [ "$health_code" = "200" ] \
+              && grep -qi '^x-pedidos-pro-release: 2026.07.21.17' /tmp/health.headers \
+              && grep -q '"schemaVersion":"7"' /tmp/health.json \
+              && grep -q '"storageConfigured":true' /tmp/health.json \
+              && grep -q '"storageBackend":"d1-chunks"' /tmp/health.json \
+              && [ "$diagnostic_code" = "200" ]; then exit 0; fi
             sleep 10
           done
           exit 1
