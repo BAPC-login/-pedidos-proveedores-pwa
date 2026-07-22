@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'tools/apply-professional-rebuild.mjs'
+      - 'tools/professional-rebuild-chunks/**'
       - '.github/workflows/apply-professional-rebuild.yml'
 
 permissions:
@@ -39,6 +40,7 @@ jobs:
           grep -q "LEGACY_CATALOG_SIZE = LEGACY_ITEMS.length" professional/worker/src/legacyCatalog.js
           grep -q "openWorkspaceSwitcher" professional/web/app-actions.js
           grep -q "data-modal-close" professional/web/index.html
+          grep -q "catalogReady" professional/worker/src/index-scoped.js
           grep -q "2026.07.22.21" worker/src/combined.js
       - name: Bundle Cloudflare worker
         working-directory: worker
@@ -47,7 +49,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "4189826+github-actions[bot]@users.noreply.github.com"
-          git rm tools/apply-professional-rebuild.mjs .github/workflows/apply-professional-rebuild.yml
+          git rm -r tools/apply-professional-rebuild.mjs tools/professional-rebuild-chunks .github/workflows/apply-professional-rebuild.yml
           git add -A
           git commit -m "feat: restore catalog and professionalize operations"
           git push origin main
