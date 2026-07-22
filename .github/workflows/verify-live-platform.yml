@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Wait for Cloudflare and verify persistent multibrand production
+      - name: Wait for Cloudflare and verify cost centers production
         shell: bash
         run: |
           set -u
@@ -30,26 +30,33 @@ jobs:
           app_ok="false"
           ai_health=""
           platform_health=""
+          release_header=""
 
-          for attempt in $(seq 1 36); do
-            echo "Production verification attempt ${attempt}/36"
+          for attempt in $(seq 1 42); do
+            echo "Production verification attempt ${attempt}/42"
             app=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/" 2>/dev/null || true)
             ai_health=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/health" 2>/dev/null || true)
-            platform_health=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/platform/health" 2>/dev/null || true)
+            platform_health=$(curl --fail --silent --show-error --max-time 20 --dump-header /tmp/platform.headers "$BASE_URL/platform/health" 2>/dev/null || true)
             app_actions=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-actions.js" 2>/dev/null || true)
             app_views=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-views.js" 2>/dev/null || true)
+            app_index=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/index.html" 2>/dev/null || true)
+            release_header=$(grep -i '^x-pedidos-pro-release:' /tmp/platform.headers 2>/dev/null | tr -d '\r' | awk '{print $2}' || true)
 
             if echo "$app" | grep -q 'Pedidos Pro Platform' \
-              && echo "$app_actions" | grep -q 'Nueva marca' \
+              && echo "$app_actions" | grep -q 'Nuevo centro de costo' \
               && echo "$app_actions" | grep -q 'Locales permitidos' \
-              && echo "$app_views" | grep -q 'Archivo documental' \
+              && echo "$app_actions" | grep -q 'costCenterId' \
+              && echo "$app_views" | grep -q 'Catálogo por centro de costo' \
+              && echo "$app_views" | grep -q 'Información útil sin paneles de relleno' \
+              && ! echo "$app_index" | grep -q 'loginOrg' \
               && echo "$ai_health" | grep -q '"service":"pedidos-pro-ai"' \
               && echo "$ai_health" | grep -q '"geminiConfigured":true' \
               && echo "$platform_health" | grep -q '"service":"pedidos-pro-platform"' \
               && echo "$platform_health" | grep -q '"databaseInitialized":true' \
-              && echo "$platform_health" | grep -q '"schemaVersion":"7"' \
+              && echo "$platform_health" | grep -q '"schemaVersion":"8"' \
               && echo "$platform_health" | grep -q '"storageConfigured":true' \
-              && echo "$platform_health" | grep -Eq '"storageBackend":"(r2|d1-chunks)"'; then
+              && echo "$platform_health" | grep -Eq '"storageBackend":"(r2|d1-chunks)"' \
+              && [ "$release_header" = "2026.07.22.20" ]; then
               app_ok="true"
               status="healthy"
               break
@@ -58,13 +65,13 @@ jobs:
           done
 
           me_status=$(curl --silent --show-error --max-time 20 --output /tmp/me.json --write-out '%{http_code}' "$BASE_URL/api/me" || true)
-          login_status=$(curl --silent --show-error --max-time 20 --output /tmp/login.json --write-out '%{http_code}' -H 'Content-Type: application/json' --data '{"email":"admin@pedidospro.local","password":"incorrecta","organizationSlug":"pedidos-pro"}' "$BASE_URL/api/auth/login" || true)
+          login_status=$(curl --silent --show-error --max-time 20 --output /tmp/login.json --write-out '%{http_code}' -H 'Content-Type: application/json' --data '{"email":"admin@pedidospro.local","password":"incorrecta"}' "$BASE_URL/api/auth/login" || true)
           bootstrap_status=$(curl --silent --show-error --max-time 20 --output /tmp/bootstrap.json --write-out '%{http_code}' -H 'Content-Type: application/json' --data '{"organizationName":"Unauthorized","locationName":"Unauthorized","displayName":"Unauthorized","email":"unauthorized@example.com","password":"unauthorized-password"}' "$BASE_URL/api/bootstrap" || true)
 
           if [ "$me_status" != "401" ] || [ "$login_status" != "401" ] || [ "$bootstrap_status" != "403" ]; then status="failed"; fi
 
           mkdir -p deployment
-          STATUS="$status" APP_OK="$app_ok" AI_HEALTH="$ai_health" PLATFORM_HEALTH="$platform_health" ME_STATUS="$me_status" LOGIN_STATUS="$login_status" BOOTSTRAP_STATUS="$bootstrap_status" python - <<'PY'
+          STATUS="$status" APP_OK="$app_ok" AI_HEALTH="$ai_health" PLATFORM_HEALTH="$platform_health" RELEASE_HEADER="$release_header" ME_STATUS="$me_status" LOGIN_STATUS="$login_status" BOOTSTRAP_STATUS="$bootstrap_status" python - <<'PY'
           import datetime, json, os
           def load(name):
               raw=os.environ.get(name,'')
@@ -75,7 +82,7 @@ jobs:
             'application_shell':os.environ.get('APP_OK')=='true',
             'checked_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
             'url':'https://pedidos-pro-ai.botreservasmultilocal.workers.dev/',
-            'release':'multibrand-schema-7-persistent-archive',
+            'release':os.environ.get('RELEASE_HEADER',''),
             'ai_health':load('AI_HEALTH'),
             'platform_health':load('PLATFORM_HEALTH'),
             'security_checks':{
@@ -94,5 +101,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add deployment/live-health.json
-          git commit -m "chore(deploy): record persistent archive health [skip ci]" || exit 0
+          git commit -m "chore(deploy): record cost centers health [skip ci]" || exit 0
           git push
