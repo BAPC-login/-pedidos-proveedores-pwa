@@ -105,9 +105,6 @@ function showApp(){
   $('#userRole').textContent=roleNames[user.role]||user.role;
   $('#userAvatar').textContent=initials(user.displayName);
   $$('.admin-only').forEach(node=>node.classList.toggle('hidden',!isAdmin()));
-  const used=Number(plan.usage.orders_created||0),limit=Number(plan.limits.ordersPerMonth||1),pct=Math.min(100,used/limit*100);
-  $('#freeUsageText').textContent=`${used} de ${limit} pedidos utilizados este mes.`;
-  $('#freeUsageBar').style.width=`${Math.max(4,pct)}%`;
 }
 function logoutLocal(){
   state.token='';state.me=null;localStorage.removeItem('pp:token');showAuth();
