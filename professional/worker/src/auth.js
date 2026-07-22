@@ -185,7 +185,6 @@ export async function bootstrap(request, env) {
 export async function login(request, env) {
   const body = await readJson(request);
   const email = normalizeEmail(body.email);
-  const organizationSlug = String(body.organizationSlug || '').trim().toLowerCase();
   const row = await env.DB.prepare(`
     SELECT
       u.id AS user_id, u.email, u.display_name, u.password_salt, u.password_hash, u.active AS user_active,
@@ -195,11 +194,10 @@ export async function login(request, env) {
     JOIN memberships m ON m.user_id = u.id
     JOIN organizations o ON o.id = m.org_id
     WHERE u.email = ?
-      AND (? = '' OR o.slug = ?)
       AND u.active = 1 AND m.active = 1 AND o.status = 'active'
-    ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, o.created_at ASC
+    ORDER BY o.created_at ASC, CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END
     LIMIT 1
-  `).bind(email, organizationSlug, organizationSlug).first();
+  `).bind(email).first();
   if (!row || !await verifyPassword(String(body.password || ''), row.password_salt, row.password_hash)) {
     await writeAudit(env, null, request, 'auth.login_failed', 'user', '', {email});
     throw new HttpError(401, 'Correo o contraseña incorrectos', 'invalid_credentials');
