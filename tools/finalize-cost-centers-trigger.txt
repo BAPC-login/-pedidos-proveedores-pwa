@@ -1,1 +1,2 @@
 Finalize Madriguera Clubhaus cost center scope, dashboard and product visibility.
+Synchronize active workflow.
