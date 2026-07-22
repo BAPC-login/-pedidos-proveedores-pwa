@@ -1,11 +1,11 @@
 name: Apply cost centers and login UI
 
 on:
-  push:
+  pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened]
     paths:
-      - 'tools/apply-cost-centers-login-ui.mjs'
-      - '.github/workflows/apply-cost-centers-login-ui.yml'
+      - 'tools/run-cost-centers-trigger.txt'
 
 permissions:
   contents: write
@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
       - name: Apply requested release
         run: node tools/apply-cost-centers-login-ui.mjs
       - name: Verify platform
@@ -35,11 +37,10 @@ jobs:
       - name: Bundle Cloudflare Worker
         working-directory: worker
         run: npx --yes wrangler@4.67.0 deploy --dry-run --outdir ../deployment/cost-centers-release
-      - name: Commit generated release
+      - name: Commit generated release to PR branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "4189826+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "feat: Madriguera cost centers and direct login"
-          git push
-# trigger-main: 2026-07-22T01:20
+          git push origin HEAD:${{ github.head_ref }}
