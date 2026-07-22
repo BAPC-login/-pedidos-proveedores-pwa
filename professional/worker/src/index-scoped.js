@@ -29,7 +29,7 @@ async function health(env, schema) {
   const catalogPurchaseFormats = Number(purchaseFormats?.total || 0);
   return {
     service: 'pedidos-pro-platform',
-    version: '2.0.0-alpha.5',
+    version: '2.0.0-alpha.6',
     databaseConfigured: Boolean(env.DB),
     databaseInitialized: true,
     schemaVersion: schema.version,
