@@ -1,1 +1,0 @@
-This folder contains the built output assets for the worker "pedidos-pro-ai" generated at 2026-07-22T01:41:32.386Z.
