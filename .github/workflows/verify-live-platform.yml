@@ -39,6 +39,7 @@ jobs:
             platform_health=$(curl --fail --silent --show-error --max-time 20 --dump-header /tmp/platform.headers "$BASE_URL/platform/health" 2>/dev/null || true)
             app_actions=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-actions.js" 2>/dev/null || true)
             app_views=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-views.js" 2>/dev/null || true)
+            app_order_core=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-order-core.js" 2>/dev/null || true)
             app_stability=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-stability.js" 2>/dev/null || true)
             app_order_detail=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-order-detail.js" 2>/dev/null || true)
             app_invoices=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-invoices.js" 2>/dev/null || true)
@@ -54,20 +55,20 @@ jobs:
               && echo "$app_views" | grep -q 'Base operativa disponible' \
               && echo "$app_views" | grep -q 'Catálogo de compras' \
               && echo "$app_views" | grep -q 'Administrar usuarios' \
-              && echo "$app_stability" | grep -q 'Lista maestra de pedido' \
-              && echo "$app_stability" | grep -q 'Separar por proveedor y generar PDFs' \
+              && echo "$app_order_core" | grep -q 'ETAPA 1 · EMISIÓN' \
+              && echo "$app_order_core" | grep -q '/api/order-batches/v2' \
+              && echo "$app_order_core" | grep -q 'Adjuntar factura' \
               && echo "$app_stability" | grep -q 'Importar masivamente' \
               && echo "$app_stability" | grep -q 'Tablero máster de compras' \
-              && echo "$app_stability" | grep -q 'Generar con IA' \
-              && echo "$app_order_detail" | grep -q 'Gestión del pedido' \
-              && echo "$app_order_detail" | grep -q 'Eliminar borrador' \
-              && echo "$app_invoices" | grep -q 'Analizar factura con Gemini' \
+              && echo "$app_order_detail" | grep -q 'Adjuntar factura y cotejar' \
+              && echo "$app_order_detail" | grep -q 'Facturas y cotejo' \
+              && echo "$app_invoices" | grep -q 'ETAPA 2 · FACTURA' \
+              && echo "$app_invoices" | grep -q 'precios históricos' \
               && echo "$app_company_logo" | grep -q 'Cargar logo de la empresa' \
-              && echo "$app_company_logo" | grep -q 'Subir logo corporativo directamente' \
               && echo "$ai_health" | grep -q '"service":"pedidos-pro-ai"' \
               && echo "$ai_health" | grep -q '"geminiConfigured":true' \
               && echo "$platform_health" | grep -q '"service":"pedidos-pro-platform"' \
-              && echo "$platform_health" | grep -q '"version":"2.0.0-alpha.7"' \
+              && echo "$platform_health" | grep -q '"version":"2.0.0-alpha.8"' \
               && echo "$platform_health" | grep -q '"databaseInitialized":true' \
               && echo "$platform_health" | grep -q '"schemaVersion":"10"' \
               && echo "$platform_health" | grep -q '"catalogReady":true' \
@@ -80,7 +81,8 @@ jobs:
               && echo "$platform_health" | grep -q '"storageConfigured":true' \
               && echo "$platform_health" | grep -Eq '"storageBackend":"(r2|d1-chunks)"' \
               && echo "$platform_health" | grep -q '"geminiConfigured":true' \
-              && [ "$release_header" = "2026.07.22.23" ]; then
+              && echo "$platform_health" | grep -q '"orderCore":true' \
+              && [ "$release_header" = "2026.07.22.24" ]; then
               app_ok="true"
               status="healthy"
               break
