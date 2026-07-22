@@ -17,8 +17,9 @@ async function openStoredDocument(key,name='pedido.pdf',mode='preview'){
   const popup=mode==='preview'?window.open('about:blank','_blank'):null;
   try{
     const {blob,url}=await fetchStoredDocument(key);
-    if(mode==='share'&&navigator.share&&navigator.canShare?.({files:[new File([blob],name,{type:'application/pdf'})]})){
-      await navigator.share({title:name,files:[new File([blob],name,{type:'application/pdf'})]});
+    const file=new File([blob],name,{type:'application/pdf'});
+    if(mode==='share'&&navigator.share&&navigator.canShare?.({files:[file]})){
+      await navigator.share({title:name,files:[file]});
       URL.revokeObjectURL(url);return;
     }
     if(mode==='download'){
@@ -47,6 +48,7 @@ async function openReception(order){
 async function openEditOrder(order){
   const productPayload=await api('/api/products');
   const current=new Map(order.items.map(item=>[item.productId,item]));
+  const quantities=new Map(order.items.map(item=>[item.productId,Number(item.quantityOrdered||0)]));
   const entries=(productPayload.products||[])
     .filter(product=>(product.costCenters||[]).some(center=>center.id===order.costCenterId))
     .map(product=>({product,relation:(product.suppliers||[]).find(relation=>relation.supplierId===order.supplierId)}))
@@ -57,21 +59,30 @@ async function openEditOrder(order){
     body:`<div class="order-builder"><section class="order-context"><label class="field"><span>Proveedor</span><input value="${esc(order.supplierName)}" disabled></label><label class="field"><span>Local</span><input value="${esc(order.locationName)}" disabled></label><label class="field"><span>Centro de costo</span><input value="${esc(order.costCenterName)}" disabled></label><label class="field"><span>Entrega esperada</span><input name="deliveryDate" type="date" value="${esc(order.deliveryDate||'')}"></label></section><section class="order-catalog"><div class="order-catalog-head"><label class="field order-search"><span>Buscar dentro del proveedor</span><input id="editOrderSearch" placeholder="Producto o categoría"></label><div class="order-selection"><strong id="editSelectedCount">${order.items.length}</strong><span>productos seleccionados</span></div></div><div id="editOrderProducts" class="order-product-list"></div></section><label class="field"><span>Notas para el proveedor</span><textarea name="notes">${esc(order.notes||'')}</textarea></label></div>`,
     submitLabel:'Guardar y generar nueva revisión',
     onSubmit:async form=>{
-      const items=$$('#editOrderProducts input[data-product-id]').map(input=>{
-        const quantity=Number(input.value||0);if(quantity<=0)return null;
-        const entry=entries.find(candidate=>candidate.product.id===input.dataset.productId);
-        return {supplierProductId:entry.relation.id,productId:entry.product.id,description:entry.product.name,quantity,orderUnit:entry.relation.orderUnit||'UNIDAD',unitsPerOrderUnit:Number(entry.relation.unitsPerOrderUnit||1),expectedGrossUnitPrice:Number(entry.relation.lastGrossUnitPrice||0)};
-      }).filter(Boolean);
+      saveVisible();
+      const items=[];
+      for(const [productId,quantity] of quantities){
+        if(Number(quantity)<=0)continue;
+        const entry=entries.find(candidate=>candidate.product.id===productId);if(!entry)continue;
+        items.push({supplierProductId:entry.relation.id,productId:entry.product.id,description:entry.product.name,quantity:Number(quantity),orderUnit:entry.relation.orderUnit||'UNIDAD',unitsPerOrderUnit:Number(entry.relation.unitsPerOrderUnit||1),expectedGrossUnitPrice:Number(entry.relation.lastGrossUnitPrice||0)});
+      }
       if(!items.length)throw new Error('El pedido debe conservar al menos un producto');
       await api(`/api/orders/${order.id}`,{method:'PATCH',json:{costCenterId:order.costCenterId,deliveryDate:form.get('deliveryDate'),notes:form.get('notes'),items}});
       toast('Pedido actualizado y PDF regenerado');await navigate('orders');setTimeout(()=>openOrderDetail(order.id),0);
     }
   });
+  function saveVisible(){
+    $$('#editOrderProducts input[data-product-id]').forEach(input=>quantities.set(input.dataset.productId,Number(input.value||0)));
+  }
+  function updateSelected(){
+    saveVisible();$('#editSelectedCount').textContent=[...quantities.values()].filter(value=>Number(value)>0).length;
+  }
   const render=()=>{
+    saveVisible();
     const query=$('#editOrderSearch').value.trim().toLowerCase();
     const filtered=entries.filter(entry=>!query||`${entry.product.name} ${entry.product.categoryName||''}`.toLowerCase().includes(query));
-    $('#editOrderProducts').innerHTML=filtered.map(({product,relation})=>{const existing=current.get(product.id);const format=relation.orderUnit||'UNIDAD';const pack=Number(relation.unitsPerOrderUnit||1);return`<article class="order-product"><div class="order-product-copy"><strong>${esc(product.name)}</strong><small>${esc(product.categoryName||'Sin categoría')} · ${esc(format)}${pack>1?` · ${pack} unidades`:''}</small></div><label class="order-quantity"><span>Cantidad</span><input type="number" min="0" step="0.001" inputmode="decimal" value="${existing?.quantityOrdered||0}" data-product-id="${esc(product.id)}"></label></article>`}).join('')||'<div class="empty-state compact-empty"><p>Sin coincidencias.</p></div>';
-    $$('#editOrderProducts input[data-product-id]').forEach(input=>input.oninput=()=>{$('#editSelectedCount').textContent=$$('#editOrderProducts input[data-product-id]').filter(field=>Number(field.value)>0).length});
+    $('#editOrderProducts').innerHTML=filtered.map(({product,relation})=>{const format=relation.orderUnit||'UNIDAD';const pack=Number(relation.unitsPerOrderUnit||1);return`<article class="order-product"><div class="order-product-copy"><strong>${esc(product.name)}</strong><small>${esc(product.categoryName||'Sin categoría')} · ${esc(format)}${pack>1?` · ${pack} unidades`:''}</small></div><label class="order-quantity"><span>Cantidad</span><input type="number" min="0" step="0.001" inputmode="decimal" value="${quantities.get(product.id)||0}" data-product-id="${esc(product.id)}"></label></article>`}).join('')||'<div class="empty-state compact-empty"><p>Sin coincidencias.</p></div>';
+    $$('#editOrderProducts input[data-product-id]').forEach(input=>input.oninput=updateSelected);updateSelected();
   };
   $('#editOrderSearch').oninput=render;render();
 }
