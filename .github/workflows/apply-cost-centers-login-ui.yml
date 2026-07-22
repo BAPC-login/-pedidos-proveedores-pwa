@@ -1,0 +1,44 @@
+name: Apply cost centers and login UI
+
+on:
+  push:
+    branches: [agent/cost-centers-login-ui]
+    paths:
+      - 'tools/apply-cost-centers-login-ui.mjs'
+      - '.github/workflows/apply-cost-centers-login-ui.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply requested release
+        run: node tools/apply-cost-centers-login-ui.mjs
+      - name: Verify platform
+        working-directory: professional
+        run: npm run verify
+      - name: Verify modified modules
+        run: |
+          node --check professional/worker/src/schema.js
+          node --check professional/worker/src/api/catalog.js
+          node --check professional/worker/src/api/orders.js
+          node --check professional/worker/src/index.js
+          node --check professional/web/app-actions.js
+          node --check professional/web/app-views.js
+          node --check professional/web/app.js
+          grep -q "SCHEMA_VERSION = '8'" professional/worker/src/schema.js
+          grep -q "Madriguera Clubhaus" professional/migrations/0005_cost_centers.sql
+          grep -q "storageBackend" professional/worker/src/index.js
+      - name: Bundle Cloudflare Worker
+        working-directory: worker
+        run: npx --yes wrangler@4.67.0 deploy --dry-run --outdir ../deployment/cost-centers-release
+      - name: Commit generated release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "4189826+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: Madriguera cost centers and direct login" 
+          git push
