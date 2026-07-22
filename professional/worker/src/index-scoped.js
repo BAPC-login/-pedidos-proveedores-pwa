@@ -4,6 +4,10 @@ import {corsHeaders, errorResponse, ok, securityHeaders} from './core.js';
 import {ensureSchema} from './schema.js';
 import {dashboard, listProducts} from './api/catalog-scoped.js';
 
+const EXPECTED_UNIQUE_PRODUCTS = 193;
+const EXPECTED_SUPPLIERS = 12;
+const EXPECTED_PURCHASE_FORMATS = 194;
+
 function addPlatformHeaders(response, request, env) {
   const headers = new Headers(response.headers);
   const origin = request.headers.get('Origin') || '';
@@ -13,21 +17,30 @@ function addPlatformHeaders(response, request, env) {
 }
 
 async function health(env, schema) {
-  const [products, suppliers, owners, locations] = await Promise.all([
+  const [products, suppliers, purchaseFormats, owners, locations] = await Promise.all([
     env.DB.prepare('SELECT COUNT(*) AS total FROM products WHERE active = 1').first(),
     env.DB.prepare('SELECT COUNT(*) AS total FROM suppliers WHERE active = 1').first(),
+    env.DB.prepare('SELECT COUNT(*) AS total FROM supplier_products WHERE active = 1').first(),
     env.DB.prepare('SELECT COUNT(*) AS total FROM platform_owners').first(),
     env.DB.prepare('SELECT COUNT(*) AS total FROM locations WHERE active = 1').first()
   ]);
+  const catalogProducts = Number(products?.total || 0);
+  const catalogSuppliers = Number(suppliers?.total || 0);
+  const catalogPurchaseFormats = Number(purchaseFormats?.total || 0);
   return {
     service: 'pedidos-pro-platform',
     version: '2.0.0-alpha.5',
     databaseConfigured: Boolean(env.DB),
     databaseInitialized: true,
     schemaVersion: schema.version,
-    catalogReady: Number(products?.total || 0) >= 194 && Number(suppliers?.total || 0) >= 12,
-    catalogProducts: Number(products?.total || 0),
-    catalogSuppliers: Number(suppliers?.total || 0),
+    catalogReady:
+      catalogProducts >= EXPECTED_UNIQUE_PRODUCTS &&
+      catalogSuppliers >= EXPECTED_SUPPLIERS &&
+      catalogPurchaseFormats >= EXPECTED_PURCHASE_FORMATS,
+    catalogProducts,
+    catalogSuppliers,
+    catalogPurchaseFormats,
+    catalogSourceRows: EXPECTED_PURCHASE_FORMATS,
     platformOwnerReady: Number(owners?.total || 0) > 0,
     activeLocations: Number(locations?.total || 0),
     storageConfigured: Boolean(env.FILES || env.DB),
