@@ -39,6 +39,8 @@ jobs:
             platform_health=$(curl --fail --silent --show-error --max-time 20 --dump-header /tmp/platform.headers "$BASE_URL/platform/health" 2>/dev/null || true)
             app_actions=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-actions.js" 2>/dev/null || true)
             app_views=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-views.js" 2>/dev/null || true)
+            app_branding=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-branding.js" 2>/dev/null || true)
+            app_stability=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-stability.js" 2>/dev/null || true)
             release_header=$(grep -i '^x-pedidos-pro-release:' /tmp/platform.headers 2>/dev/null | tr -d '\r' | awk '{print $2}' || true)
 
             if echo "$app" | grep -q '<title>Pedidos Pro</title>' \
@@ -48,16 +50,20 @@ jobs:
               && ! echo "$app" | grep -q 'loginOrg' \
               && echo "$app_actions" | grep -q 'openWorkspaceSwitcher' \
               && echo "$app_actions" | grep -q 'Crear usuario' \
-              && echo "$app_actions" | grep -q 'Crear pedido y PDF' \
               && echo "$app_actions" | grep -q 'Nuevo centro de costo' \
               && echo "$app_views" | grep -q 'Base operativa disponible' \
               && echo "$app_views" | grep -q 'Catálogo de compras' \
               && echo "$app_views" | grep -q 'Administrar usuarios' \
+              && echo "$app_branding" | grep -q 'Identidad visual' \
+              && echo "$app_branding" | grep -q 'logoPosition' \
+              && echo "$app_stability" | grep -q 'Crear pedido independiente' \
+              && echo "$app_stability" | grep -q 'Propietario protegido' \
               && echo "$ai_health" | grep -q '"service":"pedidos-pro-ai"' \
               && echo "$ai_health" | grep -q '"geminiConfigured":true' \
               && echo "$platform_health" | grep -q '"service":"pedidos-pro-platform"' \
+              && echo "$platform_health" | grep -q '"version":"2.0.0-alpha.6"' \
               && echo "$platform_health" | grep -q '"databaseInitialized":true' \
-              && echo "$platform_health" | grep -q '"schemaVersion":"9"' \
+              && echo "$platform_health" | grep -q '"schemaVersion":"10"' \
               && echo "$platform_health" | grep -q '"catalogReady":true' \
               && echo "$platform_health" | grep -q '"catalogProducts":193' \
               && echo "$platform_health" | grep -q '"catalogSuppliers":12' \
@@ -67,7 +73,7 @@ jobs:
               && echo "$platform_health" | grep -q '"activeLocations":1' \
               && echo "$platform_health" | grep -q '"storageConfigured":true' \
               && echo "$platform_health" | grep -Eq '"storageBackend":"(r2|d1-chunks)"' \
-              && [ "$release_header" = "2026.07.22.21" ]; then
+              && [ "$release_header" = "2026.07.22.22" ]; then
               app_ok="true"
               status="healthy"
               break
