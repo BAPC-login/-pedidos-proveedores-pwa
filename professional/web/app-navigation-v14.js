@@ -1,4 +1,5 @@
 import {navigate} from './app-views.js';
+import {renderDashboardV14} from './app-dashboard-v14.js';
 import {renderOperationsAdmin} from './app-experience-admin.js';
 import {renderReceiving,renderHistory} from './app-experience-operations.js';
 import {initialRoute,initializeRouter,openRoute,registerRouteRenderer} from './app-router-v14.js';
@@ -6,7 +7,8 @@ import {initialRoute,initializeRouter,openRoute,registerRouteRenderer} from './a
 const standard=['dashboard','orders','invoices','catalog','suppliers','team','audit','settings'];
 let initialized=false;
 function register(){
-  standard.forEach(view=>registerRouteRenderer(view,()=>navigate(view)));
+  registerRouteRenderer('dashboard',()=>renderDashboardV14());
+  standard.filter(view=>view!=='dashboard').forEach(view=>registerRouteRenderer(view,()=>navigate(view)));
   registerRouteRenderer('operations',route=>renderOperationsAdmin(route.subview||'home',{fromRoute:true}));
   registerRouteRenderer('receiving',()=>renderReceiving());
   registerRouteRenderer('history',()=>renderHistory());
