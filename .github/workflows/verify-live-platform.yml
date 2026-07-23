@@ -41,11 +41,13 @@ jobs:
             app_procurement=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-procurement-settings.js" 2>/dev/null || true)
             app_operations=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-experience-operations.js" 2>/dev/null || true)
             app_admin=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-experience-admin.js" 2>/dev/null || true)
+            app_navigation=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-navigation-v14.js" 2>/dev/null || true)
+            app_dashboard=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-dashboard-v14.js" 2>/dev/null || true)
             app_files=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-file-actions.js" 2>/dev/null || true)
-            app_settings=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-experience-settings.js" 2>/dev/null || true)
             app_panels=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-settings-panels-v13.js" 2>/dev/null || true)
             app_telemetry=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-telemetry-v13.js" 2>/dev/null || true)
             design_css=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/design-system-v13.css" 2>/dev/null || true)
+            operations_css=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/operations-v14.css" 2>/dev/null || true)
             release_header=$(grep -i '^x-pedidos-pro-release:' /tmp/platform.headers 2>/dev/null | tr -d '\r' | awk '{print $2}' || true)
 
             if echo "$app" | grep -q '<title>Pedidos Pro</title>' \
@@ -53,42 +55,44 @@ jobs:
               && echo "$app" | grep -q 'id="appShell"' \
               && echo "$app_order_core" | grep -q 'Guardar archivo' \
               && echo "$app_order_core" | grep -q 'Emitir todo' \
-              && echo "$app_order_core" | grep -q 'data-enter-next' \
-              && echo "$app_order_core" | grep -q 'Fechas distintas por proveedor' \
-              && echo "$app_procurement" | grep -q 'Solo aparecen tus categorías' \
+              && echo "$app_order_core" | grep -q 'product.centerCategories' \
+              && echo "$app_procurement" | grep -q 'Solo aparecen las categorías asociadas al centro seleccionado' \
               && echo "$app_procurement" | grep -q 'data-category-up' \
               && echo "$app_operations" | grep -q 'En edición' \
               && echo "$app_operations" | grep -q 'supplier-logo-shell' \
-              && echo "$app_operations" | grep -q 'data-delete-order' \
-              && echo "$app_admin" | grep -q 'Mis categorías' \
-              && echo "$app_admin" | grep -q '/api/categories/order' \
+              && echo "$app_admin" | grep -q 'La categoría pertenece a un solo centro de costo' \
+              && echo "$app_admin" | grep -q 'data-product-center-categories' \
               && echo "$app_admin" | grep -q 'Proveedores y logos' \
+              && echo "$app_navigation" | grep -q 'history.pushState' \
+              && echo "$app_navigation" | grep -q 'popstate' \
+              && echo "$app_navigation" | grep -q 'scrollY' \
+              && echo "$app_dashboard" | grep -q 'Evolución mensual del gasto' \
+              && echo "$app_dashboard" | grep -q 'dashboard-donut' \
+              && echo "$app_dashboard" | grep -q 'Principales proveedores' \
               && echo "$app_files" | grep -q 'document-preview-loading' \
               && echo "$app_files" | grep -q 'navigator.share' \
-              && echo "$app_settings" | grep -q 'Control profesional' \
               && echo "$app_panels" | grep -q 'Control profesional de diferencias' \
               && echo "$app_panels" | grep -q '/api/backups/export' \
               && echo "$app_telemetry" | grep -q '/api/telemetry/client' \
               && echo "$design_css" | grep -q 'touch-action:manipulation' \
-              && echo "$design_css" | grep -q 'simple-order-card' \
+              && echo "$operations_css" | grep -q 'category-center-groups' \
               && echo "$ai_health" | grep -q '"service":"pedidos-pro-ai"' \
               && echo "$ai_health" | grep -q '"geminiConfigured":true' \
               && echo "$platform_health" | grep -q '"service":"pedidos-pro-platform"' \
-              && echo "$platform_health" | grep -q '"version":"2.0.0-alpha.13"' \
+              && echo "$platform_health" | grep -q '"version":"2.0.0-alpha.14"' \
               && echo "$platform_health" | grep -q '"databaseInitialized":true' \
-              && echo "$platform_health" | grep -q '"schemaVersion":"13"' \
+              && echo "$platform_health" | grep -q '"schemaVersion":"14"' \
               && echo "$platform_health" | grep -q '"catalogReady":true' \
               && echo "$platform_health" | grep -q '"simpleWorkflow":true' \
-              && echo "$platform_health" | grep -q '"editableOrderFiles":true' \
-              && echo "$platform_health" | grep -q '"batchEmission":true' \
-              && echo "$platform_health" | grep -q '"categoryOwnership":true' \
+              && echo "$platform_health" | grep -q '"categoryCostCenters":true' \
+              && echo "$platform_health" | grep -q '"productCenterCategories":true' \
+              && echo "$platform_health" | grep -q '"fastNavigation":true' \
+              && echo "$platform_health" | grep -q '"professionalDashboard":true' \
               && echo "$platform_health" | grep -q '"supplierLogos":true' \
               && echo "$platform_health" | grep -q '"professionalReconciliation":true' \
-              && echo "$platform_health" | grep -q '"notifications":true' \
               && echo "$platform_health" | grep -q '"observability":true' \
               && echo "$platform_health" | grep -q '"workspaceBackups":true' \
-              && echo "$platform_health" | grep -q '"commercialReadiness":true' \
-              && [ "$release_header" = "2026.07.23.03" ]; then
+              && [ "$release_header" = "2026.07.23.04" ]; then
               app_ok="true"
               status="healthy"
               break
