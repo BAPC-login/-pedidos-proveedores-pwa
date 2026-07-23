@@ -7,6 +7,7 @@ import {initializeStabilityPass} from './app-stability.js';
 import {initializeCompanyLogoUploader} from './app-company-logo.js';
 import {initializeProcurementSettings} from './app-procurement-settings.js';
 import {initializeProcurementEntry} from './app-procurement-entry.js';
+import {initializeExperience} from './app-experience.js';
 
 initializeBrandingFeatures();
 initializeProcurementSettings();
@@ -14,6 +15,7 @@ initializeProcurementEntry();
 initializeOrderCore();
 initializeStabilityPass();
 initializeCompanyLogoUploader();
+initializeExperience();
 
 $('#loginForm').addEventListener('submit',async event=>{
   event.preventDefault();
@@ -66,7 +68,7 @@ function openCommand(){
 function renderCommands(){
   const query=$('#commandInput').value.toLowerCase();
   const commands=[
-    ['dashboard','Ir a Resumen'],['orders','Ir a Pedidos'],['invoices','Ir a Facturas'],
+    ['dashboard','Ir a Resumen'],['orders','Ir a Pedidos'],['invoices','Ir a Documentos'],
     ['catalog','Ir a Catálogo'],['suppliers','Ir a Proveedores'],
     ...(isAdmin()?[['team','Administrar usuarios'],['audit','Ver auditoría']]:[]),
     ['settings','Abrir configuración']

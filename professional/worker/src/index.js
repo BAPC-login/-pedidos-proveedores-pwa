@@ -39,10 +39,10 @@ import {
   createOrder,
   createReception,
   getOrder,
-  listOrders,
   transitionOrder,
   updateOrder
 } from './api/orders.js';
+import {listOrdersV2} from './api/orders-list-v2.js';
 import {createOrderBatch, deleteDraftOrder} from './api/order-batches.js';
 import {createOrderBatchV2,ensureOrderPdf,listOrderInvoices} from './api/order-core.js';
 import {importCatalog, listSupplierAssets, updateSupplierIdentity} from './api/catalog-admin.js';
@@ -60,7 +60,7 @@ import {getSettings, updateSettings} from './api/settings.js';
 import {createBrand, listBrands, switchBrand} from './platform.js';
 import {listDocuments} from './storage.js';
 
-const APP_VERSION = '2.0.0-alpha.10';
+const APP_VERSION = '2.0.0-alpha.11';
 
 function addPlatformHeaders(response, request, env) {
   const headers = new Headers(response.headers);
@@ -103,6 +103,9 @@ async function handleRequest(request, env, ctx) {
       geminiConfigured: Boolean(env.GEMINI_API_KEY),
       orderCore: true,
       freeItemRecognition: true,
+      experienceHub: true,
+      receivingQueue: true,
+      instagramLayout: true,
       environment: env.ENVIRONMENT || 'development',
       timestamp: new Date().toISOString()
     }, request, env);
@@ -151,7 +154,7 @@ async function handleRequest(request, env, ctx) {
   const productSupplierParams = routeMatch(path, '/api/products/:id/suppliers');
   if (productSupplierParams && method === 'POST') return ok({supplierProduct: await linkSupplierProduct(request, env, actor, productSupplierParams.id)}, request, env);
 
-  if (method === 'GET' && path === '/api/orders') return ok({orders: await listOrders(env, actor, url)}, request, env);
+  if (method === 'GET' && path === '/api/orders') return ok({orders: await listOrdersV2(env, actor, url)}, request, env);
   if (method === 'POST' && path === '/api/orders') return ok({order: await createOrder(request, env, actor)}, request, env);
   if (method === 'POST' && path === '/api/order-batches') return ok({batch: await createOrderBatch(request, env, actor)}, request, env);
   if (method === 'POST' && path === '/api/order-batches/v2') return ok({batch: await createOrderBatchV2(request, env, actor, ctx)}, request, env);
