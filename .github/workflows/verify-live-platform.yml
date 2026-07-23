@@ -37,57 +37,58 @@ jobs:
             app=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/" 2>/dev/null || true)
             ai_health=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/health" 2>/dev/null || true)
             platform_health=$(curl --fail --silent --show-error --max-time 20 --dump-header /tmp/platform.headers "$BASE_URL/platform/health" 2>/dev/null || true)
-            app_order_core=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-order-core-v2.js" 2>/dev/null || true)
+            app_order_core=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-order-core-v13.js" 2>/dev/null || true)
             app_procurement=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-procurement-settings.js" 2>/dev/null || true)
-            app_invoices=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-invoices.js" 2>/dev/null || true)
-            app_experience=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-experience.js" 2>/dev/null || true)
             app_operations=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-experience-operations.js" 2>/dev/null || true)
             app_admin=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-experience-admin.js" 2>/dev/null || true)
             app_files=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-file-actions.js" 2>/dev/null || true)
             app_settings=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-experience-settings.js" 2>/dev/null || true)
-            app_keyboard=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-experience-keyboard.js" 2>/dev/null || true)
-            experience_css=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/experience.css" 2>/dev/null || true)
+            app_panels=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-settings-panels-v13.js" 2>/dev/null || true)
+            app_telemetry=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-telemetry-v13.js" 2>/dev/null || true)
+            design_css=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/design-system-v13.css" 2>/dev/null || true)
             release_header=$(grep -i '^x-pedidos-pro-release:' /tmp/platform.headers 2>/dev/null | tr -d '\r' | awk '{print $2}' || true)
 
             if echo "$app" | grep -q '<title>Pedidos Pro</title>' \
               && echo "$app" | grep -q 'id="startupScreen"' \
               && echo "$app" | grep -q 'id="appShell"' \
+              && echo "$app_order_core" | grep -q 'Guardar archivo' \
+              && echo "$app_order_core" | grep -q 'Emitir todo' \
+              && echo "$app_order_core" | grep -q 'data-enter-next' \
               && echo "$app_order_core" | grep -q 'Fechas distintas por proveedor' \
-              && echo "$app_order_core" | grep -q '/api/order-batches/v2' \
-              && echo "$app_order_core" | grep -q 'core-row-v2' \
-              && echo "$app_procurement" | grep -q 'Orden de recorrido' \
-              && echo "$app_procurement" | grep -q 'Agregar categorías disponibles' \
-              && echo "$app_invoices" | grep -q 'Bonificado' \
-              && echo "$app_experience" | grep -q 'data-experience-view=\"operations\"' \
-              && echo "$app_experience" | grep -q 'Vigentes' \
-              && echo "$app_operations" | grep -q 'Pedidos por recibir' \
-              && echo "$app_operations" | grep -q 'data-order-pdf' \
-              && echo "$app_operations" | grep -q 'Subir factura' \
-              && echo "$app_admin" | grep -q 'Nueva categoría' \
-              && echo "$app_admin" | grep -q 'Logos de proveedores' \
+              && echo "$app_procurement" | grep -q 'Solo aparecen tus categorías' \
+              && echo "$app_procurement" | grep -q 'data-category-up' \
+              && echo "$app_operations" | grep -q 'En edición' \
+              && echo "$app_operations" | grep -q 'supplier-logo-shell' \
+              && echo "$app_operations" | grep -q 'data-delete-order' \
+              && echo "$app_admin" | grep -q 'Mis categorías' \
+              && echo "$app_admin" | grep -q '/api/categories/order' \
+              && echo "$app_admin" | grep -q 'Proveedores y logos' \
+              && echo "$app_files" | grep -q 'document-preview-loading' \
               && echo "$app_files" | grep -q 'navigator.share' \
-              && echo "$app_files" | grep -q 'data-document-key' \
-              && echo "$app_settings" | grep -q 'Operación y datos maestros' \
-              && echo "$app_keyboard" | grep -q 'Siguiente' \
-              && echo "$experience_css" | grep -q 'ops-document-actions' \
-              && echo "$experience_css" | grep -q 'bottom-item>small' \
+              && echo "$app_settings" | grep -q 'Control profesional' \
+              && echo "$app_panels" | grep -q 'Control profesional de diferencias' \
+              && echo "$app_panels" | grep -q '/api/backups/export' \
+              && echo "$app_telemetry" | grep -q '/api/telemetry/client' \
+              && echo "$design_css" | grep -q 'touch-action:manipulation' \
+              && echo "$design_css" | grep -q 'simple-order-card' \
               && echo "$ai_health" | grep -q '"service":"pedidos-pro-ai"' \
               && echo "$ai_health" | grep -q '"geminiConfigured":true' \
-              && echo "$ai_health" | grep -q '"resolver":"catalog-v23-free-items"' \
               && echo "$platform_health" | grep -q '"service":"pedidos-pro-platform"' \
-              && echo "$platform_health" | grep -q '"version":"2.0.0-alpha.12"' \
+              && echo "$platform_health" | grep -q '"version":"2.0.0-alpha.13"' \
               && echo "$platform_health" | grep -q '"databaseInitialized":true' \
-              && echo "$platform_health" | grep -q '"schemaVersion":"11"' \
+              && echo "$platform_health" | grep -q '"schemaVersion":"13"' \
               && echo "$platform_health" | grep -q '"catalogReady":true' \
-              && echo "$platform_health" | grep -q '"catalogProducts":193' \
-              && echo "$platform_health" | grep -q '"catalogSuppliers":12' \
-              && echo "$platform_health" | grep -q '"catalogPurchaseFormats":194' \
-              && echo "$platform_health" | grep -q '"operationsAdmin":true' \
+              && echo "$platform_health" | grep -q '"simpleWorkflow":true' \
+              && echo "$platform_health" | grep -q '"editableOrderFiles":true' \
+              && echo "$platform_health" | grep -q '"batchEmission":true' \
+              && echo "$platform_health" | grep -q '"categoryOwnership":true' \
               && echo "$platform_health" | grep -q '"supplierLogos":true' \
-              && echo "$platform_health" | grep -q '"perSupplierDeliveryDates":true' \
-              && echo "$platform_health" | grep -q '"directPdfActions":true' \
-              && echo "$platform_health" | grep -q '"cleanSupplierPdf":true' \
-              && [ "$release_header" = "2026.07.23.02" ]; then
+              && echo "$platform_health" | grep -q '"professionalReconciliation":true' \
+              && echo "$platform_health" | grep -q '"notifications":true' \
+              && echo "$platform_health" | grep -q '"observability":true' \
+              && echo "$platform_health" | grep -q '"workspaceBackups":true' \
+              && echo "$platform_health" | grep -q '"commercialReadiness":true' \
+              && [ "$release_header" = "2026.07.23.03" ]; then
               app_ok="true"
               status="healthy"
               break
@@ -129,7 +130,7 @@ jobs:
         if: always()
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "4189828+github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add deployment/live-health.json
           git commit -m "chore(deploy): record professional catalog health [skip ci]" || exit 0
           git push
