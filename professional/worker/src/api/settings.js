@@ -74,19 +74,30 @@ function normalizedLocationDetails(raw = {}, previous = {}) {
   };
 }
 
-function normalizeUnit(raw = {}) {
+function normalizeUnit(raw = {}, index = 0) {
   const name = text(raw.name || raw.label || 'UNIDAD', 80).toUpperCase() || 'UNIDAD';
   return {
     id: text(raw.id || name.replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '') || 'UNIDAD', 90),
     name,
     unitsPerFormat: Math.max(0.001, Math.min(100000, Number(raw.unitsPerFormat ?? raw.units ?? raw.pack ?? 1) || 1)),
+    sortOrder: Math.max(0, Math.min(999, Number(raw.sortOrder ?? index) || index)),
     active: raw.active === undefined ? true : Boolean(raw.active)
+  };
+}
+
+function normalizeCategory(raw, index = 0) {
+  const name = typeof raw === 'string' ? text(raw, 120) : text(raw?.name, 120);
+  return {
+    name,
+    sortOrder: Math.max(0, Math.min(999, Number(typeof raw === 'string' ? index : raw?.sortOrder ?? index) || index))
   };
 }
 
 function normalizeWarehouse(raw = {}, index = 0) {
   const name = text(raw.name || `Bodega ${index + 1}`, 120) || `Bodega ${index + 1}`;
-  const categories = Array.isArray(raw.categories) ? raw.categories.map(item => text(item, 120)).filter(Boolean) : [];
+  const categories = Array.isArray(raw.categories)
+    ? raw.categories.map(normalizeCategory).filter(category => category.name)
+    : [];
   return {
     id: text(raw.id || name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase(), 100),
     name,
@@ -100,11 +111,17 @@ function normalizedProcurement(raw = {}, previous = {}) {
   const sourceCenters = raw.costCenters || previous.costCenters || {};
   const costCenters = {};
   for (const [costCenterId, config] of Object.entries(sourceCenters || {})) {
-    const units = Array.isArray(config?.units) ? config.units.map(normalizeUnit).filter(unit => unit.active) : [];
-    const warehouses = Array.isArray(config?.warehouses)
-      ? config.warehouses.map(normalizeWarehouse).filter(warehouse => warehouse.active).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'es'))
+    const units = Array.isArray(config?.units)
+      ? config.units.map(normalizeUnit).filter(unit => unit.active).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'es'))
       : [];
-    costCenters[String(costCenterId)] = {units, warehouses};
+    const warehouses = Array.isArray(config?.warehouses)
+      ? config.warehouses.map(normalizeWarehouse).filter(warehouse => warehouse.active)
+      : [];
+    costCenters[String(costCenterId)] = {
+      orderMode: config?.orderMode === 'custom' ? 'custom' : 'alphabetical',
+      units,
+      warehouses
+    };
   }
   return {costCenters};
 }

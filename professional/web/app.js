@@ -5,8 +5,12 @@ import {initializeBrandingFeatures,refreshBranding} from './app-branding.js';
 import {initializeOrderCore} from './app-order-core.js';
 import {initializeStabilityPass} from './app-stability.js';
 import {initializeCompanyLogoUploader} from './app-company-logo.js';
+import {initializeProcurementSettings} from './app-procurement-settings.js';
+import {initializeProcurementEntry} from './app-procurement-entry.js';
 
 initializeBrandingFeatures();
+initializeProcurementSettings();
+initializeProcurementEntry();
 initializeOrderCore();
 initializeStabilityPass();
 initializeCompanyLogoUploader();
@@ -80,15 +84,9 @@ window.addEventListener('online',()=>{state.online=true;updateSyncChip();syncMut
 window.addEventListener('offline',()=>{state.online=false;updateSyncChip();toast('Modo offline','error')});
 
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('./sw.js').then(registration=>{
-    registration.update().catch(()=>{});
-    if(registration.waiting)registration.waiting.postMessage({type:'SKIP_WAITING'});
-  }).catch(console.warn);
+  navigator.serviceWorker.register('./sw.js').then(registration=>registration.update().catch(()=>{})).catch(console.warn);
   navigator.serviceWorker.addEventListener('controllerchange',()=>{
-    if(!sessionStorage.getItem('pp:sw-reloaded')){
-      sessionStorage.setItem('pp:sw-reloaded','1');
-      location.reload();
-    }
+    console.info('service_worker_updated');
   });
 }
 
@@ -104,7 +102,7 @@ async function initialize(){
     state.me=await api('/api/me');
   }catch(error){
     if(error.status===401)logoutLocal();
-    else{showAuth();toast('No se pudo validar la sesión. Revisa tu conexión.','error')}
+    else{toast('No se pudo validar la sesión. Reintentaremos al recuperar conexión.','error')}
     return;
   }
   try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}

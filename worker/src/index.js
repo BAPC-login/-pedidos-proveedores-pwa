@@ -279,6 +279,7 @@ const responseSchema = {
   type: 'OBJECT',
   properties: {
     supplierName: {type: 'STRING'}, supplierRut: {type: 'STRING'}, invoiceNumber: {type: 'STRING'}, invoiceDate: {type: 'STRING'}, currency: {type: 'STRING'},
+    documentType: {type: 'STRING'}, documentTypeCode: {type: 'STRING'},
     totals: {
       type: 'OBJECT',
       properties: {net: {type: 'NUMBER'}, freight: {type: 'NUMBER'}, additionalTax: {type: 'NUMBER'}, vat: {type: 'NUMBER'}, other: {type: 'NUMBER'}, total: {type: 'NUMBER'}},
@@ -293,22 +294,24 @@ const responseSchema = {
           packSize: {type: 'NUMBER'}, units: {type: 'NUMBER'}, contentMl: {type: 'NUMBER'}, alcoholDegree: {type: 'NUMBER'},
           unitPriceNet: {type: 'NUMBER'}, discountPct: {type: 'NUMBER'}, netLineTotal: {type: 'NUMBER'}, freightLine: {type: 'NUMBER'},
           vatLine: {type: 'NUMBER'}, additionalTaxLine: {type: 'NUMBER'}, otherLineCharges: {type: 'NUMBER'}, grossLineTotal: {type: 'NUMBER'},
-          matchedOrderProductId: {type: 'STRING'}, matchConfidence: {type: 'NUMBER'}, matchReason: {type: 'STRING'}, notes: {type: 'STRING'}
+          matchedOrderProductId: {type: 'STRING'}, matchConfidence: {type: 'NUMBER'}, matchReason: {type: 'STRING'}, notes: {type: 'STRING'},
+          isFree: {type: 'BOOLEAN'}, freeReason: {type: 'STRING'}
         },
-        required: ['code','descriptionOriginal','quantityCellRaw','invoiceQuantity','packSize','units','contentMl','alcoholDegree','unitPriceNet','discountPct','netLineTotal','freightLine','vatLine','additionalTaxLine','otherLineCharges','grossLineTotal','matchedOrderProductId','matchConfidence','matchReason','notes']
+        required: ['code','descriptionOriginal','quantityCellRaw','invoiceQuantity','packSize','units','contentMl','alcoholDegree','unitPriceNet','discountPct','netLineTotal','freightLine','vatLine','additionalTaxLine','otherLineCharges','grossLineTotal','matchedOrderProductId','matchConfidence','matchReason','notes','isFree','freeReason']
       }
     },
     warnings: {type: 'ARRAY', items: {type: 'STRING'}}
   },
-  required: ['supplierName','invoiceNumber','totals','items','warnings']
+  required: ['supplierName','invoiceNumber','documentType','documentTypeCode','totals','items','warnings']
 };
 
 function buildPrompt(context) {
   const products = (context.products || []).map(product => ({id: String(product.productId), d: String(product.description), u: String(product.unit || 'UNIDAD'), q: numeric(product.orderedQty), pack: orderPackSize(product.unit, product.description)}));
-  return `<task>Extrae y coteja factura A contra pedido B y CAT. Responde solo según JSON Schema.</task>
+  return `<task>Extrae y coteja documento tributario A contra pedido B y CAT. Responde solo según JSON Schema.</task>
 <CAT>${JSON.stringify(products)}</CAT>
-<context>proveedor=${String(context.providerName || '')};folio=${String(context.folio || '')}</context>
+<context>proveedor=${String(context.providerName || '')};folio=${String(context.folio || '')};archivo=${String(context.fileName || '')}</context>
 <rules>
+- Identifica documentType como FACTURA, BOLETA, GUIA_DESPACHO, NOTA_CREDITO u OTRO y documentTypeCode como 33, 39, 52, 61, 34 o 0.
 - Una salida por producto. Excluye flete, impuestos, descuentos, depósitos, garantías y totales.
 - quantityCellRaw copia Cantidad; invoiceQuantity sale solo de esa celda.
 - packSize sale de X06/X6/1000CCX6/6X350CC. units=invoiceQuantity*packSize.
@@ -316,6 +319,8 @@ function buildPrompt(context) {
 - matchedOrderProductId es un id exacto de CAT o vacío. Nunca inventes.
 - DISPLAY=24; 1.5L=6, salvo pack explícito.
 - Lee neto, descuento, flete, IVA, impuesto adicional, otros y total final por línea.
+- isFree=true solo si la línea tiene valor cero, descuento cercano a 100%, o texto SIN CARGO, BONIFICACION, BONIF, GRATIS, MUESTRA o PROMOCIONAL. freeReason explica la señal.
+- BOLETA es un tipo de documento y no significa por sí sola que el producto sea gratis. Una bonificación puede venir en factura o guía de despacho.
 - Números sin símbolos. Ilegible=0 y warning breve.
 </rules>`;
 }
@@ -333,7 +338,7 @@ async function parseGeminiResponse(response, model) {
 }
 
 async function callGemini(env, model, invoiceMime, invoiceData, orderMime, orderData, context) {
-  const parts = [{text: 'DOCUMENTO A — FACTURA'}, {inline_data: {mime_type: invoiceMime, data: invoiceData}}];
+  const parts = [{text: 'DOCUMENTO A — DOCUMENTO TRIBUTARIO O COMERCIAL'}, {inline_data: {mime_type: invoiceMime, data: invoiceData}}];
   if (orderData) parts.push({text: 'DOCUMENTO B — PEDIDO PDF'}, {inline_data: {mime_type: orderMime || 'application/pdf', data: orderData}});
   parts.push({text: buildPrompt(context)});
   const controller = new AbortController();
@@ -366,14 +371,35 @@ async function callWithFallbacks(env, invoiceMime, invoiceData, orderMime, order
   error.attempts = attempts; throw error;
 }
 
+function documentTypeCode(raw = {}) {
+  const explicit = String(raw.documentTypeCode || '').trim();
+  if (['33','34','39','52','61'].includes(explicit)) return explicit;
+  const label = normalize(raw.documentType || '');
+  if (label.includes('GUIA')) return '52';
+  if (label.includes('NOTA') && label.includes('CREDITO')) return '61';
+  if (label.includes('BOLETA')) return '39';
+  if (label.includes('EXENTA')) return '34';
+  return label.includes('FACTURA') ? '33' : '0';
+}
+
+function freeLineSignal(line, sourceLine, invoiceQuantity) {
+  const text = expandAbbreviations(sourceLine);
+  const explicit = line.isFree === true;
+  const discount = numeric(line.discountPct) >= 99.5;
+  const zero = invoiceQuantity > 0 && numeric(line.netLineTotal) === 0 && numeric(line.grossLineTotal) === 0;
+  const keyword = /\b(SIN CARGO|BONIFICACION|BONIF|GRATIS|MUESTRA|PROMOCIONAL|CORTESIA)\b/.test(text);
+  return explicit || discount || zero || keyword;
+}
+
 function distributeResidual(lines, targetTotal) {
-  const current = lines.reduce((sum, line) => sum + line.grossLineTotal, 0);
+  const chargeable = lines.filter(line => !line.isFree);
+  const current = chargeable.reduce((sum, line) => sum + line.grossLineTotal, 0);
   const residual = Math.round(targetTotal - current);
-  if (!targetTotal || !lines.length || Math.abs(residual) <= 1) return;
-  const basis = lines.reduce((sum, line) => sum + Math.max(0, line.netLineTotal), 0) || lines.length;
+  if (!targetTotal || !chargeable.length || Math.abs(residual) <= 1) return;
+  const basis = chargeable.reduce((sum, line) => sum + Math.max(0, line.netLineTotal), 0) || chargeable.length;
   let assigned = 0;
-  lines.forEach((line, index) => {
-    const share = index === lines.length - 1 ? residual - assigned : Math.round(residual * ((Math.max(0, line.netLineTotal) || 1) / basis));
+  chargeable.forEach((line, index) => {
+    const share = index === chargeable.length - 1 ? residual - assigned : Math.round(residual * ((Math.max(0, line.netLineTotal) || 1) / basis));
     line.grossLineTotal = Math.max(0, line.grossLineTotal + share); assigned += share;
   });
 }
@@ -406,43 +432,47 @@ function validateInvoice(raw, context) {
     let packSize = explicitPack || Math.max(1, numeric(line.packSize) || 1);
     if (product && normalize(product.unit).includes('DISPLAY') && !explicitPack) packSize = expectedOrderPack;
     const units = Math.max(0, invoiceQuantity * packSize);
-    const netLineTotal = Math.max(0, Math.round(numeric(line.netLineTotal)));
-    const freightLine = Math.max(0, Math.round(numeric(line.freightLine)));
-    const vatLine = Math.max(0, Math.round(numeric(line.vatLine)));
-    const additionalTaxLine = Math.max(0, Math.round(numeric(line.additionalTaxLine)));
-    const otherLineCharges = Math.max(0, Math.round(numeric(line.otherLineCharges)));
+    const isFree = freeLineSignal(line, sourceLine, invoiceQuantity);
+    let netLineTotal = Math.max(0, Math.round(numeric(line.netLineTotal)));
+    let freightLine = Math.max(0, Math.round(numeric(line.freightLine)));
+    let vatLine = Math.max(0, Math.round(numeric(line.vatLine)));
+    let additionalTaxLine = Math.max(0, Math.round(numeric(line.additionalTaxLine)));
+    let otherLineCharges = Math.max(0, Math.round(numeric(line.otherLineCharges)));
     const componentTotal = netLineTotal + freightLine + vatLine + additionalTaxLine + otherLineCharges;
     let grossLineTotal = Math.max(0, Math.round(numeric(line.grossLineTotal)));
-    if (!grossLineTotal || Math.abs(grossLineTotal - componentTotal) > Math.max(3, componentTotal * .03)) grossLineTotal = componentTotal;
+    if (isFree) {
+      netLineTotal = 0; freightLine = 0; vatLine = 0; additionalTaxLine = 0; otherLineCharges = 0; grossLineTotal = 0;
+    } else if (!grossLineTotal || Math.abs(grossLineTotal - componentTotal) > Math.max(3, componentTotal * .03)) grossLineTotal = componentTotal;
     const receivedOrderQty = product ? units / expectedOrderPack : 0;
     if (!product) warnings.push(`Sin coincidencia segura con el pedido: ${sourceLine || `línea ${index + 1}`}`);
     return {
       id: `gemini-${index + 1}`, code: String(line.code || ''), sourceLine, descriptionOriginal: sourceLine,
       quantityCellRaw: String(line.quantityCellRaw || ''), invoiceQuantity, packageQty: invoiceQuantity, packSize, units,
       contentMl: contentMl(sourceLine) || Math.max(0, numeric(line.contentMl)), alcoholDegree: alcoholDegree(sourceLine) || Math.max(0, numeric(line.alcoholDegree)),
-      unitPriceNet: Math.max(0, Math.round(numeric(line.unitPriceNet))), discountPct: Math.max(0, numeric(line.discountPct)),
+      unitPriceNet: isFree ? 0 : Math.max(0, Math.round(numeric(line.unitPriceNet))), discountPct: Math.max(0, numeric(line.discountPct)),
       netLineTotal, freightLine, vatLine, additionalTaxLine, otherLineCharges, grossLineTotal,
-      grossPackPrice: invoiceQuantity ? Math.round(grossLineTotal / invoiceQuantity) : 0,
-      grossUnitPrice: units ? Math.round(grossLineTotal / units) : 0,
+      grossPackPrice: isFree ? 0 : (invoiceQuantity ? Math.round(grossLineTotal / invoiceQuantity) : 0),
+      grossUnitPrice: isFree ? 0 : (units ? Math.round(grossLineTotal / units) : 0),
       productId: product?.productId || '', suggestedProductId: !product && candidate?.productId ? String(candidate.productId) : '',
       description: product?.description || sourceLine, receivedOrderQty: Number(receivedOrderQty.toFixed(3)), orderPackSize: expectedOrderPack,
       confidence: Math.max(0, Math.min(1, Math.max(numeric(line.matchConfidence), match.score || 0))),
       matchMethod: match.method, matchScore: Number((match.score || 0).toFixed(4)),
-      matchReason: String(line.matchReason || match.reason || ''), notes: String(line.notes || ''), engine: 'gemini'
+      matchReason: String(line.matchReason || match.reason || ''), notes: String(line.notes || ''),
+      isFree, freeReason: isFree ? String(line.freeReason || line.notes || 'Producto sin cargo o bonificado') : '', engine: 'gemini'
     };
-  }).filter(line => line.sourceLine || line.invoiceQuantity || line.netLineTotal || line.grossLineTotal);
+  }).filter(line => line.sourceLine || line.invoiceQuantity || line.netLineTotal || line.grossLineTotal || line.isFree);
 
   distributeResidual(lines, totals.total);
   for (const line of lines) {
-    line.grossUnitPrice = line.units ? Math.round(line.grossLineTotal / line.units) : 0;
-    line.grossPackPrice = line.invoiceQuantity ? Math.round(line.grossLineTotal / line.invoiceQuantity) : 0;
+    line.grossUnitPrice = line.isFree ? 0 : (line.units ? Math.round(line.grossLineTotal / line.units) : 0);
+    line.grossPackPrice = line.isFree ? 0 : (line.invoiceQuantity ? Math.round(line.grossLineTotal / line.invoiceQuantity) : 0);
   }
   if (!lines.length) warnings.push('Gemini no detectó líneas de productos.');
   const matched = lines.filter(line => line.productId).length;
   return {
     supplierName: String(raw.supplierName || ''), supplierRut: String(raw.supplierRut || ''), invoiceNumber: String(raw.invoiceNumber || ''),
-    invoiceDate: String(raw.invoiceDate || ''), currency: String(raw.currency || 'CLP'), totals, lines,
-    matchSummary: {matched, unmatched: lines.length - matched, totalInvoiceLines: lines.length},
+    invoiceDate: String(raw.invoiceDate || ''), currency: String(raw.currency || 'CLP'), documentType: String(raw.documentType || ''), documentTypeCode: documentTypeCode(raw), totals, lines,
+    matchSummary: {matched, unmatched: lines.length - matched, totalInvoiceLines: lines.length, freeLines: lines.filter(line => line.isFree).length},
     warnings: [...new Set(warnings.filter(Boolean))], rawText: JSON.stringify(raw)
   };
 }
@@ -452,10 +482,10 @@ async function analyze(request, env, origin) {
   const form = await request.formData();
   const invoice = form.get('file');
   const order = form.get('orderFile');
-  if (!(invoice instanceof File)) return json({ok: false, error: 'Debes adjuntar la factura', code: 'missing_file'}, 400, origin);
-  if (invoice.size > MAX_INVOICE_BYTES) return json({ok: false, error: 'La factura supera 12 MB', code: 'file_too_large'}, 413, origin);
+  if (!(invoice instanceof File)) return json({ok: false, error: 'Debes adjuntar el documento', code: 'missing_file'}, 400, origin);
+  if (invoice.size > MAX_INVOICE_BYTES) return json({ok: false, error: 'El documento supera 12 MB', code: 'file_too_large'}, 413, origin);
   if (order instanceof File && order.size > MAX_ORDER_BYTES) return json({ok: false, error: 'El PDF del pedido supera 3 MB', code: 'order_too_large'}, 413, origin);
-  if (invoice.size + (order instanceof File ? order.size : 0) > MAX_COMBINED_BYTES) return json({ok: false, error: 'Factura y pedido superan 16 MB', code: 'combined_too_large'}, 413, origin);
+  if (invoice.size + (order instanceof File ? order.size : 0) > MAX_COMBINED_BYTES) return json({ok: false, error: 'Documento y pedido superan 16 MB', code: 'combined_too_large'}, 413, origin);
   let context = {};
   try { context = JSON.parse(String(form.get('context') || '{}')); }
   catch { return json({ok: false, error: 'Contexto de pedido inválido', code: 'invalid_context'}, 400, origin); }
@@ -485,7 +515,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, {status: 204, headers: corsHeaders(origin)});
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === '/health') {
-      const base = {ok: true, service: 'pedidos-pro-ai', geminiConfigured: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL || DEFAULT_MODEL, resolver: 'catalog-v22'};
+      const base = {ok: true, service: 'pedidos-pro-ai', geminiConfigured: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL || DEFAULT_MODEL, resolver: 'catalog-v23-free-items'};
       if (url.searchParams.get('probe') !== '1' || !env.GEMINI_API_KEY) return json(base, 200, origin);
       try { return json({...base, probe: await probeGemini(env)}, 200, origin); }
       catch (error) { return json({...base, ok: false, probe: {ok: false, error: String(error.message || error)}}, 502, origin); }
@@ -494,7 +524,7 @@ export default {
       try { return await analyze(request, env, origin); }
       catch (error) {
         console.error(error);
-        return json({ok: false, error: String(error.message || 'No se pudo analizar la factura'), code: 'gemini_failed', attempts: error.attempts || []}, 502, origin);
+        return json({ok: false, error: String(error.message || 'No se pudo analizar el documento'), code: 'gemini_failed', attempts: error.attempts || []}, 502, origin);
       }
     }
     return json({ok: false, error: 'Ruta no encontrada'}, 404, origin);
