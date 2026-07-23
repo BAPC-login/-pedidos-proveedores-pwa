@@ -13,9 +13,15 @@ export async function listOrdersV2(env,actor,url){
       cc.id AS cost_center_id,cc.name AS cost_center_name,
       u.display_name AS requested_by_name,
       COUNT(oi.id) AS item_count,
-      (SELECT COUNT(*) FROM invoice_order_links iol WHERE iol.order_id=o.id) AS invoice_count,
-      (SELECT COUNT(*) FROM receptions r WHERE r.order_id=o.id) AS reception_count,
-      (SELECT MAX(COALESCE(r.received_at,r.created_at)) FROM receptions r WHERE r.order_id=o.id) AS last_received_at
+      (SELECT COUNT(*) FROM invoice_order_links iol WHERE iol.org_id=o.org_id AND iol.order_id=o.id) AS invoice_count,
+      (SELECT COUNT(*) FROM receptions r WHERE r.org_id=o.org_id AND r.order_id=o.id) AS reception_count,
+      (SELECT MAX(COALESCE(r.received_at,r.created_at)) FROM receptions r WHERE r.org_id=o.org_id AND r.order_id=o.id) AS last_received_at,
+      (SELECT f.storage_key FROM document_links dl JOIN files f ON f.id=dl.file_id
+        WHERE dl.org_id=o.org_id AND dl.entity_type='order' AND dl.entity_id=o.id AND dl.document_kind='order_pdf'
+        ORDER BY dl.revision DESC,dl.created_at DESC LIMIT 1) AS pdf_key,
+      (SELECT f.file_name FROM document_links dl JOIN files f ON f.id=dl.file_id
+        WHERE dl.org_id=o.org_id AND dl.entity_type='order' AND dl.entity_id=o.id AND dl.document_kind='order_pdf'
+        ORDER BY dl.revision DESC,dl.created_at DESC LIMIT 1) AS pdf_name
     FROM orders o
     JOIN suppliers s ON s.id=o.supplier_id
     JOIN locations l ON l.id=o.location_id
@@ -37,7 +43,7 @@ export async function listOrdersV2(env,actor,url){
     costCenterName:order.cost_center_name||'Barra',requestedBy:order.requested_by_name,deliveryDate:order.delivery_date,
     notes:order.notes,currency:order.currency,netTotal:Number(order.net_total||0),taxTotal:Number(order.tax_total||0),
     grossTotal:Number(order.gross_total||0),itemCount:Number(order.item_count||0),invoiceCount:Number(order.invoice_count||0),
-    receptionCount:Number(order.reception_count||0),lastReceivedAt:order.last_received_at||null,revision:Number(order.revision||1),
-    createdAt:order.created_at,updatedAt:order.updated_at,sentAt:order.sent_at
+    receptionCount:Number(order.reception_count||0),lastReceivedAt:order.last_received_at||null,pdfKey:order.pdf_key||'',pdfName:order.pdf_name||'',
+    revision:Number(order.revision||1),createdAt:order.created_at,updatedAt:order.updated_at,sentAt:order.sent_at
   }))
 }
