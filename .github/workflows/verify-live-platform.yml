@@ -56,7 +56,7 @@ jobs:
               && echo "$app_order_core" | grep -q 'locations.length===1' \
               && echo "$app_procurement" | grep -q 'Orden de recorrido' \
               && echo "$app_procurement" | grep -q 'Agregar categorías disponibles' \
-              && echo "$app_procurement" | grep -q "orderMode:'custom'" \
+              && echo "$app_procurement" | grep -q "raw.orderMode==='custom'" \
               && echo "$app_procurement_entry" | grep -q 'Lista maestra y recorrido de bodegas' \
               && echo "$app_invoices" | grep -q 'Tipo de documento' \
               && echo "$app_invoices" | grep -q 'Bonificado' \
