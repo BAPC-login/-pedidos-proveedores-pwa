@@ -1,8 +1,8 @@
-const VERSION='pedidos-pro-platform-v13-simple-workflow';
+const VERSION='pedidos-pro-platform-v14-category-navigation-dashboard';
 const SHELL=[
-  './','./index.html','./styles.css','./pro-ui.css','./experience.css','./design-system-v13.css','./app.js','./app-core.js','./app-views.js','./app-actions.js',
+  './','./index.html','./styles.css','./pro-ui.css','./experience.css','./design-system-v13.css','./operations-v14.css','./app.js','./app-core.js','./app-views.js','./app-actions.js',
   './app-modal.js','./app-order-detail.js','./app-invoices.js','./app-branding.js','./app-order-core-v13.js','./app-company-logo.js',
-  './app-procurement-settings.js','./app-procurement-entry.js','./app-experience.js','./app-experience-operations.js','./app-experience-settings.js','./app-experience-keyboard.js','./app-experience-admin.js','./app-file-actions.js','./app-assets-v13.js','./app-settings-panels-v13.js','./app-telemetry-v13.js',
+  './app-procurement-settings.js','./app-procurement-entry.js','./app-experience.js','./app-experience-operations.js','./app-experience-settings.js','./app-experience-keyboard.js','./app-experience-admin.js','./app-file-actions.js','./app-assets-v13.js','./app-settings-panels-v13.js','./app-telemetry-v13.js','./app-navigation-v14.js','./app-dashboard-v14.js',
   './manifest.webmanifest','./icon.svg'
 ];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(VERSION).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()))});
