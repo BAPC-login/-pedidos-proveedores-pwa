@@ -3,6 +3,7 @@ import {renderReceiving,renderHistory,setExperienceActive} from './app-experienc
 import {enhanceSettings} from './app-experience-settings.js';
 import {initializeQuantityKeyboard} from './app-experience-keyboard.js';
 let initialized=false;
+function loadStyles(){if(document.querySelector('link[data-experience-css]'))return;const link=document.createElement('link');link.rel='stylesheet';link.href='./experience.css';link.dataset.experienceCss='1';document.head.append(link)}
 function injectNavigation(){
   const side=$('.side-nav');
   if(side&&!side.querySelector('[data-experience-view="receiving"]')){const orders=side.querySelector('[data-view="orders"]');orders?.insertAdjacentHTML('afterend','<button class="nav-item" data-experience-view="receiving"><span class="nav-icon">⇣</span><span>Recepción</span><b class="nav-count" id="receivingCount">0</b></button>');const invoices=side.querySelector('[data-view="invoices"]');if(invoices){invoices.querySelector('span:last-of-type').textContent='Documentos';invoices.insertAdjacentHTML('afterend','<button class="nav-item" data-experience-view="history"><span class="nav-icon">◷</span><span>Historial</span></button>')}const settings=$('[data-view="settings"]');if(settings)settings.querySelector('span:last-of-type').textContent='Configuración'}
@@ -10,7 +11,7 @@ function injectNavigation(){
 }
 function open(view){if(view==='receiving')renderReceiving().catch(console.error);if(view==='history')renderHistory().catch(console.error)}
 export function initializeExperience(){
-  if(initialized)return;initialized=true;injectNavigation();initializeQuantityKeyboard();
+  if(initialized)return;initialized=true;loadStyles();injectNavigation();initializeQuantityKeyboard();
   document.addEventListener('click',event=>{const button=event.target.closest?.('[data-experience-view]');if(button){event.preventDefault();event.stopPropagation();open(button.dataset.experienceView)}},true);
   let timer=0;new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(()=>{injectNavigation();if(state.view==='settings')enhanceSettings();if(!['receiving','history'].includes(state.view))setExperienceActive(state.view)},25)}).observe($('#appShell')||document.body,{subtree:true,childList:true});
 }
