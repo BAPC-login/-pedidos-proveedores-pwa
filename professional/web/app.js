@@ -3,7 +3,6 @@ import {navigate} from './app-views.js';
 import {openBootstrap,openOrder,openWorkspaceSwitcher,handleAction} from './app-actions.js';
 import {initializeBrandingFeatures,refreshBranding} from './app-branding.js';
 import {initializeOrderCoreV13} from './app-order-core-v13.js';
-import {initializeStabilityPass} from './app-stability.js';
 import {initializeCompanyLogoUploader} from './app-company-logo.js';
 import {initializeProcurementSettings} from './app-procurement-settings.js';
 import {initializeProcurementEntry} from './app-procurement-entry.js';
@@ -12,17 +11,9 @@ import {initializeFileActions} from './app-file-actions.js';
 import {initializeSettingsPanelsV13} from './app-settings-panels-v13.js';
 import {initializeTelemetryV13} from './app-telemetry-v13.js';
 
-initializeBrandingFeatures();initializeProcurementSettings();initializeProcurementEntry();initializeOrderCoreV13();initializeStabilityPass();initializeCompanyLogoUploader();initializeFileActions();initializeSettingsPanelsV13();initializeExperience();initializeTelemetryV13();
-
-function preloadOperations(){
-  if(!state.token)return;
-  Promise.allSettled([
-    api('/api/orders').then(payload=>state.cache.orders=payload.orders||[]),api('/api/invoices').then(payload=>state.cache.invoices=payload.invoices||[]),api('/api/categories').then(payload=>state.cache.categories=payload.categories||[]),api('/api/cost-centers').then(payload=>state.cache.costCenters=payload.costCenters||[]),api('/api/suppliers').then(payload=>state.cache.suppliers=payload.suppliers||[]),api('/api/notifications')
-  ]);
-}
-
+initializeBrandingFeatures();initializeProcurementSettings();initializeProcurementEntry();initializeOrderCoreV13();initializeCompanyLogoUploader();initializeFileActions();initializeSettingsPanelsV13();initializeExperience();initializeTelemetryV13();
+function preloadOperations(){if(!state.token)return;Promise.allSettled([api('/api/orders').then(payload=>state.cache.orders=payload.orders||[]),api('/api/invoices').then(payload=>state.cache.invoices=payload.invoices||[]),api('/api/categories').then(payload=>state.cache.categories=payload.categories||[]),api('/api/cost-centers').then(payload=>state.cache.costCenters=payload.costCenters||[]),api('/api/suppliers').then(payload=>state.cache.suppliers=payload.suppliers||[]),api('/api/notifications')])}
 $('#loginForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;setBusy(button,true,'Ingresando…');try{const response=await api('/api/auth/login',{method:'POST',json:{email:$('#loginEmail').value,password:$('#loginPassword').value}});state.token=response.token;localStorage.setItem('pp:token',state.token);state.me=await api('/api/me');try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}showApp();preloadOperations();await navigate('dashboard');toast('Sesión iniciada')}catch(error){toast(error.message,'error')}finally{setBusy(button,false)}});
-
 $('#openBootstrap').onclick=openBootstrap;$('#logoutButton').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST',json:{}})}catch{}logoutLocal()};$$('[data-view]').forEach(button=>button.addEventListener('click',()=>navigate(button.dataset.view)));$('#primaryAction').onclick=()=>handleAction(state.view==='invoices'?'analyze-invoice':state.view==='catalog'?'new-product':state.view==='suppliers'?'new-supplier':state.view==='team'?'new-user':'new-order');$('#mobileCreate').onclick=()=>openOrder();$('#themeButton').onclick=()=>{const current=document.documentElement.dataset.theme;setTheme(current==='system'?'light':current==='light'?'dark':'system')};$('#syncChip').onclick=syncMutations;$('#workspaceCard').addEventListener('click',openWorkspaceSwitcher);$('#mobileWorkspaceButton').addEventListener('click',openWorkspaceSwitcher);$('#mobileUserButton').addEventListener('click',openWorkspaceSwitcher);$('#globalSearch').addEventListener('focus',()=>openCommand());$('#globalSearch').addEventListener('keydown',event=>{if(event.key==='Enter')openCommand()});
 function openCommand(){$('#commandMenu').classList.remove('hidden');$('#commandInput').value='';renderCommands();setTimeout(()=>$('#commandInput').focus(),0)}
 function renderCommands(){const query=$('#commandInput').value.toLowerCase(),commands=[['dashboard','Ir a Resumen'],['receiving','Abrir archivos y pedidos'],['invoices','Ir a Documentos'],['history','Abrir historial'],['operations','Abrir Operaciones'],...(isAdmin()?[['team','Administrar usuarios'],['audit','Ver auditoría']]:[]),['settings','Abrir configuración']].filter(([,label])=>label.toLowerCase().includes(query));$('#commandResults').innerHTML=commands.map(([view,label])=>`<button class="command-result" data-command="${view}"><span>${label}</span><span>↵</span></button>`).join('');$$('[data-command]').forEach(node=>node.onclick=async()=>{$('#commandMenu').classList.add('hidden');if(node.dataset.command==='operations'){const{renderOperationsAdmin}=await import('./app-experience-admin.js');return renderOperationsAdmin()}if(node.dataset.command==='receiving'){const{renderReceiving}=await import('./app-experience-operations.js');return renderReceiving()}if(node.dataset.command==='history'){const{renderHistory}=await import('./app-experience-operations.js');return renderHistory()}navigate(node.dataset.command)})}
