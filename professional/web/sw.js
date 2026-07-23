@@ -1,4 +1,4 @@
-const VERSION='pedidos-pro-platform-v14-fast-navigation';
+const VERSION='pedidos-pro-platform-v14-fast-navigation-2';
 const SHELL=[
   './','./index.html','./styles.css','./pro-ui.css','./experience.css','./design-system-v13.css','./design-system-v14.css',
   './app.js','./app-core.js','./app-views.js','./app-actions.js','./app-router-v14.js','./app-navigation-v14.js','./app-dashboard-v14.js',
