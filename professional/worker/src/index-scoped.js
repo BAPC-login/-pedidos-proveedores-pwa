@@ -1,14 +1,34 @@
 import platformWorker from './index.js';
 import {authenticate} from './auth.js';
-import {corsHeaders,errorResponse,ok,securityHeaders} from './core.js';
+import {corsHeaders,errorResponse,ok,routeMatch,securityHeaders} from './core.js';
 import {ensureSchema} from './schema.js';
 import {dashboard,listProducts} from './api/catalog-scoped.js';
+import {createCategoryV14,deleteCategoryV14,listUserCategoriesV14,updateCategoryV14} from './api/catalog-v14.js';
 
 const EXPECTED_UNIQUE_PRODUCTS=193,EXPECTED_SUPPLIERS=12,EXPECTED_PURCHASE_FORMATS=194;
 function addPlatformHeaders(response,request,env){const headers=new Headers(response.headers),origin=request.headers.get('Origin')||'';for(const[name,value]of Object.entries(corsHeaders(origin,env)))headers.set(name,value);for(const[name,value]of Object.entries(securityHeaders()))headers.set(name,value);return new Response(response.body,{status:response.status,statusText:response.statusText,headers})}
 async function health(env,schema){
   const[products,suppliers,purchaseFormats,owners,locations]=await Promise.all([env.DB.prepare('SELECT COUNT(*) AS total FROM products WHERE active=1').first(),env.DB.prepare('SELECT COUNT(*) AS total FROM suppliers WHERE active=1').first(),env.DB.prepare('SELECT COUNT(*) AS total FROM supplier_products WHERE active=1').first(),env.DB.prepare('SELECT COUNT(*) AS total FROM platform_owners').first(),env.DB.prepare('SELECT COUNT(*) AS total FROM locations WHERE active=1').first()]);
   const catalogProducts=Number(products?.total||0),catalogSuppliers=Number(suppliers?.total||0),catalogPurchaseFormats=Number(purchaseFormats?.total||0);
-  return{service:'pedidos-pro-platform',version:'2.0.0-alpha.13',databaseConfigured:Boolean(env.DB),databaseInitialized:true,schemaVersion:schema.version,catalogReady:catalogProducts>=EXPECTED_UNIQUE_PRODUCTS&&catalogSuppliers>=EXPECTED_SUPPLIERS&&catalogPurchaseFormats>=EXPECTED_PURCHASE_FORMATS,catalogProducts,catalogSuppliers,catalogPurchaseFormats,catalogSourceRows:EXPECTED_PURCHASE_FORMATS,platformOwnerReady:Number(owners?.total||0)>0,activeLocations:Number(locations?.total||0),storageConfigured:Boolean(env.FILES||env.DB),storageBackend:env.FILES?'r2':'d1-chunks',r2Configured:Boolean(env.FILES),aiEndpoint:Boolean(env.AI_ENDPOINT),geminiConfigured:Boolean(env.GEMINI_API_KEY),orderCore:true,simpleWorkflow:true,editableOrderFiles:true,batchEmission:true,categoryOwnership:true,supplierLogos:true,perSupplierDeliveryDates:true,directPdfActions:true,cleanSupplierPdf:true,professionalReconciliation:true,notifications:true,observability:true,workspaceBackups:true,commercialReadiness:true,deviceQa:true,environment:env.ENVIRONMENT||'development',timestamp:new Date().toISOString()};
+  return{service:'pedidos-pro-platform',version:'2.0.0-alpha.14',databaseConfigured:Boolean(env.DB),databaseInitialized:true,schemaVersion:schema.version,catalogReady:catalogProducts>=EXPECTED_UNIQUE_PRODUCTS&&catalogSuppliers>=EXPECTED_SUPPLIERS&&catalogPurchaseFormats>=EXPECTED_PURCHASE_FORMATS,catalogProducts,catalogSuppliers,catalogPurchaseFormats,catalogSourceRows:EXPECTED_PURCHASE_FORMATS,platformOwnerReady:Number(owners?.total||0)>0,activeLocations:Number(locations?.total||0),storageConfigured:Boolean(env.FILES||env.DB),storageBackend:env.FILES?'r2':'d1-chunks',r2Configured:Boolean(env.FILES),aiEndpoint:Boolean(env.AI_ENDPOINT),geminiConfigured:Boolean(env.GEMINI_API_KEY),orderCore:true,simpleWorkflow:true,editableOrderFiles:true,batchEmission:true,categoryOwnership:true,categoryCostCenters:true,supplierLogos:true,perSupplierDeliveryDates:true,deliveryDateExceptions:true,directPdfActions:true,cleanSupplierPdf:true,professionalReconciliation:true,notifications:true,observability:true,workspaceBackups:true,commercialReadiness:true,deviceQa:true,fastNavigation:true,restoredScroll:true,professionalDashboard:true,environment:env.ENVIRONMENT||'development',timestamp:new Date().toISOString()};
 }
-export default{async fetch(request,env,ctx){const url=new URL(request.url),method=request.method.toUpperCase(),scopedHealth=method==='GET'&&url.pathname==='/health',scopedDashboard=method==='GET'&&url.pathname==='/api/dashboard',scopedProducts=method==='GET'&&url.pathname==='/api/products';if(!scopedHealth&&!scopedDashboard&&!scopedProducts)return platformWorker.fetch(request,env,ctx);try{const schema=await ensureSchema(env);if(scopedHealth)return addPlatformHeaders(ok(await health(env,schema),request,env),request,env);const actor=await authenticate(request,env),payload=scopedDashboard?await dashboard(env,actor):{products:await listProducts(env,actor,url)};return addPlatformHeaders(ok(payload,request,env),request,env)}catch(error){if(Number(error?.status||500)>=500)console.error('scoped_request_failed',error);return addPlatformHeaders(errorResponse(error,request,env),request,env)}}};
+export default{async fetch(request,env,ctx){
+  const url=new URL(request.url),method=request.method.toUpperCase(),path=url.pathname;
+  const categoryParams=routeMatch(path,'/api/categories/:id');
+  const scopedHealth=method==='GET'&&path==='/health',scopedDashboard=method==='GET'&&path==='/api/dashboard',scopedProducts=method==='GET'&&path==='/api/products';
+  const scopedCategories=(path==='/api/categories'&&['GET','POST'].includes(method))||(categoryParams&&['PATCH','DELETE'].includes(method));
+  if(!scopedHealth&&!scopedDashboard&&!scopedProducts&&!scopedCategories)return platformWorker.fetch(request,env,ctx);
+  try{
+    const schema=await ensureSchema(env);
+    if(scopedHealth)return addPlatformHeaders(ok(await health(env,schema),request,env),request,env);
+    const actor=await authenticate(request,env);
+    let payload;
+    if(scopedDashboard)payload=await dashboard(env,actor);
+    else if(scopedProducts)payload={products:await listProducts(env,actor,url)};
+    else if(path==='/api/categories'&&method==='GET')payload={categories:await listUserCategoriesV14(env,actor)};
+    else if(path==='/api/categories'&&method==='POST')payload={category:await createCategoryV14(request,env,actor)};
+    else if(categoryParams&&method==='PATCH')payload={category:await updateCategoryV14(request,env,actor,categoryParams.id)};
+    else payload=await deleteCategoryV14(request,env,actor,categoryParams.id);
+    return addPlatformHeaders(ok(payload,request,env),request,env);
+  }catch(error){if(Number(error?.status||500)>=500)console.error('scoped_request_failed',error);return addPlatformHeaders(errorResponse(error,request,env),request,env)}
+}};
