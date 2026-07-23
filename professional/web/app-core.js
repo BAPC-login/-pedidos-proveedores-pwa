@@ -114,11 +114,14 @@ async function updateSyncChip(){
   chip.classList.toggle('pending',count>0||!navigator.onLine);
 }
 
+function hideStartup(){$('#startupScreen')?.classList.add('hidden')}
 function showAuth(){
+  hideStartup();
   $('#authScreen')?.classList.remove('hidden');
   $('#appShell')?.classList.add('hidden');
 }
 function showApp(){
+  hideStartup();
   $('#authScreen')?.classList.add('hidden');
   $('#appShell')?.classList.remove('hidden');
   const {user,organization,plan}=state.me;
