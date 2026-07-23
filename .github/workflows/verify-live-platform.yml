@@ -37,11 +37,13 @@ jobs:
             app=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/" 2>/dev/null || true)
             ai_health=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/health" 2>/dev/null || true)
             platform_health=$(curl --fail --silent --show-error --max-time 20 --dump-header /tmp/platform.headers "$BASE_URL/platform/health" 2>/dev/null || true)
-            app_order_core=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-order-core.js" 2>/dev/null || true)
+            app_order_core=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-order-core-v2.js" 2>/dev/null || true)
             app_procurement=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-procurement-settings.js" 2>/dev/null || true)
             app_invoices=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-invoices.js" 2>/dev/null || true)
             app_experience=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-experience.js" 2>/dev/null || true)
             app_operations=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-experience-operations.js" 2>/dev/null || true)
+            app_admin=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-experience-admin.js" 2>/dev/null || true)
+            app_files=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-file-actions.js" 2>/dev/null || true)
             app_settings=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-experience-settings.js" 2>/dev/null || true)
             app_keyboard=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-experience-keyboard.js" 2>/dev/null || true)
             experience_css=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/experience.css" 2>/dev/null || true)
@@ -50,39 +52,42 @@ jobs:
             if echo "$app" | grep -q '<title>Pedidos Pro</title>' \
               && echo "$app" | grep -q 'id="startupScreen"' \
               && echo "$app" | grep -q 'id="appShell"' \
-              && echo "$app_order_core" | grep -q 'ETAPA 1 · EMISIÓN' \
+              && echo "$app_order_core" | grep -q 'Fechas distintas por proveedor' \
               && echo "$app_order_core" | grep -q '/api/order-batches/v2' \
+              && echo "$app_order_core" | grep -q 'core-row-v2' \
               && echo "$app_procurement" | grep -q 'Orden de recorrido' \
               && echo "$app_procurement" | grep -q 'Agregar categorías disponibles' \
               && echo "$app_invoices" | grep -q 'Bonificado' \
-              && echo "$app_experience" | grep -q 'data-experience-view=\"receiving\"' \
-              && echo "$app_experience" | grep -q 'Configuración' \
-              && echo "$app_operations" | grep -q 'Recepción y documentos' \
-              && echo "$app_operations" | grep -q 'Historial completo' \
-              && echo "$app_operations" | grep -q 'invoiceCount' \
-              && echo "$app_settings" | grep -q 'Perfil de la empresa' \
-              && echo "$app_settings" | grep -q 'Lista maestra y recorrido' \
+              && echo "$app_experience" | grep -q 'data-experience-view=\"operations\"' \
+              && echo "$app_experience" | grep -q 'Vigentes' \
+              && echo "$app_operations" | grep -q 'Pedidos por recibir' \
+              && echo "$app_operations" | grep -q 'data-order-pdf' \
+              && echo "$app_operations" | grep -q 'Subir factura' \
+              && echo "$app_admin" | grep -q 'Nueva categoría' \
+              && echo "$app_admin" | grep -q 'Logos de proveedores' \
+              && echo "$app_files" | grep -q 'navigator.share' \
+              && echo "$app_files" | grep -q 'data-document-key' \
+              && echo "$app_settings" | grep -q 'Operación y datos maestros' \
               && echo "$app_keyboard" | grep -q 'Siguiente' \
-              && echo "$app_keyboard" | grep -q 'visualViewport' \
-              && echo "$experience_css" | grep -q 'social-gradient' \
-              && echo "$experience_css" | grep -q 'grid-template-areas' \
+              && echo "$experience_css" | grep -q 'compact-order-card' \
+              && echo "$experience_css" | grep -q 'bottom-item>small' \
               && echo "$ai_health" | grep -q '"service":"pedidos-pro-ai"' \
               && echo "$ai_health" | grep -q '"geminiConfigured":true' \
               && echo "$ai_health" | grep -q '"resolver":"catalog-v23-free-items"' \
               && echo "$platform_health" | grep -q '"service":"pedidos-pro-platform"' \
-              && echo "$platform_health" | grep -q '"version":"2.0.0-alpha.11"' \
+              && echo "$platform_health" | grep -q '"version":"2.0.0-alpha.12"' \
               && echo "$platform_health" | grep -q '"databaseInitialized":true' \
               && echo "$platform_health" | grep -q '"schemaVersion":"11"' \
               && echo "$platform_health" | grep -q '"catalogReady":true' \
               && echo "$platform_health" | grep -q '"catalogProducts":193' \
               && echo "$platform_health" | grep -q '"catalogSuppliers":12' \
               && echo "$platform_health" | grep -q '"catalogPurchaseFormats":194' \
-              && echo "$platform_health" | grep -q '"customProcurementOrder":true' \
-              && echo "$platform_health" | grep -q '"freeItemRecognition":true' \
-              && echo "$platform_health" | grep -q '"experienceHub":true' \
-              && echo "$platform_health" | grep -q '"receivingQueue":true' \
-              && echo "$platform_health" | grep -q '"instagramLayout":true' \
-              && [ "$release_header" = "2026.07.23.01" ]; then
+              && echo "$platform_health" | grep -q '"operationsAdmin":true' \
+              && echo "$platform_health" | grep -q '"supplierLogos":true' \
+              && echo "$platform_health" | grep -q '"perSupplierDeliveryDates":true' \
+              && echo "$platform_health" | grep -q '"directPdfActions":true' \
+              && echo "$platform_health" | grep -q '"cleanSupplierPdf":true' \
+              && [ "$release_header" = "2026.07.23.02" ]; then
               app_ok="true"
               status="healthy"
               break
@@ -93,7 +98,6 @@ jobs:
           me_status=$(curl --silent --show-error --max-time 20 --output /tmp/me.json --write-out '%{http_code}' "$BASE_URL/api/me" || true)
           login_status=$(curl --silent --show-error --max-time 20 --output /tmp/login.json --write-out '%{http_code}' -H 'Content-Type: application/json' --data '{"email":"admin@pedidospro.local","password":"incorrecta"}' "$BASE_URL/api/auth/login" || true)
           bootstrap_status=$(curl --silent --show-error --max-time 20 --output /tmp/bootstrap.json --write-out '%{http_code}' -H 'Content-Type: application/json' --data '{"organizationName":"Unauthorized","locationName":"Unauthorized","displayName":"Unauthorized","email":"unauthorized@example.com","password":"unauthorized-password"}' "$BASE_URL/api/bootstrap" || true)
-
           if [ "$me_status" != "401" ] || [ "$login_status" != "401" ] || [ "$bootstrap_status" != "403" ]; then status="failed"; fi
 
           mkdir -p deployment
