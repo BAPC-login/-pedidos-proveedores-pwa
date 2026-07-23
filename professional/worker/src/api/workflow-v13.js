@@ -10,6 +10,11 @@ const locationAllowed=(actor,locationId)=>actor.locationScope?.includes?.('*')||
 function safeJson(value,fallback={}){try{return JSON.parse(value||'')}catch{return fallback}}
 function canAdmin(actor){return ['owner','admin'].includes(String(actor.role||''))}
 
+export async function listUserCategoriesV13(env,actor){
+  const result=await env.DB.prepare("SELECT id,name,sort_order,active,source FROM categories WHERE org_id=? AND active=1 AND source='user' ORDER BY sort_order,name COLLATE NOCASE").bind(actor.orgId).all();
+  return rows(result).map(item=>({id:item.id,name:item.name,sortOrder:Number(item.sort_order||0),active:Boolean(item.active),source:'user'}));
+}
+
 export async function updateCategoryV13(request,env,actor,categoryId){
   assertMinimumRole(actor.role,ROLES.PURCHASER);
   const current=await env.DB.prepare('SELECT id,name,source FROM categories WHERE id=? AND org_id=?').bind(categoryId,actor.orgId).first();
@@ -62,16 +67,15 @@ export async function quickUpdateOrderV13(request,env,actor,orderId){
 
 export async function emitOrderBatchV13(request,env,actor,batchId,ctx){
   assertMinimumRole(actor.role,ROLES.PURCHASER);
-  const result=await env.DB.prepare(`SELECT id,status,location_id,folio FROM orders WHERE org_id=? AND batch_id=? ORDER BY created_at`).bind(actor.orgId,batchId).all();
+  const result=await env.DB.prepare('SELECT id,status,location_id,folio FROM orders WHERE org_id=? AND batch_id=? ORDER BY created_at').bind(actor.orgId,batchId).all();
   const orders=rows(result).filter(order=>locationAllowed(actor,order.location_id));
   if(!orders.length)throw new HttpError(404,'Archivo de pedidos no encontrado','not_found');
   const editable=orders.filter(order=>order.status==='draft');
   if(!editable.length)throw new HttpError(409,'Este archivo ya fue emitido','already_emitted');
-  const timestamp=nowIso();
-  const statements=[];
+  const timestamp=nowIso(),statements=[];
   for(const order of editable){
     statements.push(env.DB.prepare("UPDATE orders SET status='requested',emitted_at=?,sent_at=?,updated_at=? WHERE id=? AND org_id=? AND status='draft'").bind(timestamp,timestamp,timestamp,order.id,actor.orgId));
-    statements.push(env.DB.prepare(`INSERT INTO order_events(id,org_id,order_id,actor_user_id,from_status,to_status,reason,created_at) VALUES(?,?,?,?, 'draft','requested','Archivo emitido',?)`).bind(uuid(),actor.orgId,order.id,actor.userId,timestamp));
+    statements.push(env.DB.prepare("INSERT INTO order_events(id,org_id,order_id,actor_user_id,from_status,to_status,reason,created_at) VALUES(?,?,?,?, 'draft','requested','Archivo emitido',?)").bind(uuid(),actor.orgId,order.id,actor.userId,timestamp));
   }
   await env.DB.batch(statements);
   await writeAudit(env,actor,request,'order_batch.emit','order_batch',batchId,{orders:editable.map(order=>order.id)});
@@ -99,14 +103,10 @@ export async function deleteOrderV13(request,env,actor,orderId,url){
   return {deleted:true,id:orderId,folio:order.folio,batchId:order.batch_id};
 }
 
-export async function listNotificationsV13(env,actor){
-  const orders=await listOrdersV2(env,actor,new URL('https://internal/api/orders'));
-  return operationalNotifications(orders);
-}
+export async function listNotificationsV13(env,actor){const orders=await listOrdersV2(env,actor,new URL('https://internal/api/orders'));return operationalNotifications(orders)}
 
 export async function recordClientEventV13(request,env,actor){
-  const body=await readJson(request);
-  const type=String(body.type||'client_event').replace(/[^a-z0-9_.-]/gi,'').slice(0,80)||'client_event';
+  const body=await readJson(request),type=String(body.type||'client_event').replace(/[^a-z0-9_.-]/gi,'').slice(0,80)||'client_event';
   const message=optionalText(body.message,{max:1000});
   const metadata={path:String(body.path||'').slice(0,300),view:String(body.view||'').slice(0,80),device:String(body.device||'').slice(0,160),details:body.details&&typeof body.details==='object'?body.details:{}};
   await env.DB.prepare('INSERT INTO client_events(id,org_id,user_id,event_type,message,metadata_json,created_at) VALUES(?,?,?,?,?,?,?)').bind(uuid(),actor.orgId,actor.userId,type,message,JSON.stringify(metadata),nowIso()).run();
@@ -127,10 +127,15 @@ export async function exportWorkspaceV13(request,env,actor){
   const tables=['organizations','locations','cost_centers','categories','suppliers','products','supplier_products','product_cost_centers','orders','order_items','order_cost_centers','receptions','reception_items','invoices','invoice_lines','invoice_order_links','files','document_links','memberships','users','audit_logs'];
   const data={};
   for(const table of tables){
-    if(table==='users')data[table]=rows(await env.DB.prepare('SELECT id,email,display_name,active,profile_json,created_at,updated_at FROM users WHERE id IN (SELECT user_id FROM memberships WHERE org_id=?)').bind(actor.orgId).all());
-    else if(table==='organizations')data[table]=rows(await env.DB.prepare('SELECT id,name,slug,plan,status,settings_json,created_at,updated_at FROM organizations WHERE id=?').bind(actor.orgId).all());
-    else if(table==='memberships')data[table]=rows(await env.DB.prepare('SELECT id,org_id,user_id,role,location_scope,active,created_at,updated_at FROM memberships WHERE org_id=?').bind(actor.orgId).all());
-    else data[table]=rows(await env.DB.prepare(`SELECT * FROM ${table} WHERE org_id=?`).bind(actor.orgId).all()).catch?.(()=>[])||[];
+    try{
+      if(table==='users')data[table]=rows(await env.DB.prepare('SELECT id,email,display_name,active,profile_json,created_at,updated_at FROM users WHERE id IN (SELECT user_id FROM memberships WHERE org_id=?)').bind(actor.orgId).all());
+      else if(table==='organizations')data[table]=rows(await env.DB.prepare('SELECT id,name,slug,plan,status,settings_json,created_at,updated_at FROM organizations WHERE id=?').bind(actor.orgId).all());
+      else if(table==='memberships')data[table]=rows(await env.DB.prepare('SELECT id,org_id,user_id,role,location_scope,active,created_at,updated_at FROM memberships WHERE org_id=?').bind(actor.orgId).all());
+      else if(['order_items','reception_items'].includes(table)){
+        const parent=table==='order_items'?'orders':'receptions',foreign=table==='order_items'?'order_id':'reception_id';
+        data[table]=rows(await env.DB.prepare(`SELECT child.* FROM ${table} child JOIN ${parent} parent ON parent.id=child.${foreign} WHERE parent.org_id=?`).bind(actor.orgId).all());
+      }else data[table]=rows(await env.DB.prepare(`SELECT * FROM ${table} WHERE org_id=?`).bind(actor.orgId).all());
+    }catch(error){data[table]=[]}
   }
   const backup={version:1,organizationId:actor.orgId,generatedAt:nowIso(),generatedBy:actor.userId,data};
   await writeAudit(env,actor,request,'workspace.export','organization',actor.orgId,{tables:Object.keys(data),rows:Object.values(data).reduce((sum,list)=>sum+list.length,0)});
@@ -138,15 +143,13 @@ export async function exportWorkspaceV13(request,env,actor){
 }
 
 export async function getReconciliationSettingsV13(env,actor){
-  const org=await env.DB.prepare('SELECT settings_json FROM organizations WHERE id=?').bind(actor.orgId).first();
-  const settings=safeJson(org?.settings_json,{}).reconciliation||{};
+  const org=await env.DB.prepare('SELECT settings_json FROM organizations WHERE id=?').bind(actor.orgId).first(),settings=safeJson(org?.settings_json,{}).reconciliation||{};
   return {quantityTolerancePct:Number(settings.quantityTolerancePct||0),priceTolerancePct:Number(settings.priceTolerancePct||1),requireProductMatch:settings.requireProductMatch!==false,flagFreeItems:settings.flagFreeItems!==false};
 }
 
 export async function updateReconciliationSettingsV13(request,env,actor){
   assertMinimumRole(actor.role,ROLES.ADMIN);
-  const body=await readJson(request),org=await env.DB.prepare('SELECT settings_json FROM organizations WHERE id=?').bind(actor.orgId).first();
-  const current=safeJson(org?.settings_json,{});
+  const body=await readJson(request),org=await env.DB.prepare('SELECT settings_json FROM organizations WHERE id=?').bind(actor.orgId).first(),current=safeJson(org?.settings_json,{});
   const reconciliation={quantityTolerancePct:Math.max(0,Math.min(100,Number(body.quantityTolerancePct||0))),priceTolerancePct:Math.max(0,Math.min(100,Number(body.priceTolerancePct||0))),requireProductMatch:body.requireProductMatch!==false,flagFreeItems:body.flagFreeItems!==false};
   await env.DB.prepare('UPDATE organizations SET settings_json=?,updated_at=? WHERE id=?').bind(JSON.stringify({...current,reconciliation}),nowIso(),actor.orgId).run();
   await writeAudit(env,actor,request,'reconciliation.settings','organization',actor.orgId,reconciliation);
@@ -154,9 +157,7 @@ export async function updateReconciliationSettingsV13(request,env,actor){
 }
 
 export async function getAccountReadinessV13(env,actor){
-  const limits=planFor(actor.organization.plan),month=monthKey();
-  const usageRows=rows(await env.DB.prepare('SELECT metric,quantity FROM usage_counters WHERE org_id=? AND month_key=?').bind(actor.orgId,month).all());
-  const usage=Object.fromEntries(usageRows.map(item=>[item.metric,Number(item.quantity||0)]));
+  const limits=planFor(actor.organization.plan),month=monthKey(),usageRows=rows(await env.DB.prepare('SELECT metric,quantity FROM usage_counters WHERE org_id=? AND month_key=?').bind(actor.orgId,month).all()),usage=Object.fromEntries(usageRows.map(item=>[item.metric,Number(item.quantity||0)]));
   const [locations,suppliers,products,users,documents]=await Promise.all([
     env.DB.prepare('SELECT COUNT(*) AS total FROM locations WHERE org_id=? AND active=1').bind(actor.orgId).first(),env.DB.prepare('SELECT COUNT(*) AS total FROM suppliers WHERE org_id=? AND active=1').bind(actor.orgId).first(),env.DB.prepare('SELECT COUNT(*) AS total FROM products WHERE org_id=? AND active=1').bind(actor.orgId).first(),env.DB.prepare('SELECT COUNT(*) AS total FROM memberships WHERE org_id=? AND active=1').bind(actor.orgId).first(),env.DB.prepare('SELECT COUNT(*) AS total FROM files WHERE org_id=?').bind(actor.orgId).first()
   ]);
