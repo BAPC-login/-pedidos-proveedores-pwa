@@ -8,6 +8,7 @@ import {initializeCompanyLogoUploader} from './app-company-logo.js';
 import {initializeProcurementSettings} from './app-procurement-settings.js';
 import {initializeProcurementEntry} from './app-procurement-entry.js';
 import {initializeExperience} from './app-experience.js';
+import {initializeFileActions} from './app-file-actions.js';
 
 initializeBrandingFeatures();
 initializeProcurementSettings();
@@ -15,6 +16,7 @@ initializeProcurementEntry();
 initializeOrderCoreV2();
 initializeStabilityPass();
 initializeCompanyLogoUploader();
+initializeFileActions();
 initializeExperience();
 
 function preloadOperations(){
@@ -28,15 +30,8 @@ function preloadOperations(){
 }
 
 $('#loginForm').addEventListener('submit',async event=>{
-  event.preventDefault();
-  const button=event.submitter;
-  setBusy(button,true,'Ingresando…');
-  try{
-    const response=await api('/api/auth/login',{method:'POST',json:{email:$('#loginEmail').value,password:$('#loginPassword').value}});
-    state.token=response.token;localStorage.setItem('pp:token',state.token);state.me=await api('/api/me');
-    try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}
-    showApp();preloadOperations();await navigate('dashboard');toast('Sesión iniciada');
-  }catch(error){toast(error.message,'error')}finally{setBusy(button,false)}
+  event.preventDefault();const button=event.submitter;setBusy(button,true,'Ingresando…');
+  try{const response=await api('/api/auth/login',{method:'POST',json:{email:$('#loginEmail').value,password:$('#loginPassword').value}});state.token=response.token;localStorage.setItem('pp:token',state.token);state.me=await api('/api/me');try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}showApp();preloadOperations();await navigate('dashboard');toast('Sesión iniciada')}catch(error){toast(error.message,'error')}finally{setBusy(button,false)}
 });
 
 $('#openBootstrap').onclick=openBootstrap;
@@ -51,27 +46,13 @@ $('#mobileWorkspaceButton').addEventListener('click',openWorkspaceSwitcher);
 $('#mobileUserButton').addEventListener('click',openWorkspaceSwitcher);
 $('#globalSearch').addEventListener('focus',()=>openCommand());
 $('#globalSearch').addEventListener('keydown',event=>{if(event.key==='Enter')openCommand()});
-
 function openCommand(){$('#commandMenu').classList.remove('hidden');$('#commandInput').value='';renderCommands();setTimeout(()=>$('#commandInput').focus(),0)}
-function renderCommands(){
-  const query=$('#commandInput').value.toLowerCase();
-  const commands=[['dashboard','Ir a Resumen'],['orders','Ir a Pedidos'],['invoices','Ir a Documentos'],['catalog','Ir a Catálogo'],['suppliers','Ir a Proveedores'],['operations','Abrir Operaciones'],...(isAdmin()?[['team','Administrar usuarios'],['audit','Ver auditoría']]:[]),['settings','Abrir configuración']].filter(([,label])=>label.toLowerCase().includes(query));
-  $('#commandResults').innerHTML=commands.map(([view,label])=>`<button class="command-result" data-command="${view}"><span>${label}</span><span>↵</span></button>`).join('');
-  $$('[data-command]').forEach(node=>node.onclick=async()=>{$('#commandMenu').classList.add('hidden');if(node.dataset.command==='operations'){const{renderOperationsAdmin}=await import('./app-experience-admin.js');return renderOperationsAdmin()}navigate(node.dataset.command)});
-}
+function renderCommands(){const query=$('#commandInput').value.toLowerCase(),commands=[['dashboard','Ir a Resumen'],['orders','Ir a Pedidos'],['invoices','Ir a Documentos'],['catalog','Ir a Catálogo'],['suppliers','Ir a Proveedores'],['operations','Abrir Operaciones'],...(isAdmin()?[['team','Administrar usuarios'],['audit','Ver auditoría']]:[]),['settings','Abrir configuración']].filter(([,label])=>label.toLowerCase().includes(query));$('#commandResults').innerHTML=commands.map(([view,label])=>`<button class="command-result" data-command="${view}"><span>${label}</span><span>↵</span></button>`).join('');$$('[data-command]').forEach(node=>node.onclick=async()=>{$('#commandMenu').classList.add('hidden');if(node.dataset.command==='operations'){const{renderOperationsAdmin}=await import('./app-experience-admin.js');return renderOperationsAdmin()}navigate(node.dataset.command)})}
 $('#commandInput').addEventListener('input',renderCommands);
 $('#commandMenu').addEventListener('click',event=>{if(event.target===$('#commandMenu'))$('#commandMenu').classList.add('hidden')});
 document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();openCommand()}if(event.key==='Escape')$('#commandMenu').classList.add('hidden')});
 window.addEventListener('online',()=>{state.online=true;updateSyncChip();syncMutations();toast('Conexión recuperada')});
 window.addEventListener('offline',()=>{state.online=false;updateSyncChip();toast('Modo offline','error')});
-
 if('serviceWorker'in navigator){navigator.serviceWorker.register('./sw.js').then(registration=>registration.update().catch(()=>{})).catch(console.warn);navigator.serviceWorker.addEventListener('controllerchange',()=>console.info('service_worker_updated'))}
-
-async function initialize(){
-  await updateSyncChip();$('#openBootstrap').classList.add('hidden');
-  if(!state.token){$('#loginEmail').value='';showAuth();return}
-  try{state.me=await api('/api/me')}catch(error){if(error.status===401)logoutLocal();else toast('No se pudo validar la sesión. Reintentaremos al recuperar conexión.','error');return}
-  try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}
-  showApp();preloadOperations();try{await navigate('dashboard')}catch(error){console.warn('dashboard_load_failed',error);toast('La sesión sigue activa. Reintenta cargar el panel.','error')}syncMutations();
-}
+async function initialize(){await updateSyncChip();$('#openBootstrap').classList.add('hidden');if(!state.token){$('#loginEmail').value='';showAuth();return}try{state.me=await api('/api/me')}catch(error){if(error.status===401)logoutLocal();else toast('No se pudo validar la sesión. Reintentaremos al recuperar conexión.','error');return}try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}showApp();preloadOperations();try{await navigate('dashboard')}catch(error){console.warn('dashboard_load_failed',error);toast('La sesión sigue activa. Reintenta cargar el panel.','error')}syncMutations()}
 initialize();
