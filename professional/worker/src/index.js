@@ -51,16 +51,16 @@ import {getGeminiDashboardInsights} from './api/analytics-ai.js';
 import {
   analyzeInvoice,
   auditLog,
-  createInvoice,
   getFile,
   listInvoices,
   uploadFile
 } from './api/documents.js';
+import {createInvoiceV2} from './api/invoices-v2.js';
 import {getSettings, updateSettings} from './api/settings.js';
 import {createBrand, listBrands, switchBrand} from './platform.js';
 import {listDocuments} from './storage.js';
 
-const APP_VERSION = '2.0.0-alpha.9';
+const APP_VERSION = '2.0.0-alpha.10';
 
 function addPlatformHeaders(response, request, env) {
   const headers = new Headers(response.headers);
@@ -102,7 +102,7 @@ async function handleRequest(request, env, ctx) {
       aiEndpoint: Boolean(env.AI_ENDPOINT),
       geminiConfigured: Boolean(env.GEMINI_API_KEY),
       orderCore: true,
-      warehouseUnits: true,
+      freeItemRecognition: true,
       environment: env.ENVIRONMENT || 'development',
       timestamp: new Date().toISOString()
     }, request, env);
@@ -169,7 +169,7 @@ async function handleRequest(request, env, ctx) {
   if (receptionParams && method === 'POST') return ok({reception: await createReception(request, env, actor, receptionParams.id)}, request, env);
 
   if (method === 'GET' && path === '/api/invoices') return ok({invoices: await listInvoices(env, actor, url)}, request, env);
-  if (method === 'POST' && path === '/api/invoices') return ok({invoice: await createInvoice(request, env, actor)}, request, env);
+  if (method === 'POST' && path === '/api/invoices') return ok({invoice: await createInvoiceV2(request, env, actor)}, request, env);
   if (method === 'POST' && path === '/api/invoices/analyze') return ok({analysis: await analyzeInvoice(request, env, actor)}, request, env);
   if (method === 'GET' && path === '/api/documents') return ok({documents: await listDocuments(env, actor, {entityType: String(url.searchParams.get('entityType') || ''), entityId: String(url.searchParams.get('entityId') || ''), kind: String(url.searchParams.get('kind') || '')})}, request, env);
   if (method === 'POST' && path === '/api/files') return ok({file: await uploadFile(request, env, actor, url)}, request, env);
