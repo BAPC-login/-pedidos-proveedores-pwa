@@ -69,7 +69,7 @@ jobs:
               && echo "$app_files" | grep -q 'data-document-key' \
               && echo "$app_settings" | grep -q 'Operación y datos maestros' \
               && echo "$app_keyboard" | grep -q 'Siguiente' \
-              && echo "$experience_css" | grep -q 'compact-order-card' \
+              && echo "$experience_css" | grep -q 'ops-document-actions' \
               && echo "$experience_css" | grep -q 'bottom-item>small' \
               && echo "$ai_health" | grep -q '"service":"pedidos-pro-ai"' \
               && echo "$ai_health" | grep -q '"geminiConfigured":true' \
@@ -129,7 +129,7 @@ jobs:
         if: always()
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "4189828+github-actions[bot]@users.noreply.github.com"
           git add deployment/live-health.json
           git commit -m "chore(deploy): record professional catalog health [skip ci]" || exit 0
           git push
