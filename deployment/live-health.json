@@ -1,23 +1,23 @@
 {
-  "status": "healthy",
-  "application_shell": true,
-  "checked_at": "2026-07-22T23:52:09.303489+00:00",
+  "status": "failed",
+  "application_shell": false,
+  "checked_at": "2026-07-23T01:57:31.081777+00:00",
   "url": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/",
-  "release": "2026.07.22.24",
+  "release": "2026.07.22.26",
   "ai_health": {
     "ok": true,
     "service": "pedidos-pro-ai",
     "geminiConfigured": true,
     "model": "gemini-3.5-flash",
-    "resolver": "catalog-v22"
+    "resolver": "catalog-v23-free-items"
   },
   "platform_health": {
     "ok": true,
     "service": "pedidos-pro-platform",
-    "version": "2.0.0-alpha.8",
+    "version": "2.0.0-alpha.10",
     "databaseConfigured": true,
     "databaseInitialized": true,
-    "schemaVersion": "10",
+    "schemaVersion": "11",
     "catalogReady": true,
     "catalogProducts": 193,
     "catalogSuppliers": 12,
@@ -31,8 +31,11 @@
     "aiEndpoint": true,
     "geminiConfigured": true,
     "orderCore": true,
+    "warehouseUnits": true,
+    "customProcurementOrder": true,
+    "freeItemRecognition": true,
     "environment": "production",
-    "timestamp": "2026-07-22T23:52:06.659Z"
+    "timestamp": "2026-07-23T01:57:20.356Z"
   },
   "security_checks": {
     "unauthenticated_me_http": 401,
