@@ -159,9 +159,10 @@ export async function openProcurementSettings(initialCenterId=''){
   const getDraft=id=>{if(!drafts.has(id)){const center=availableCenters.find(item=>item.id===id);drafts.set(id,clone(configForCenter(center,categoryNames,settings)))}return drafts.get(id)};
 
   openModal({eyebrow:'AJUSTES · COMPRAS',title:'Bodegas, categorías y unidades',subtitle:'Se configura fuera de la operación. Cada centro conserva su propio recorrido, bodegas y unidades de compra.',size:'large',body:`<div class="proc-settings"><div class="proc-top"><label class="field"><span>Centro de costo</span><select id="procCenter">${availableCenters.map(center=>{const location=state.cache.locations.find(item=>item.id===center.locationId);return`<option value="${esc(center.id)}">${esc(location?.name||'Local')} · ${esc(center.name)}</option>`}).join('')}</select></label><label class="field"><span>Orden de recorrido</span><select id="procOrderMode"><option value="alphabetical">Alfabético</option><option value="custom">Personalizado</option></select></label></div><div id="procEditor"></div></div>`,submitLabel:'Guardar ajustes del centro',onSubmit:async()=>{
+    syncInputs();
     const center=availableCenters.find(item=>item.id===centerId);const draft=getDraft(centerId);
     if(!draft.units.length)throw new Error('Crea al menos una unidad de compra');if(!draft.warehouses.length)throw new Error('Crea al menos una bodega');
-    const current=settings.organization.procurement||{costCenters:{}};
+    const current=settingsCache?.organization?.procurement||settings.organization.procurement||{costCenters:{}};
     const procurement={costCenters:{...(current.costCenters||{}),[centerId]:draft}};
     settingsCache=await api('/api/settings',{method:'PATCH',json:{procurement}});
     toast(`Ajustes guardados para ${center.name}`);
@@ -181,6 +182,7 @@ export async function openProcurementSettings(initialCenterId=''){
     $$('[data-warehouse-index]').forEach(row=>{const warehouse=draft.warehouses[Number(row.dataset.warehouseIndex)];warehouse.name=row.querySelector('[data-warehouse-name]').value.trim()||warehouse.name;warehouse.id=slug(warehouse.name)});
   }
   function bind(){
+    $('#procEditor').oninput=syncInputs;
     $('#procAddUnit').onclick=()=>{syncInputs();const draft=getDraft(centerId);draft.units.push({id:crypto.randomUUID(),name:'UNIDAD',unitsPerFormat:1,sortOrder:draft.units.length,active:true});render()};
     $('#procAddWarehouse').onclick=()=>{syncInputs();const draft=getDraft(centerId);draft.warehouses.push({id:crypto.randomUUID(),name:`Bodega ${draft.warehouses.length+1}`,sortOrder:draft.warehouses.length,categories:[],active:true});render()};
     $$('[data-unit-index]').forEach(row=>{const index=Number(row.dataset.unitIndex);row.querySelector('[data-unit-up]').onclick=()=>{syncInputs();move(getDraft(centerId).units,index,-1);render()};row.querySelector('[data-unit-down]').onclick=()=>{syncInputs();move(getDraft(centerId).units,index,1);render()};row.querySelector('[data-remove-unit]').onclick=()=>{getDraft(centerId).units.splice(index,1);render()}});
