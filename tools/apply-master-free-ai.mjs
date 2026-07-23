@@ -72,7 +72,7 @@ function freeLineSignal(line, sourceLine, invoiceQuantity) {
   const explicit = line.isFree === true;
   const discount = numeric(line.discountPct) >= 99.5;
   const zero = invoiceQuantity > 0 && numeric(line.netLineTotal) === 0 && numeric(line.grossLineTotal) === 0;
-  const keyword = /\\b(SIN CARGO|BONIFICACION|BONIF|GRATIS|MUESTRA|PROMOCIONAL|CORTESIA)\\b/.test(text);
+  const keyword = /\b(SIN CARGO|BONIFICACION|BONIF|GRATIS|MUESTRA|PROMOCIONAL|CORTESIA)\b/.test(text);
   return explicit || discount || zero || keyword;
 }
 
@@ -139,3 +139,12 @@ replace(
 replace(`resolver: 'catalog-v22'`,`resolver: 'catalog-v23-free-items'`,'resolver version');
 fs.writeFileSync(file,source,'utf8');
 console.log('updated',file);
+
+const procurementFile='professional/web/app-procurement-settings.js';
+let procurementSource=fs.readFileSync(procurementFile,'utf8');
+const procurementFrom=`  openModal({eyebrow:'AJUSTES · COMPRAS',title:'Bodegas, categorías y unidades',subtitle:'Se configura fuera de la operación. Cada centro conserva su propio recorrido, bodegas y unidades de compra.',size:'large',body:`;
+const marker=`onSubmit:async()=>{\n    const center=availableCenters.find(item=>item.id===centerId);const draft=getDraft(centerId);`;
+if(!procurementSource.includes(procurementFrom)||!procurementSource.includes(marker))throw new Error('Missing procurement save marker');
+procurementSource=procurementSource.replace(marker,`onSubmit:async()=>{\n    syncInputs();\n    const center=availableCenters.find(item=>item.id===centerId);const draft=getDraft(centerId);`);
+fs.writeFileSync(procurementFile,procurementSource,'utf8');
+console.log('updated',procurementFile);
