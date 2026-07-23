@@ -8,6 +8,13 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./pro-ui.css">
+  <link rel="stylesheet" href="./experience.css" data-experience-css="1">
+  <link rel="stylesheet" href="./design-system-v13.css" data-design-v13="1">
+  <link rel="stylesheet" href="./design-system-v14.css" data-design-v14="1">
+  <link rel="modulepreload" href="./app-core.js">
+  <link rel="modulepreload" href="./app-router-v14.js">
+  <link rel="modulepreload" href="./app-navigation-v14.js">
+  <link rel="modulepreload" href="./app-dashboard-v14.js">
   <title>Pedidos Pro</title>
 </head>
 <body>
@@ -74,6 +81,7 @@
     </aside>
 
     <header class="topbar">
+      <button class="route-back hidden" id="routeBack" type="button" aria-label="Volver a la vista anterior">←</button>
       <button class="mobile-workspace-button" id="mobileWorkspaceButton" type="button" aria-label="Cambiar marca y abrir administración">
         <div class="brand-mark tiny">P</div>
         <span><strong>Pedidos Pro</strong><small id="mobileWorkspaceName">Madriguera</small></span>
