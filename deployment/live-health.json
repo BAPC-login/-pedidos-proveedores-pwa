@@ -1,7 +1,7 @@
 {
   "status": "healthy",
   "application_shell": true,
-  "checked_at": "2026-07-23T05:36:00.153889+00:00",
+  "checked_at": "2026-07-23T05:38:50.783401+00:00",
   "url": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/",
   "release": "2026.07.23.01",
   "ai_health": {
@@ -38,7 +38,7 @@
     "receivingQueue": true,
     "instagramLayout": true,
     "environment": "production",
-    "timestamp": "2026-07-23T05:35:57.631Z"
+    "timestamp": "2026-07-23T05:38:47.077Z"
   },
   "security_checks": {
     "unauthenticated_me_http": 401,
