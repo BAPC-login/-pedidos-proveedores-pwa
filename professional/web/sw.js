@@ -1,8 +1,8 @@
-const VERSION = 'pedidos-pro-platform-v9-warehouses-units';
+const VERSION = 'pedidos-pro-platform-v10-master-list-free-items';
 const SHELL = [
   './','./index.html','./styles.css','./pro-ui.css','./app.js','./app-core.js','./app-views.js','./app-actions.js',
   './app-modal.js','./app-order-detail.js','./app-invoices.js','./app-branding.js','./app-order-core.js','./app-stability.js','./app-company-logo.js',
-  './manifest.webmanifest','./icon.svg'
+  './app-procurement-settings.js','./app-procurement-entry.js','./manifest.webmanifest','./icon.svg'
 ];
 
 self.addEventListener('install',event=>{
