@@ -2,57 +2,22 @@ import {$,$$,state,api,toast,setBusy,setTheme,syncMutations,updateSyncChip,showA
 import {navigate} from './app-views.js';
 import {openBootstrap,openOrder,openWorkspaceSwitcher,handleAction} from './app-actions.js';
 import {initializeBrandingFeatures,refreshBranding} from './app-branding.js';
-import {initializeOrderCoreV2} from './app-order-core-v2.js';
-import {initializeStabilityPass} from './app-stability.js';
+import {initializeOrderCoreV13} from './app-order-core-v13.js';
 import {initializeCompanyLogoUploader} from './app-company-logo.js';
 import {initializeProcurementSettings} from './app-procurement-settings.js';
 import {initializeProcurementEntry} from './app-procurement-entry.js';
 import {initializeExperience} from './app-experience.js';
 import {initializeFileActions} from './app-file-actions.js';
+import {initializeSettingsPanelsV13} from './app-settings-panels-v13.js';
+import {initializeTelemetryV13} from './app-telemetry-v13.js';
 
-initializeBrandingFeatures();
-initializeProcurementSettings();
-initializeProcurementEntry();
-initializeOrderCoreV2();
-initializeStabilityPass();
-initializeCompanyLogoUploader();
-initializeFileActions();
-initializeExperience();
-
-function preloadOperations(){
-  if(!state.token)return;
-  Promise.allSettled([
-    api('/api/orders').then(payload=>state.cache.orders=payload.orders||[]),
-    api('/api/invoices').then(payload=>state.cache.invoices=payload.invoices||[]),
-    api('/api/categories').then(payload=>state.cache.categories=payload.categories||[]),
-    api('/api/cost-centers').then(payload=>state.cache.costCenters=payload.costCenters||[])
-  ]);
-}
-
-$('#loginForm').addEventListener('submit',async event=>{
-  event.preventDefault();const button=event.submitter;setBusy(button,true,'Ingresando…');
-  try{const response=await api('/api/auth/login',{method:'POST',json:{email:$('#loginEmail').value,password:$('#loginPassword').value}});state.token=response.token;localStorage.setItem('pp:token',state.token);state.me=await api('/api/me');try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}showApp();preloadOperations();await navigate('dashboard');toast('Sesión iniciada')}catch(error){toast(error.message,'error')}finally{setBusy(button,false)}
-});
-
-$('#openBootstrap').onclick=openBootstrap;
-$('#logoutButton').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST',json:{}})}catch{}logoutLocal()};
-$$('[data-view]').forEach(button=>button.addEventListener('click',()=>navigate(button.dataset.view)));
-$('#primaryAction').onclick=()=>handleAction(state.view==='invoices'?'analyze-invoice':state.view==='catalog'?'new-product':state.view==='suppliers'?'new-supplier':state.view==='team'?'new-user':'new-order');
-$('#mobileCreate').onclick=()=>openOrder();
-$('#themeButton').onclick=()=>{const current=document.documentElement.dataset.theme;setTheme(current==='system'?'light':current==='light'?'dark':'system')};
-$('#syncChip').onclick=syncMutations;
-$('#workspaceCard').addEventListener('click',openWorkspaceSwitcher);
-$('#mobileWorkspaceButton').addEventListener('click',openWorkspaceSwitcher);
-$('#mobileUserButton').addEventListener('click',openWorkspaceSwitcher);
-$('#globalSearch').addEventListener('focus',()=>openCommand());
-$('#globalSearch').addEventListener('keydown',event=>{if(event.key==='Enter')openCommand()});
+initializeBrandingFeatures();initializeProcurementSettings();initializeProcurementEntry();initializeOrderCoreV13();initializeCompanyLogoUploader();initializeFileActions();initializeSettingsPanelsV13();initializeExperience();initializeTelemetryV13();
+function preloadOperations(){if(!state.token)return;Promise.allSettled([api('/api/orders').then(payload=>state.cache.orders=payload.orders||[]),api('/api/invoices').then(payload=>state.cache.invoices=payload.invoices||[]),api('/api/categories').then(payload=>state.cache.categories=payload.categories||[]),api('/api/cost-centers').then(payload=>state.cache.costCenters=payload.costCenters||[]),api('/api/suppliers').then(payload=>state.cache.suppliers=payload.suppliers||[]),api('/api/notifications')])}
+$('#loginForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;setBusy(button,true,'Ingresando…');try{const response=await api('/api/auth/login',{method:'POST',json:{email:$('#loginEmail').value,password:$('#loginPassword').value}});state.token=response.token;localStorage.setItem('pp:token',state.token);state.me=await api('/api/me');try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}showApp();preloadOperations();await navigate('dashboard');toast('Sesión iniciada')}catch(error){toast(error.message,'error')}finally{setBusy(button,false)}});
+$('#openBootstrap').onclick=openBootstrap;$('#logoutButton').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST',json:{}})}catch{}logoutLocal()};$$('[data-view]').forEach(button=>button.addEventListener('click',()=>navigate(button.dataset.view)));$('#primaryAction').onclick=()=>handleAction(state.view==='invoices'?'analyze-invoice':state.view==='catalog'?'new-product':state.view==='suppliers'?'new-supplier':state.view==='team'?'new-user':'new-order');$('#mobileCreate').onclick=()=>openOrder();$('#themeButton').onclick=()=>{const current=document.documentElement.dataset.theme;setTheme(current==='system'?'light':current==='light'?'dark':'system')};$('#syncChip').onclick=syncMutations;$('#workspaceCard').addEventListener('click',openWorkspaceSwitcher);$('#mobileWorkspaceButton').addEventListener('click',openWorkspaceSwitcher);$('#mobileUserButton').addEventListener('click',openWorkspaceSwitcher);$('#globalSearch').addEventListener('focus',()=>openCommand());$('#globalSearch').addEventListener('keydown',event=>{if(event.key==='Enter')openCommand()});
 function openCommand(){$('#commandMenu').classList.remove('hidden');$('#commandInput').value='';renderCommands();setTimeout(()=>$('#commandInput').focus(),0)}
-function renderCommands(){const query=$('#commandInput').value.toLowerCase(),commands=[['dashboard','Ir a Resumen'],['orders','Ir a Pedidos'],['invoices','Ir a Documentos'],['catalog','Ir a Catálogo'],['suppliers','Ir a Proveedores'],['operations','Abrir Operaciones'],...(isAdmin()?[['team','Administrar usuarios'],['audit','Ver auditoría']]:[]),['settings','Abrir configuración']].filter(([,label])=>label.toLowerCase().includes(query));$('#commandResults').innerHTML=commands.map(([view,label])=>`<button class="command-result" data-command="${view}"><span>${label}</span><span>↵</span></button>`).join('');$$('[data-command]').forEach(node=>node.onclick=async()=>{$('#commandMenu').classList.add('hidden');if(node.dataset.command==='operations'){const{renderOperationsAdmin}=await import('./app-experience-admin.js');return renderOperationsAdmin()}navigate(node.dataset.command)})}
-$('#commandInput').addEventListener('input',renderCommands);
-$('#commandMenu').addEventListener('click',event=>{if(event.target===$('#commandMenu'))$('#commandMenu').classList.add('hidden')});
-document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();openCommand()}if(event.key==='Escape')$('#commandMenu').classList.add('hidden')});
-window.addEventListener('online',()=>{state.online=true;updateSyncChip();syncMutations();toast('Conexión recuperada')});
-window.addEventListener('offline',()=>{state.online=false;updateSyncChip();toast('Modo offline','error')});
+function renderCommands(){const query=$('#commandInput').value.toLowerCase(),commands=[['dashboard','Ir a Resumen'],['receiving','Abrir archivos y pedidos'],['invoices','Ir a Documentos'],['history','Abrir historial'],['operations','Abrir Operaciones'],...(isAdmin()?[['team','Administrar usuarios'],['audit','Ver auditoría']]:[]),['settings','Abrir configuración']].filter(([,label])=>label.toLowerCase().includes(query));$('#commandResults').innerHTML=commands.map(([view,label])=>`<button class="command-result" data-command="${view}"><span>${label}</span><span>↵</span></button>`).join('');$$('[data-command]').forEach(node=>node.onclick=async()=>{$('#commandMenu').classList.add('hidden');if(node.dataset.command==='operations'){const{renderOperationsAdmin}=await import('./app-experience-admin.js');return renderOperationsAdmin()}if(node.dataset.command==='receiving'){const{renderReceiving}=await import('./app-experience-operations.js');return renderReceiving()}if(node.dataset.command==='history'){const{renderHistory}=await import('./app-experience-operations.js');return renderHistory()}navigate(node.dataset.command)})}
+$('#commandInput').addEventListener('input',renderCommands);$('#commandMenu').addEventListener('click',event=>{if(event.target===$('#commandMenu'))$('#commandMenu').classList.add('hidden')});document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();openCommand()}if(event.key==='Escape')$('#commandMenu').classList.add('hidden')});window.addEventListener('online',()=>{state.online=true;updateSyncChip();syncMutations();toast('Conexión recuperada')});window.addEventListener('offline',()=>{state.online=false;updateSyncChip();toast('Modo offline','error')});
 if('serviceWorker'in navigator){navigator.serviceWorker.register('./sw.js').then(registration=>registration.update().catch(()=>{})).catch(console.warn);navigator.serviceWorker.addEventListener('controllerchange',()=>console.info('service_worker_updated'))}
 async function initialize(){await updateSyncChip();$('#openBootstrap').classList.add('hidden');if(!state.token){$('#loginEmail').value='';showAuth();return}try{state.me=await api('/api/me')}catch(error){if(error.status===401)logoutLocal();else toast('No se pudo validar la sesión. Reintentaremos al recuperar conexión.','error');return}try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}showApp();preloadOperations();try{await navigate('dashboard')}catch(error){console.warn('dashboard_load_failed',error);toast('La sesión sigue activa. Reintenta cargar el panel.','error')}syncMutations()}
 initialize();

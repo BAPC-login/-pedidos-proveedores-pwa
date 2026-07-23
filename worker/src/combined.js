@@ -1,7 +1,7 @@
 import aiWorker from './index.js';
 import platformWorker from '../../professional/worker/src/index-scoped.js';
 
-const PLATFORM_RELEASE='2026.07.23.02';
+const PLATFORM_RELEASE='2026.07.23.03';
 function rewritePath(request,pathname){const url=new URL(request.url);url.pathname=pathname;return new Request(url.toString(),request)}
 function isAiRoute(pathname){return pathname==='/health'||pathname.startsWith('/v1/')}
 function withPlatformRelease(response){const headers=new Headers(response.headers);headers.set('X-Pedidos-Pro-Release',PLATFORM_RELEASE);return new Response(response.body,{status:response.status,statusText:response.statusText,headers})}
