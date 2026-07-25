@@ -1,0 +1,100 @@
+name: Apply v15 catalog trash hotfix
+
+on:
+  push:
+    branches: [agent/v15-trash-and-browser-e2e]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v15-trash-and-browser-e2e
+          show-progress: false
+      - name: Add product and supplier trash support
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          enterprise=Path('professional/worker/src/api/enterprise-v15.js')
+          s=enterprise.read_text()
+          needle="\nexport async function deleteOrderToTrashV15(request,env,actor,orderId,url){"
+          insert=r'''
+
+          export async function deleteProductToTrashV15(request,env,actor,productId){
+            assertMinimumRole(actor.role,ROLES.PURCHASER);
+            const product=await env.DB.prepare('SELECT * FROM products WHERE id=? AND org_id=? AND active=1').bind(productId,actor.orgId).first();
+            if(!product)throw new HttpError(404,'Producto no encontrado','not_found');
+            const [relations,centers]=await Promise.all([env.DB.prepare('SELECT id,active FROM supplier_products WHERE org_id=? AND product_id=?').bind(actor.orgId,productId).all(),env.DB.prepare('SELECT cost_center_id FROM product_cost_centers WHERE org_id=? AND product_id=?').bind(actor.orgId,productId).all()]);
+            const trashId=await recordTrash(env,actor,{entityType:'product',entityId:productId,entityName:product.name,snapshot:{product,relations:rows(relations),costCenterIds:rows(centers).map(item=>item.cost_center_id)}}),timestamp=nowIso();
+            await env.DB.batch([env.DB.prepare('UPDATE products SET active=0,updated_at=? WHERE id=? AND org_id=?').bind(timestamp,productId,actor.orgId),env.DB.prepare('UPDATE supplier_products SET active=0,updated_at=? WHERE org_id=? AND product_id=?').bind(timestamp,actor.orgId,productId)]);
+            await writeAudit(env,actor,request,'product.trash','product',productId,{name:product.name,trashId});return{deleted:true,trashId,id:productId,name:product.name};
+          }
+
+          export async function deleteSupplierToTrashV15(request,env,actor,supplierId){
+            admin(actor);
+            const supplier=await env.DB.prepare('SELECT * FROM suppliers WHERE id=? AND org_id=? AND active=1').bind(supplierId,actor.orgId).first();
+            if(!supplier)throw new HttpError(404,'Proveedor no encontrado','not_found');
+            const relations=await env.DB.prepare('SELECT id,active FROM supplier_products WHERE org_id=? AND supplier_id=?').bind(actor.orgId,supplierId).all(),trashId=await recordTrash(env,actor,{entityType:'supplier',entityId:supplierId,entityName:supplier.name,snapshot:{supplier,relations:rows(relations)}}),timestamp=nowIso();
+            await env.DB.batch([env.DB.prepare('UPDATE suppliers SET active=0,updated_at=? WHERE id=? AND org_id=?').bind(timestamp,supplierId,actor.orgId),env.DB.prepare('UPDATE supplier_products SET active=0,updated_at=? WHERE org_id=? AND supplier_id=?').bind(timestamp,actor.orgId,supplierId)]);
+            await writeAudit(env,actor,request,'supplier.trash','supplier',supplierId,{name:supplier.name,trashId});return{deleted:true,trashId,id:supplierId,name:supplier.name};
+          }
+          '''
+          if 'deleteProductToTrashV15' not in s:
+              if needle not in s: raise SystemExit('enterprise delete insertion point not found')
+              s=s.replace(needle,insert+needle,1)
+          old="""  }else if(item.entity_type==='order'){
+              const o=snapshot.order;"""
+          new="""  }else if(item.entity_type==='product'){
+              const product=snapshot.product;if(!product)throw new HttpError(409,'La copia del producto está incompleta','invalid_snapshot');
+              await env.DB.prepare('UPDATE products SET active=1,updated_at=? WHERE id=? AND org_id=?').bind(timestamp,item.entity_id,actor.orgId).run();
+              const activeRelations=new Set((snapshot.relations||[]).filter(relation=>Number(relation.active)!==0).map(relation=>String(relation.id)));if(activeRelations.size)await runBatches(env.DB,[...activeRelations].map(id=>env.DB.prepare('UPDATE supplier_products SET active=1,updated_at=? WHERE id=? AND org_id=?').bind(timestamp,id,actor.orgId)));
+            }else if(item.entity_type==='supplier'){
+              const supplier=snapshot.supplier;if(!supplier)throw new HttpError(409,'La copia del proveedor está incompleta','invalid_snapshot');
+              await env.DB.prepare('UPDATE suppliers SET active=1,updated_at=? WHERE id=? AND org_id=?').bind(timestamp,item.entity_id,actor.orgId).run();
+              const activeRelations=new Set((snapshot.relations||[]).filter(relation=>Number(relation.active)!==0).map(relation=>String(relation.id)));if(activeRelations.size)await runBatches(env.DB,[...activeRelations].map(id=>env.DB.prepare('UPDATE supplier_products SET active=1,updated_at=? WHERE id=? AND org_id=?').bind(timestamp,id,actor.orgId)));
+            }else if(item.entity_type==='order'){
+              const o=snapshot.order;"""
+          if "item.entity_type==='product'" not in s:
+              if old not in s: raise SystemExit('enterprise restore insertion point not found')
+              s=s.replace(old,new,1)
+          enterprise.write_text(s)
+
+          scoped=Path('professional/worker/src/index-scoped.js')
+          s=scoped.read_text()
+          s=s.replace("import {deleteCategoryToTrashV15} from './api/enterprise-v15.js';","import {deleteCategoryToTrashV15,deleteProductToTrashV15,deleteSupplierToTrashV15} from './api/enterprise-v15.js';")
+          s=s.replace("const categoryParams=routeMatch(path,'/api/categories/:id');","const categoryParams=routeMatch(path,'/api/categories/:id'),productParams=routeMatch(path,'/api/products/:id'),supplierParams=routeMatch(path,'/api/suppliers/:id');")
+          s=s.replace("const scopedHealth=method==='GET'&&path==='/health',scopedDashboard=method==='GET'&&path==='/api/dashboard',scopedProducts=method==='GET'&&path==='/api/products';","const scopedHealth=method==='GET'&&path==='/health',scopedDashboard=method==='GET'&&path==='/api/dashboard',scopedProducts=(method==='GET'&&path==='/api/products')||(method==='DELETE'&&Boolean(productParams)),scopedSuppliers=method==='DELETE'&&Boolean(supplierParams);")
+          s=s.replace("if(!scopedHealth&&!scopedDashboard&&!scopedProducts&&!scopedCategories)return platformWorker.fetch(request,env,ctx);","if(!scopedHealth&&!scopedDashboard&&!scopedProducts&&!scopedSuppliers&&!scopedCategories)return platformWorker.fetch(request,env,ctx);")
+          s=s.replace("else if(scopedProducts)payload={products:await listProducts(env,actor,url)};","else if(method==='GET'&&path==='/api/products')payload={products:await listProducts(env,actor,url)};\n    else if(productParams&&method==='DELETE')payload=await deleteProductToTrashV15(request,env,actor,productParams.id);\n    else if(supplierParams&&method==='DELETE')payload=await deleteSupplierToTrashV15(request,env,actor,supplierParams.id);")
+          scoped.write_text(s)
+
+          admin=Path('professional/web/app-experience-admin.js')
+          s=admin.read_text()
+          old='''<button class="btn small" type="button" data-assign-cost-centers="${esc(product.id)}">Centros</button></article>'''
+          new='''<div class="enterprise-actions"><button class="btn small" type="button" data-assign-cost-centers="${esc(product.id)}">Centros</button><button class="btn small danger" type="button" data-product-delete="${esc(product.id)}">Papelera</button></div></article>'''
+          s=s.replace(old,new)
+          old='''<button class="btn" type="button" data-supplier-logo="${esc(supplier.id)}">${asset.logoKey?'Cambiar logo':'Cargar logo'}</button></article>'''
+          new='''<div class="enterprise-actions"><button class="btn" type="button" data-supplier-logo="${esc(supplier.id)}">${asset.logoKey?'Cambiar logo':'Cargar logo'}</button><button class="btn danger" type="button" data-supplier-delete="${esc(supplier.id)}">Papelera</button></div></article>'''
+          s=s.replace(old,new)
+          s=s.replace("suppliers:suppliersPayload.suppliers||[],products:productsPayload.products||[]","suppliers:(suppliersPayload.suppliers||[]).filter(item=>item.active!==false),products:(productsPayload.products||[]).filter(item=>item.active!==false)")
+          marker="""$$('[data-center-config]').forEach(button=>button.onclick=()=>openProcurementSettings(button.dataset.centerConfig).catch(error=>toast(error.message,'error')));"""
+          handlers="""$$('[data-product-delete]').forEach(button=>button.onclick=async()=>{const product=data.products.find(item=>item.id===button.dataset.productDelete);if(!confirm(`¿Enviar “${product?.name}” a la papelera?`))return;try{await api(`/api/products/${button.dataset.productDelete}`,{method:'DELETE'});toast('Producto enviado a la papelera');await renderOperationsAdmin('products')}catch(error){toast(error.message,'error')}});$$('[data-supplier-delete]').forEach(button=>button.onclick=async()=>{const supplier=data.suppliers.find(item=>item.id===button.dataset.supplierDelete);if(!confirm(`¿Enviar “${supplier?.name}” a la papelera? Sus formatos quedarán inactivos hasta restaurarlo.`))return;try{await api(`/api/suppliers/${button.dataset.supplierDelete}`,{method:'DELETE'});toast('Proveedor enviado a la papelera');await renderOperationsAdmin('suppliers')}catch(error){toast(error.message,'error')}});"""
+          if 'data-product-delete' in s and handlers not in s:
+              if marker not in s: raise SystemExit('admin handler insertion point not found')
+              s=s.replace(marker,handlers+marker,1)
+          admin.write_text(s)
+          PY
+          node --check professional/worker/src/api/enterprise-v15.js
+          node --check professional/worker/src/index-scoped.js
+          node --check professional/web/app-experience-admin.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add professional/worker/src/api/enterprise-v15.js professional/worker/src/index-scoped.js professional/web/app-experience-admin.js
+          git commit -m "feat: complete trash recovery for products and suppliers" || exit 0
+          git push origin HEAD:agent/v15-trash-and-browser-e2e
