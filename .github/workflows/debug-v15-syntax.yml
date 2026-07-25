@@ -1,0 +1,30 @@
+name: Debug v15 syntax
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          show-progress: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Capture syntax and tests
+        shell: bash
+        run: |
+          cd professional
+          set +e
+          npm run verify > ../v15-debug.log 2>&1
+          code=$?
+          echo "exit_code=$code" >> ../v15-debug.log
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v15-debug-log
+          path: v15-debug.log
+          retention-days: 1
