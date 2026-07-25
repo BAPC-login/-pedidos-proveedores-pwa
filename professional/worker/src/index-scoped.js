@@ -4,7 +4,7 @@ import {corsHeaders,errorResponse,ok,routeMatch,securityHeaders} from './core.js
 import {ensureSchema} from './schema.js';
 import {dashboard,listProducts} from './api/catalog-scoped.js';
 import {createCategoryV14,listUserCategoriesV14,updateCategoryV14} from './api/catalog-v14.js';
-import {deleteCategoryToTrashV15} from './api/enterprise-v15.js';
+import {deleteCategoryToTrashV15,deleteProductToTrashV15,deleteSupplierToTrashV15} from './api/enterprise-v15.js';
 
 const EXPECTED_UNIQUE_PRODUCTS=193,EXPECTED_SUPPLIERS=12,EXPECTED_PURCHASE_FORMATS=194;
 function addPlatformHeaders(response,request,env){const headers=new Headers(response.headers),origin=request.headers.get('Origin')||'';for(const[name,value]of Object.entries(corsHeaders(origin,env)))headers.set(name,value);for(const[name,value]of Object.entries(securityHeaders()))headers.set(name,value);return new Response(response.body,{status:response.status,statusText:response.statusText,headers})}
@@ -15,17 +15,19 @@ async function health(env,schema){
 }
 export default{async fetch(request,env,ctx){
   const url=new URL(request.url),method=request.method.toUpperCase(),path=url.pathname;
-  const categoryParams=routeMatch(path,'/api/categories/:id');
-  const scopedHealth=method==='GET'&&path==='/health',scopedDashboard=method==='GET'&&path==='/api/dashboard',scopedProducts=method==='GET'&&path==='/api/products';
+  const categoryParams=routeMatch(path,'/api/categories/:id'),productParams=routeMatch(path,'/api/products/:id'),supplierParams=routeMatch(path,'/api/suppliers/:id');
+  const scopedHealth=method==='GET'&&path==='/health',scopedDashboard=method==='GET'&&path==='/api/dashboard',scopedProducts=(method==='GET'&&path==='/api/products')||(method==='DELETE'&&Boolean(productParams)),scopedSuppliers=method==='DELETE'&&Boolean(supplierParams);
   const scopedCategories=(path==='/api/categories'&&['GET','POST'].includes(method))||(categoryParams&&['PATCH','DELETE'].includes(method));
-  if(!scopedHealth&&!scopedDashboard&&!scopedProducts&&!scopedCategories)return platformWorker.fetch(request,env,ctx);
+  if(!scopedHealth&&!scopedDashboard&&!scopedProducts&&!scopedSuppliers&&!scopedCategories)return platformWorker.fetch(request,env,ctx);
   try{
     const schema=await ensureSchema(env);
     if(scopedHealth)return addPlatformHeaders(ok(await health(env,schema),request,env),request,env);
     const actor=await authenticate(request,env);
     let payload;
     if(scopedDashboard)payload=await dashboard(env,actor);
-    else if(scopedProducts)payload={products:await listProducts(env,actor,url)};
+    else if(method==='GET'&&path==='/api/products')payload={products:await listProducts(env,actor,url)};
+    else if(productParams&&method==='DELETE')payload=await deleteProductToTrashV15(request,env,actor,productParams.id);
+    else if(supplierParams&&method==='DELETE')payload=await deleteSupplierToTrashV15(request,env,actor,supplierParams.id);
     else if(path==='/api/categories'&&method==='GET')payload={categories:await listUserCategoriesV14(env,actor)};
     else if(path==='/api/categories'&&method==='POST')payload={category:await createCategoryV14(request,env,actor)};
     else if(categoryParams&&method==='PATCH')payload={category:await updateCategoryV14(request,env,actor,categoryParams.id)};

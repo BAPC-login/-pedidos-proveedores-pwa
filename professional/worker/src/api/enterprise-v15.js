@@ -21,6 +21,26 @@ export async function deleteCategoryToTrashV15(request,env,actor,categoryId){
   await writeAudit(env,actor,request,'category.trash','category',categoryId,{name:category.name,trashId});return{deleted:true,trashId,id:categoryId,name:category.name};
 }
 
+
+export async function deleteProductToTrashV15(request,env,actor,productId){
+  assertMinimumRole(actor.role,ROLES.PURCHASER);
+  const product=await env.DB.prepare('SELECT * FROM products WHERE id=? AND org_id=? AND active=1').bind(productId,actor.orgId).first();
+  if(!product)throw new HttpError(404,'Producto no encontrado','not_found');
+  const [relations,centers]=await Promise.all([env.DB.prepare('SELECT id,active FROM supplier_products WHERE org_id=? AND product_id=?').bind(actor.orgId,productId).all(),env.DB.prepare('SELECT cost_center_id FROM product_cost_centers WHERE org_id=? AND product_id=?').bind(actor.orgId,productId).all()]);
+  const trashId=await recordTrash(env,actor,{entityType:'product',entityId:productId,entityName:product.name,snapshot:{product,relations:rows(relations),costCenterIds:rows(centers).map(item=>item.cost_center_id)}}),timestamp=nowIso();
+  await env.DB.batch([env.DB.prepare('UPDATE products SET active=0,updated_at=? WHERE id=? AND org_id=?').bind(timestamp,productId,actor.orgId),env.DB.prepare('UPDATE supplier_products SET active=0,updated_at=? WHERE org_id=? AND product_id=?').bind(timestamp,actor.orgId,productId)]);
+  await writeAudit(env,actor,request,'product.trash','product',productId,{name:product.name,trashId});return{deleted:true,trashId,id:productId,name:product.name};
+}
+
+export async function deleteSupplierToTrashV15(request,env,actor,supplierId){
+  admin(actor);
+  const supplier=await env.DB.prepare('SELECT * FROM suppliers WHERE id=? AND org_id=? AND active=1').bind(supplierId,actor.orgId).first();
+  if(!supplier)throw new HttpError(404,'Proveedor no encontrado','not_found');
+  const relations=await env.DB.prepare('SELECT id,active FROM supplier_products WHERE org_id=? AND supplier_id=?').bind(actor.orgId,supplierId).all(),trashId=await recordTrash(env,actor,{entityType:'supplier',entityId:supplierId,entityName:supplier.name,snapshot:{supplier,relations:rows(relations)}}),timestamp=nowIso();
+  await env.DB.batch([env.DB.prepare('UPDATE suppliers SET active=0,updated_at=? WHERE id=? AND org_id=?').bind(timestamp,supplierId,actor.orgId),env.DB.prepare('UPDATE supplier_products SET active=0,updated_at=? WHERE org_id=? AND supplier_id=?').bind(timestamp,actor.orgId,supplierId)]);
+  await writeAudit(env,actor,request,'supplier.trash','supplier',supplierId,{name:supplier.name,trashId});return{deleted:true,trashId,id:supplierId,name:supplier.name};
+}
+
 export async function deleteOrderToTrashV15(request,env,actor,orderId,url){
   assertMinimumRole(actor.role,ROLES.PURCHASER);
   const order=await env.DB.prepare('SELECT * FROM orders WHERE id=? AND org_id=?').bind(orderId,actor.orgId).first();
@@ -41,6 +61,14 @@ export async function restoreTrashV15(request,env,actor,trashId){
     const c=snapshot.category;if(!c)throw new HttpError(409,'La copia de la categoría está incompleta','invalid_snapshot');
     await env.DB.prepare(`INSERT INTO categories(id,org_id,name,sort_order,active,created_at,updated_at,source,cost_center_id) VALUES(?,?,?,?,1,?,?, 'user',?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,active=1,updated_at=excluded.updated_at,source='user',cost_center_id=excluded.cost_center_id`).bind(c.id,actor.orgId,c.name,Number(c.sort_order||0),c.created_at||timestamp,timestamp,c.cost_center_id||null).run();
     const ids=(snapshot.productIds||[]).map(String).filter(Boolean);if(ids.length)await runBatches(env.DB,ids.map(id=>env.DB.prepare('UPDATE products SET category_id=?,updated_at=? WHERE id=? AND org_id=?').bind(c.id,timestamp,id,actor.orgId)));
+  }else if(item.entity_type==='product'){
+    const product=snapshot.product;if(!product)throw new HttpError(409,'La copia del producto está incompleta','invalid_snapshot');
+    await env.DB.prepare('UPDATE products SET active=1,updated_at=? WHERE id=? AND org_id=?').bind(timestamp,item.entity_id,actor.orgId).run();
+    const activeRelations=new Set((snapshot.relations||[]).filter(relation=>Number(relation.active)!==0).map(relation=>String(relation.id)));if(activeRelations.size)await runBatches(env.DB,[...activeRelations].map(id=>env.DB.prepare('UPDATE supplier_products SET active=1,updated_at=? WHERE id=? AND org_id=?').bind(timestamp,id,actor.orgId)));
+  }else if(item.entity_type==='supplier'){
+    const supplier=snapshot.supplier;if(!supplier)throw new HttpError(409,'La copia del proveedor está incompleta','invalid_snapshot');
+    await env.DB.prepare('UPDATE suppliers SET active=1,updated_at=? WHERE id=? AND org_id=?').bind(timestamp,item.entity_id,actor.orgId).run();
+    const activeRelations=new Set((snapshot.relations||[]).filter(relation=>Number(relation.active)!==0).map(relation=>String(relation.id)));if(activeRelations.size)await runBatches(env.DB,[...activeRelations].map(id=>env.DB.prepare('UPDATE supplier_products SET active=1,updated_at=? WHERE id=? AND org_id=?').bind(timestamp,id,actor.orgId)));
   }else if(item.entity_type==='order'){
     const o=snapshot.order;if(!o)throw new HttpError(409,'La copia del pedido está incompleta','invalid_snapshot');
     const duplicate=await env.DB.prepare('SELECT id FROM orders WHERE org_id=? AND folio=?').bind(actor.orgId,o.folio).first();if(duplicate)throw new HttpError(409,'El folio ya está en uso. Elimina o cambia el pedido actual antes de restaurar.','folio_in_use');
