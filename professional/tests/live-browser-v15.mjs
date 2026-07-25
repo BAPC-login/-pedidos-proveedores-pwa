@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
-import {chromium,webkit,devices} from 'playwright';
+import {chromium,webkit} from 'playwright';
 
 const baseUrl=process.env.E2E_BASE_URL||'https://pedidos-pro-ai.botreservasmultilocal.workers.dev/';
 const email=process.env.E2E_EMAIL||'';
 const password=process.env.E2E_PASSWORD||'';
 const profiles=[
   {name:'Chromium desktop',engine:chromium,context:{viewport:{width:1440,height:900}}},
-  {name:'WebKit iPhone',engine:webkit,context:{...devices['iPhone 15 Pro']}},
-  {name:'WebKit iPad',engine:webkit,context:{...devices['iPad Pro 11 landscape']}}
+  {name:'WebKit iPhone',engine:webkit,context:{viewport:{width:390,height:844},isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1'}},
+  {name:'WebKit iPad',engine:webkit,context:{viewport:{width:1180,height:820},isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (iPad; CPU OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1'}}
 ];
 
 for(const profile of profiles){
@@ -20,8 +20,7 @@ for(const profile of profiles){
   assert.ok(response?.ok(),`${profile.name}: shell HTTP ${response?.status()}`);
   assert.equal(await page.title(),'Pedidos Pro',`${profile.name}: title`);
   await page.locator('#startupScreen,#authScreen,#appShell').first().waitFor({state:'attached',timeout:20000});
-  const hasLogin=await page.locator('#loginForm').count();
-  assert.equal(hasLogin,1,`${profile.name}: login form exists`);
+  assert.equal(await page.locator('#loginForm').count(),1,`${profile.name}: login form exists`);
   if(email&&password){
     await page.fill('#loginEmail',email);
     await page.fill('#loginPassword',password);
