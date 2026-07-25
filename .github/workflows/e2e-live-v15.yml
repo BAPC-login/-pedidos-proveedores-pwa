@@ -1,0 +1,51 @@
+name: Live browser E2E v15
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'professional/web/**'
+      - 'professional/worker/**'
+      - 'professional/tests/live-browser-v15.mjs'
+      - 'worker/**'
+      - '.github/workflows/e2e-live-v15.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-browser-e2e-v15
+  cancel-in-progress: true
+
+jobs:
+  browsers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Wait for production v15
+        shell: bash
+        run: |
+          for attempt in $(seq 1 60); do
+            health=$(curl --silent --show-error --max-time 20 https://pedidos-pro-ai.botreservasmultilocal.workers.dev/platform/health || true)
+            if echo "$health" | grep -q '"version":"2.0.0-alpha.15"' && echo "$health" | grep -q '"schemaVersion":"15"'; then
+              exit 0
+            fi
+            echo "Waiting for production ${attempt}/60"
+            sleep 10
+          done
+          exit 1
+      - name: Install Playwright browsers
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+      - name: Run Chromium and WebKit flows
+        env:
+          E2E_BASE_URL: https://pedidos-pro-ai.botreservasmultilocal.workers.dev/
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: node professional/tests/live-browser-v15.mjs
