@@ -8,7 +8,7 @@ const [app,navigation,master,detail,enterprise,index,scoped]=files;
 
 const contracts=[
   ['login→dashboard',app.includes("openRoute('dashboard'"),navigation.includes("registerRouteRenderer('dashboard'")],
-  ['dashboard→master order',app.includes('initializeOrderCoreV15'),master.includes("data-action==='new-order'")],
+  ['dashboard→master order',app.includes('initializeOrderCoreV15'),master.includes("target.dataset.action==='new-order'")],
   ['master order autosave',master.includes("api('/api/autosave'"),index.includes("path==='/api/autosave'")],
   ['delivery exceptions',master.includes('PASO 1 DE 2'),master.includes('PASO 2 DE 2')],
   ['save order batch',master.includes("api('/api/order-batches/v2'"),index.includes("path==='/api/order-batches/v2'")],
