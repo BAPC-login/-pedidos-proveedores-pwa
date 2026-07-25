@@ -25,6 +25,8 @@ jobs:
           exit 0
       - uses: actions/upload-artifact@v4
         with:
-          name: v15-debug-log
-          path: v15-debug.log
+          name: v15-debug-bundle
+          path: |
+            v15-debug.log
+            professional/worker/src/api/enterprise-v15.js
           retention-days: 1
