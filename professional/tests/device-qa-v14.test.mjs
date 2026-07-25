@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 
 const [design,orderCore,keyboard,router,dashboard,fileActions]=await Promise.all([
   readFile(new URL('../web/design-system-v14.css',import.meta.url),'utf8'),
-  readFile(new URL('../web/app-order-core-v13.js',import.meta.url),'utf8'),
+  readFile(new URL('../web/app-order-core-v15.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-experience-keyboard.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-router-v14.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-dashboard-v14.js',import.meta.url),'utf8'),
@@ -25,10 +25,12 @@ assert.match(design,/route-back/);
 assert.match(orderCore,/inputmode="decimal"/);
 assert.match(orderCore,/enterkeyhint="next"/);
 assert.doesNotMatch(orderCore,/quantity-enter-button/);
-assert.match(keyboard,/Enter \/ siguiente/);
-assert.doesNotMatch(keyboard,/input\.type='text'/);
+assert.match(keyboard,/inputMode='decimal'/);
+assert.match(keyboard,/enterKeyHint='next'/);
+assert.match(keyboard,/focusNext/);
+assert.doesNotMatch(keyboard,/quantity-keyboard-toolbar/);
 assert.match(router,/scrollY/);
 assert.match(dashboard,/preserveAspectRatio="none"/);
 assert.match(fileActions,/document-preview-loading/);
 
-console.log(`device QA v14: ${matrix.map(device=>device.name).join(', ')} OK`);
+console.log(`device QA v15: ${matrix.map(device=>device.name).join(', ')} OK`);

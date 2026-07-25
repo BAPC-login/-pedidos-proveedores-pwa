@@ -3,14 +3,15 @@ import {authenticate} from './auth.js';
 import {corsHeaders,errorResponse,ok,routeMatch,securityHeaders} from './core.js';
 import {ensureSchema} from './schema.js';
 import {dashboard,listProducts} from './api/catalog-scoped.js';
-import {createCategoryV14,deleteCategoryV14,listUserCategoriesV14,updateCategoryV14} from './api/catalog-v14.js';
+import {createCategoryV14,listUserCategoriesV14,updateCategoryV14} from './api/catalog-v14.js';
+import {deleteCategoryToTrashV15} from './api/enterprise-v15.js';
 
 const EXPECTED_UNIQUE_PRODUCTS=193,EXPECTED_SUPPLIERS=12,EXPECTED_PURCHASE_FORMATS=194;
 function addPlatformHeaders(response,request,env){const headers=new Headers(response.headers),origin=request.headers.get('Origin')||'';for(const[name,value]of Object.entries(corsHeaders(origin,env)))headers.set(name,value);for(const[name,value]of Object.entries(securityHeaders()))headers.set(name,value);return new Response(response.body,{status:response.status,statusText:response.statusText,headers})}
 async function health(env,schema){
   const[products,suppliers,purchaseFormats,owners,locations]=await Promise.all([env.DB.prepare('SELECT COUNT(*) AS total FROM products WHERE active=1').first(),env.DB.prepare('SELECT COUNT(*) AS total FROM suppliers WHERE active=1').first(),env.DB.prepare('SELECT COUNT(*) AS total FROM supplier_products WHERE active=1').first(),env.DB.prepare('SELECT COUNT(*) AS total FROM platform_owners').first(),env.DB.prepare('SELECT COUNT(*) AS total FROM locations WHERE active=1').first()]);
   const catalogProducts=Number(products?.total||0),catalogSuppliers=Number(suppliers?.total||0),catalogPurchaseFormats=Number(purchaseFormats?.total||0);
-  return{service:'pedidos-pro-platform',version:'2.0.0-alpha.14',databaseConfigured:Boolean(env.DB),databaseInitialized:true,schemaVersion:schema.version,catalogReady:catalogProducts>=EXPECTED_UNIQUE_PRODUCTS&&catalogSuppliers>=EXPECTED_SUPPLIERS&&catalogPurchaseFormats>=EXPECTED_PURCHASE_FORMATS,catalogProducts,catalogSuppliers,catalogPurchaseFormats,catalogSourceRows:EXPECTED_PURCHASE_FORMATS,platformOwnerReady:Number(owners?.total||0)>0,activeLocations:Number(locations?.total||0),storageConfigured:Boolean(env.FILES||env.DB),storageBackend:env.FILES?'r2':'d1-chunks',r2Configured:Boolean(env.FILES),aiEndpoint:Boolean(env.AI_ENDPOINT),geminiConfigured:Boolean(env.GEMINI_API_KEY),orderCore:true,simpleWorkflow:true,editableOrderFiles:true,batchEmission:true,categoryOwnership:true,categoryCostCenters:true,supplierLogos:true,perSupplierDeliveryDates:true,deliveryDateExceptions:true,directPdfActions:true,cleanSupplierPdf:true,professionalReconciliation:true,notifications:true,observability:true,workspaceBackups:true,commercialReadiness:true,deviceQa:true,fastNavigation:true,restoredScroll:true,professionalDashboard:true,environment:env.ENVIRONMENT||'development',timestamp:new Date().toISOString()};
+  return{service:'pedidos-pro-platform',version:'2.0.0-alpha.15',databaseConfigured:Boolean(env.DB),databaseInitialized:true,schemaVersion:schema.version,catalogReady:catalogProducts>=EXPECTED_UNIQUE_PRODUCTS&&catalogSuppliers>=EXPECTED_SUPPLIERS&&catalogPurchaseFormats>=EXPECTED_PURCHASE_FORMATS,catalogProducts,catalogSuppliers,catalogPurchaseFormats,catalogSourceRows:EXPECTED_PURCHASE_FORMATS,platformOwnerReady:Number(owners?.total||0)>0,activeLocations:Number(locations?.total||0),storageConfigured:Boolean(env.FILES||env.DB),storageBackend:env.FILES?'r2':'d1-chunks',r2Configured:Boolean(env.FILES),aiEndpoint:Boolean(env.AI_ENDPOINT),geminiConfigured:Boolean(env.GEMINI_API_KEY),persistentCatalog:true,persistentBranding:true,trashRestore:true,autosave:true,orderDuplication:true,costCenterBudgets:true,advancedReception:true,threeWayReconciliation:true,aliasLearning:true,priceAlerts:true,productPriceHistory:true,humanInvoiceReview:true,multichannelNotifications:true,realBilling:Boolean(env.MERCADOPAGO_ACCESS_TOKEN),backupRestore:true,r2Migration:true,commercialMonitoring:true,e2eReady:true,customDashboard:true,executiveExports:true,environment:env.ENVIRONMENT||'development',timestamp:new Date().toISOString()};
 }
 export default{async fetch(request,env,ctx){
   const url=new URL(request.url),method=request.method.toUpperCase(),path=url.pathname;
@@ -28,7 +29,7 @@ export default{async fetch(request,env,ctx){
     else if(path==='/api/categories'&&method==='GET')payload={categories:await listUserCategoriesV14(env,actor)};
     else if(path==='/api/categories'&&method==='POST')payload={category:await createCategoryV14(request,env,actor)};
     else if(categoryParams&&method==='PATCH')payload={category:await updateCategoryV14(request,env,actor,categoryParams.id)};
-    else payload=await deleteCategoryV14(request,env,actor,categoryParams.id);
+    else payload=await deleteCategoryToTrashV15(request,env,actor,categoryParams.id);
     return addPlatformHeaders(ok(payload,request,env),request,env);
   }catch(error){if(Number(error?.status||500)>=500)console.error('scoped_request_failed',error);return addPlatformHeaders(errorResponse(error,request,env),request,env)}
 }};
