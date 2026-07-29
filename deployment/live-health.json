@@ -1,7 +1,7 @@
 {
   "status": "healthy",
   "application_shell": true,
-  "checked_at": "2026-07-25T01:39:51.236433+00:00",
+  "checked_at": "2026-07-29T06:39:23.095263+00:00",
   "url": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/",
   "release": "2026.07.24.02",
   "ai_health": {
@@ -19,9 +19,9 @@
     "databaseInitialized": true,
     "schemaVersion": "15",
     "catalogReady": true,
-    "catalogProducts": 193,
-    "catalogSuppliers": 12,
-    "catalogPurchaseFormats": 194,
+    "catalogProducts": 195,
+    "catalogSuppliers": 13,
+    "catalogPurchaseFormats": 196,
     "catalogSourceRows": 194,
     "platformOwnerReady": true,
     "activeLocations": 1,
@@ -51,7 +51,7 @@
     "customDashboard": true,
     "executiveExports": true,
     "environment": "production",
-    "timestamp": "2026-07-25T01:39:48.135Z"
+    "timestamp": "2026-07-29T06:39:20.267Z"
   },
   "security_checks": {
     "unauthenticated_me_http": 401,
