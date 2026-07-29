@@ -1,7 +1,7 @@
 {
-  "status": "healthy",
-  "application_shell": true,
-  "checked_at": "2026-07-29T06:39:23.095263+00:00",
+  "status": "failed",
+  "application_shell": false,
+  "checked_at": "2026-07-29T07:10:18.597151+00:00",
   "url": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/",
   "release": "2026.07.24.02",
   "ai_health": {
@@ -14,10 +14,10 @@
   "platform_health": {
     "ok": true,
     "service": "pedidos-pro-platform",
-    "version": "2.0.0-alpha.15",
+    "version": "2.0.0-alpha.17",
     "databaseConfigured": true,
     "databaseInitialized": true,
-    "schemaVersion": "15",
+    "schemaVersion": "17",
     "catalogReady": true,
     "catalogProducts": 195,
     "catalogSuppliers": 13,
@@ -50,8 +50,20 @@
     "e2eReady": true,
     "customDashboard": true,
     "executiveExports": true,
+    "excelWorkbookImport": true,
+    "excelImportPreview": true,
+    "catalogRestorePoints": true,
+    "batchNativeShare": true,
+    "supplierLogoPdf": true,
+    "commercialReadinessCenter": true,
+    "tenantIsolationAudit": true,
+    "invoiceBenchmark": true,
+    "automaticOnboarding": true,
+    "legalAcceptance": true,
+    "supportTickets": true,
+    "recoveryVerification": true,
     "environment": "production",
-    "timestamp": "2026-07-29T06:39:20.267Z"
+    "timestamp": "2026-07-29T07:10:07.863Z"
   },
   "security_checks": {
     "unauthenticated_me_http": 401,
