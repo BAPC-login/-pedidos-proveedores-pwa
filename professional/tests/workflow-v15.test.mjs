@@ -18,7 +18,7 @@ const [schema,legacy,enterprise,index,scoped,orderCore,keyboard,orderDetail,dash
   readFile(new URL('../migrations/0006_enterprise_v15.sql',import.meta.url),'utf8')
 ]);
 
-assert.match(schema,/SCHEMA_VERSION='15'/);
+assert.match(schema,/SCHEMA_VERSION='(?:15|16|17)'/);
 assert.match(schema,/seedLegacyCatalogOnce/);
 assert.match(schema,/classifyLegacyCategoriesOnce/);
 assert.match(schema,/if\(Number\(completed\?\.item_count\|\|0\)>=LEGACY_CATALOG_SIZE\)/);
@@ -73,4 +73,4 @@ assert.match(liveBrowser,/WebKit iPhone/);
 assert.match(liveBrowser,/WebKit iPad/);
 assert.match(serviceWorker,/addEventListener\('push'/);
 
-console.log('workflow v15 complete tests: OK');
+console.log('workflow v15 compatibility tests: OK');

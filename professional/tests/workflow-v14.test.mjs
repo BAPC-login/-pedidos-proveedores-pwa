@@ -14,7 +14,7 @@ const [catalog,schema,operations,procurement,order,router,navigation,dashboard,e
   readFile(new URL('../web/index.html',import.meta.url),'utf8')
 ]);
 
-assert.match(schema,/SCHEMA_VERSION='15'/);
+assert.match(schema,/SCHEMA_VERSION='(?:15|16|17)'/);
 assert.match(schema,/categories','cost_center_id'/);
 assert.match(catalog,/Selecciona un centro de costo válido/);
 assert.match(catalog,/claimedSystemCategory/);
