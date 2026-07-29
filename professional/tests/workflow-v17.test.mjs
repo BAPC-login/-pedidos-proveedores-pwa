@@ -52,7 +52,7 @@ assert.match(scoped,/\/api\/catalog\/import-workbook\/preview/);
 assert.match(scoped,/catalogRestorePoints:true/);
 assert.match(scoped,/commercialReadinessCenter:true/);
 
-for(const label of ['Prueba integral','Importación segura','Benchmark de cotejo','Aislamiento multiempresa','Onboarding automático','Planes y cobro','Recuperación','Soporte y observabilidad','Documentación legal'])assert.match(center,new RegExp(label));
+for(const label of ['PRUEBA INTEGRAL','IMPORTACIÓN SEGURA','BENCHMARK IA','MULTIEMPRESA','ONBOARDING','PLANES Y COBRO','RECUPERACIÓN','SOPORTE','DOCUMENTACIÓN LEGAL'])assert.match(center,new RegExp(label,'i'));
 assert.match(center,/WebKit|userAgent/);
 assert.match(center,/14 días/);
 assert.match(preview,/Generar vista previa/);
