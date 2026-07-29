@@ -5,26 +5,28 @@ import {ensureSchema} from './schema.js';
 import {dashboard,listProducts} from './api/catalog-scoped.js';
 import {createCategoryV14,listUserCategoriesV14,updateCategoryV14} from './api/catalog-v14.js';
 import {deleteCategoryToTrashV15,deleteProductToTrashV15,deleteSupplierToTrashV15} from './api/enterprise-v15.js';
+import {importCatalogWorkbookV16} from './api/catalog-workbook-v16.js';
 
 const EXPECTED_UNIQUE_PRODUCTS=193,EXPECTED_SUPPLIERS=12,EXPECTED_PURCHASE_FORMATS=194;
 function addPlatformHeaders(response,request,env){const headers=new Headers(response.headers),origin=request.headers.get('Origin')||'';for(const[name,value]of Object.entries(corsHeaders(origin,env)))headers.set(name,value);for(const[name,value]of Object.entries(securityHeaders()))headers.set(name,value);return new Response(response.body,{status:response.status,statusText:response.statusText,headers})}
 async function health(env,schema){
   const[products,suppliers,purchaseFormats,owners,locations]=await Promise.all([env.DB.prepare('SELECT COUNT(*) AS total FROM products WHERE active=1').first(),env.DB.prepare('SELECT COUNT(*) AS total FROM suppliers WHERE active=1').first(),env.DB.prepare('SELECT COUNT(*) AS total FROM supplier_products WHERE active=1').first(),env.DB.prepare('SELECT COUNT(*) AS total FROM platform_owners').first(),env.DB.prepare('SELECT COUNT(*) AS total FROM locations WHERE active=1').first()]);
   const catalogProducts=Number(products?.total||0),catalogSuppliers=Number(suppliers?.total||0),catalogPurchaseFormats=Number(purchaseFormats?.total||0);
-  return{service:'pedidos-pro-platform',version:'2.0.0-alpha.15',databaseConfigured:Boolean(env.DB),databaseInitialized:true,schemaVersion:schema.version,catalogReady:catalogProducts>=EXPECTED_UNIQUE_PRODUCTS&&catalogSuppliers>=EXPECTED_SUPPLIERS&&catalogPurchaseFormats>=EXPECTED_PURCHASE_FORMATS,catalogProducts,catalogSuppliers,catalogPurchaseFormats,catalogSourceRows:EXPECTED_PURCHASE_FORMATS,platformOwnerReady:Number(owners?.total||0)>0,activeLocations:Number(locations?.total||0),storageConfigured:Boolean(env.FILES||env.DB),storageBackend:env.FILES?'r2':'d1-chunks',r2Configured:Boolean(env.FILES),aiEndpoint:Boolean(env.AI_ENDPOINT),geminiConfigured:Boolean(env.GEMINI_API_KEY),persistentCatalog:true,persistentBranding:true,trashRestore:true,autosave:true,orderDuplication:true,costCenterBudgets:true,advancedReception:true,threeWayReconciliation:true,aliasLearning:true,priceAlerts:true,productPriceHistory:true,humanInvoiceReview:true,multichannelNotifications:true,realBilling:Boolean(env.MERCADOPAGO_ACCESS_TOKEN),backupRestore:true,r2Migration:true,commercialMonitoring:true,e2eReady:true,customDashboard:true,executiveExports:true,environment:env.ENVIRONMENT||'development',timestamp:new Date().toISOString()};
+  return{service:'pedidos-pro-platform',version:'2.0.0-alpha.16',databaseConfigured:Boolean(env.DB),databaseInitialized:true,schemaVersion:schema.version,catalogReady:catalogProducts>=EXPECTED_UNIQUE_PRODUCTS&&catalogSuppliers>=EXPECTED_SUPPLIERS&&catalogPurchaseFormats>=EXPECTED_PURCHASE_FORMATS,catalogProducts,catalogSuppliers,catalogPurchaseFormats,catalogSourceRows:EXPECTED_PURCHASE_FORMATS,platformOwnerReady:Number(owners?.total||0)>0,activeLocations:Number(locations?.total||0),storageConfigured:Boolean(env.FILES||env.DB),storageBackend:env.FILES?'r2':'d1-chunks',r2Configured:Boolean(env.FILES),aiEndpoint:Boolean(env.AI_ENDPOINT),geminiConfigured:Boolean(env.GEMINI_API_KEY),persistentCatalog:true,persistentBranding:true,trashRestore:true,autosave:true,orderDuplication:true,costCenterBudgets:true,advancedReception:true,threeWayReconciliation:true,aliasLearning:true,priceAlerts:true,productPriceHistory:true,humanInvoiceReview:true,multichannelNotifications:true,realBilling:Boolean(env.MERCADOPAGO_ACCESS_TOKEN),backupRestore:true,r2Migration:true,commercialMonitoring:true,e2eReady:true,customDashboard:true,executiveExports:true,excelWorkbookImport:true,batchNativeShare:true,supplierLogoPdf:true,environment:env.ENVIRONMENT||'development',timestamp:new Date().toISOString()};
 }
 export default{async fetch(request,env,ctx){
   const url=new URL(request.url),method=request.method.toUpperCase(),path=url.pathname;
   const categoryParams=routeMatch(path,'/api/categories/:id'),productParams=routeMatch(path,'/api/products/:id'),supplierParams=routeMatch(path,'/api/suppliers/:id');
-  const scopedHealth=method==='GET'&&path==='/health',scopedDashboard=method==='GET'&&path==='/api/dashboard',scopedProducts=(method==='GET'&&path==='/api/products')||(method==='DELETE'&&Boolean(productParams)),scopedSuppliers=method==='DELETE'&&Boolean(supplierParams);
+  const scopedHealth=method==='GET'&&path==='/health',scopedDashboard=method==='GET'&&path==='/api/dashboard',scopedProducts=(method==='GET'&&path==='/api/products')||(method==='DELETE'&&Boolean(productParams)),scopedSuppliers=method==='DELETE'&&Boolean(supplierParams),scopedWorkbook=method==='POST'&&path==='/api/catalog/import-workbook';
   const scopedCategories=(path==='/api/categories'&&['GET','POST'].includes(method))||(categoryParams&&['PATCH','DELETE'].includes(method));
-  if(!scopedHealth&&!scopedDashboard&&!scopedProducts&&!scopedSuppliers&&!scopedCategories)return platformWorker.fetch(request,env,ctx);
+  if(!scopedHealth&&!scopedDashboard&&!scopedProducts&&!scopedSuppliers&&!scopedCategories&&!scopedWorkbook)return platformWorker.fetch(request,env,ctx);
   try{
     const schema=await ensureSchema(env);
     if(scopedHealth)return addPlatformHeaders(ok(await health(env,schema),request,env),request,env);
     const actor=await authenticate(request,env);
     let payload;
     if(scopedDashboard)payload=await dashboard(env,actor);
+    else if(scopedWorkbook)payload={result:await importCatalogWorkbookV16(request,env,actor)};
     else if(method==='GET'&&path==='/api/products')payload={products:await listProducts(env,actor,url)};
     else if(productParams&&method==='DELETE')payload=await deleteProductToTrashV15(request,env,actor,productParams.id);
     else if(supplierParams&&method==='DELETE')payload=await deleteSupplierToTrashV15(request,env,actor,supplierParams.id);

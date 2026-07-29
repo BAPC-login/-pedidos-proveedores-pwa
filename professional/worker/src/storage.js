@@ -1,10 +1,11 @@
 import {Buffer} from 'node:buffer';
 import {HttpError,nowIso,sanitizeFileName,sha256,uuid} from './core.js';
-import {createProfessionalOrderPdfV2} from './pdf-order-v2.js';
+import {createProfessionalOrderPdfV16} from './pdf-order-v16.js';
 
 const CHUNK_BYTES=192*1024;
 const CHUNK_BATCH=20;
 function safeJson(value,fallback={}){try{return JSON.parse(value||'')}catch{return fallback}}
+function isJpeg(bytes,contentType=''){const data=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes||[]);return String(contentType||'').toLowerCase().startsWith('image/jpeg')||(data.length>2&&data[0]===0xff&&data[1]===0xd8&&data[2]===0xff)}
 
 async function storeD1Chunks(env,fileId,data,createdAt){
   const bytes=data instanceof Uint8Array?data:new Uint8Array(data),pending=[];
@@ -55,10 +56,10 @@ export async function archiveOrderPdf(env,actor,order){
   ]);
   const settings=safeJson(organization?.settings_json,{}),business=settings.business||{},branding=settings.branding||{},supplierSettings=safeJson(supplier?.settings_json,{}),supplierBranding=supplierSettings.identity||{};
   let logoBytes=null,supplierLogoBytes=null;
-  if(branding.logoKey){try{const logo=await readStoredBytes(env,actor,branding.logoKey);if(String(logo.contentType||'').toLowerCase()==='image/jpeg')logoBytes=logo.bytes}catch(error){console.warn('order_pdf_logo_skipped',error?.message||error)}}
-  if(supplierBranding.logoKey){try{const logo=await readStoredBytes(env,actor,supplierBranding.logoKey);if(String(logo.contentType||'').toLowerCase()==='image/jpeg')supplierLogoBytes=logo.bytes}catch(error){console.warn('supplier_pdf_logo_skipped',error?.message||error)}}
-  const bytes=createProfessionalOrderPdfV2({organization:{name:organization?.name||actor.organization?.name||'Pedidos Pro'},business,branding,supplierBranding,location:{id:location?.id||order.locationId,name:location?.name||order.locationName,details:safeJson(location?.details_json,{})},requester:{displayName:requester?.display_name||order.requestedBy||actor.displayName,profile:safeJson(requester?.profile_json,{})},order,logoBytes,supplierLogoBytes});
+  if(branding.logoKey){try{const logo=await readStoredBytes(env,actor,branding.logoKey);if(isJpeg(logo.bytes,logo.contentType))logoBytes=logo.bytes}catch(error){console.warn('order_pdf_logo_skipped',error?.message||error)}}
+  if(supplierBranding.logoKey){try{const logo=await readStoredBytes(env,actor,supplierBranding.logoKey);if(isJpeg(logo.bytes,logo.contentType))supplierLogoBytes=logo.bytes}catch(error){console.warn('supplier_pdf_logo_skipped',error?.message||error)}}
+  const bytes=createProfessionalOrderPdfV16({organization:{name:organization?.name||actor.organization?.name||'Plataforma de compras'},business,branding,supplierBranding,location:{id:location?.id||order.locationId,name:location?.name||order.locationName,details:safeJson(location?.details_json,{})},requester:{displayName:requester?.display_name||order.requestedBy||actor.displayName,profile:safeJson(requester?.profile_json,{})},order,logoBytes,supplierLogoBytes});
   const supplierName=sanitizeFileName(order.supplierName||supplier?.name||'proveedor').replace(/\s+/g,'-');
-  const file=await storeBytes(env,actor,{bytes,fileName:`${order.folio}-${supplierName}.pdf`,contentType:'application/pdf',purpose:'order-pdf',entityType:'order',entityId:order.id,documentKind:'order_pdf',revision:order.revision,metadata:{folio:order.folio,status:order.status,locationId:order.locationId,supplierId:order.supplierId,requestedBy:requester?.display_name||order.requestedBy||''}});
+  const file=await storeBytes(env,actor,{bytes,fileName:`${order.folio}-${supplierName}.pdf`,contentType:'application/pdf',purpose:'order-pdf',entityType:'order',entityId:order.id,documentKind:'order_pdf',revision:order.revision,metadata:{pdfVersion:16,folio:order.folio,status:order.status,deliveryDate:order.deliveryDate||'',emittedAt:order.emittedAt||'',locationId:order.locationId,supplierId:order.supplierId,supplierLogoKey:supplierBranding.logoKey||'',brandLogoKey:branding.logoKey||'',requestedBy:requester?.display_name||order.requestedBy||''}});
   await recordSnapshot(env,actor,{entityType:'order',entityId:order.id,locationId:order.locationId,revision:order.revision,snapshot:order});return file;
 }
