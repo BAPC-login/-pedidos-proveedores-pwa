@@ -1,7 +1,7 @@
 import platformWorker from './index-v19.js';
 import {authenticate} from './auth.js';
 import {accessSsoStatus,loginWithCloudflareAccess} from './access-sso-v20.js';
-import {corsHeaders,errorResponse,ok,routeMatch,securityHeaders} from './core.js';
+import {corsHeaders,errorResponse,HttpError,ok,routeMatch,securityHeaders} from './core.js';
 import {ensureSchema} from './schema.js';
 import {emitOrderBatchV13} from './api/workflow-v13.js';
 import {
@@ -36,7 +36,10 @@ export default{async fetch(request,env,ctx){const url=new URL(request.url),metho
     const professional=path==='/api/professional'||path.startsWith('/api/professional/');
     if(!professional&&!(batchEmit&&method==='POST'))return platformWorker.fetch(request,env,ctx);
     await ensureSchema(env);const actor=await authenticate(request,env);let payload;
-    if(batchEmit&&method==='POST')payload=await emitOrderBatchWithApprovalV20(request,env,actor,batchEmit.id,ctx,emitOrderBatchV13);
+    if(batchEmit&&method==='POST'){
+      payload=await emitOrderBatchWithApprovalV20(request,env,actor,batchEmit.id,ctx,emitOrderBatchV13);
+      if(payload?.approvalRequired)throw new HttpError(409,'El archivo quedó pendiente de aprobación. Un aprobador debe revisarlo antes de emitir.','approval_required',payload.approval);
+    }
     else if(path==='/api/professional'&&method==='GET')payload=await professionalOverviewV20(env,actor);
     else if(path==='/api/professional/storage/probe'&&method==='POST')payload={run:await runStorageProbeV20(request,env,actor)};
     else if(path==='/api/professional/approval-policy'&&method==='GET')payload={policy:await getApprovalPolicyV20(env,actor)};
