@@ -1,6 +1,6 @@
 import {Buffer} from 'node:buffer';
 import {HttpError,nowIso,sanitizeFileName,sha256,uuid} from './core.js';
-import {createProfessionalOrderPdfV19} from './pdf-order-v19.js';
+import {createProfessionalOrderPdfV22} from './pdf-order-v22.js';
 
 const CHUNK_BYTES=192*1024;
 const CHUNK_BATCH=20;
@@ -62,8 +62,8 @@ export async function archiveOrderPdf(env,actor,order){
   if(branding.logoKey){try{const logo=await readStoredBytes(env,actor,branding.logoKey);if(isJpeg(logo.bytes,logo.contentType))logoBytes=logo.bytes}catch(error){console.warn('order_pdf_logo_skipped',error?.message||error)}}
   if(supplierBranding.logoKey){try{const logo=await readStoredBytes(env,actor,supplierBranding.logoKey);if(isJpeg(logo.bytes,logo.contentType))supplierLogoBytes=logo.bytes}catch(error){console.warn('supplier_pdf_logo_skipped',error?.message||error)}}
   const pdfOrder={...order,emittedAt:order.emittedAt||orderMeta?.emitted_at||orderMeta?.sent_at||orderMeta?.created_at||order.createdAt,sentAt:order.sentAt||orderMeta?.sent_at||null,createdAt:order.createdAt||orderMeta?.created_at,deliveryDate:order.deliveryDate||orderMeta?.delivery_date};
-  const bytes=createProfessionalOrderPdfV19({organization:{name:organization?.name||actor.organization?.name||'Plataforma de compras'},business,branding,supplierBranding,location:{id:location?.id||order.locationId,name:location?.name||order.locationName,details:safeJson(location?.details_json,{})},requester:{displayName:requester?.display_name||order.requestedBy||actor.displayName,profile:safeJson(requester?.profile_json,{})},order:pdfOrder,logoBytes,supplierLogoBytes});
+  const bytes=createProfessionalOrderPdfV22({organization:{name:organization?.name||actor.organization?.name||'Plataforma de compras'},business,branding,supplierBranding,location:{id:location?.id||order.locationId,name:location?.name||order.locationName,details:safeJson(location?.details_json,{})},requester:{displayName:requester?.display_name||order.requestedBy||actor.displayName,profile:safeJson(requester?.profile_json,{})},order:pdfOrder,logoBytes,supplierLogoBytes});
   const supplierName=sanitizeFileName(order.supplierName||supplier?.name||'proveedor').replace(/\s+/g,'-');
-  const file=await storeBytes(env,actor,{bytes,fileName:`${order.folio}-${supplierName}.pdf`,contentType:'application/pdf',purpose:'order-pdf',entityType:'order',entityId:order.id,documentKind:'order_pdf',revision:order.revision,metadata:{pdfVersion:19,folio:order.folio,status:order.status,deliveryDate:pdfOrder.deliveryDate||'',emittedAt:pdfOrder.emittedAt||'',locationId:order.locationId,supplierId:order.supplierId,supplierLogoKey:supplierBranding.logoKey||'',brandLogoKey:branding.logoKey||'',requestedBy:requester?.display_name||order.requestedBy||'',costCenterName:order.costCenterName||''}});
+  const file=await storeBytes(env,actor,{bytes,fileName:`${order.folio}-${supplierName}.pdf`,contentType:'application/pdf',purpose:'order-pdf',entityType:'order',entityId:order.id,documentKind:'order_pdf',revision:order.revision,metadata:{pdfVersion:22,folio:order.folio,status:order.status,deliveryDate:pdfOrder.deliveryDate||'',emittedAt:pdfOrder.emittedAt||'',locationId:order.locationId,supplierId:order.supplierId,supplierLogoKey:supplierBranding.logoKey||'',brandLogoKey:branding.logoKey||'',requestedBy:requester?.display_name||order.requestedBy||'',costCenterName:order.costCenterName||''}});
   await recordSnapshot(env,actor,{entityType:'order',entityId:order.id,locationId:order.locationId,revision:order.revision,snapshot:pdfOrder});return file;
 }
