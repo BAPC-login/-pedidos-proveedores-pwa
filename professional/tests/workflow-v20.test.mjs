@@ -48,8 +48,8 @@ assert.match(indexV20,/\/api\/professional\/security/);
 assert.match(indexV20,/\/api\/professional\/brand/);
 assert.match(indexV20,/approval_required/);
 assert.match(indexV20,/professionalSuiteV20:true/);
-assert.match(combined,/index-v(?:20|21)\.js/);
-assert.match(combined,/2026\.07\.31\.(?:20|21)/);
+assert.match(combined,/index-v(?:20|21|22)\.js/);
+assert.match(combined,/2026\.07\.31\.(?:20|21|22)/);
 
 assert.match(wrangler,/REQUIRE_R2 = "false"/);
 assert.doesNotMatch(wrangler,/^\s*\[\[r2_buckets\]\]/m);
@@ -72,11 +72,11 @@ assert.match(app,/initializeSsoV20/);
 assert.match(app,/initializeProfessionalV20/);
 assert.match(app,/initializeHistorySemanticV20/);
 assert.match(navigation,/professional/);
-assert.match(serviceWorker,/(?:v20-professional-sso|nuvasto-v21-brand-platform)/);
+assert.match(serviceWorker,/(?:v20-professional-sso|nuvasto-v21-brand-platform|nuvasto-v22-orders-pdf-motion)/);
 assert.match(serviceWorker,/app-professional-v20\.js/);
 assert.match(serviceWorker,/app-sso-v20\.js/);
 assert.match(serviceWorker,/app-history-semantic-v20\.js/);
-assert.match(pkg,/2\.0\.0-alpha\.(?:20|21)/);
+assert.match(pkg,/2\.0\.0-alpha\.(?:20|21|22)/);
 assert.match(pkg,/deploy:r2/);
 assert.match(pkg,/workflow-v20\.test\.mjs/);
 
