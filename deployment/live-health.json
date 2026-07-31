@@ -1,9 +1,9 @@
 {
   "status": "failed",
   "application_shell": false,
-  "checked_at": "2026-07-31T17:07:32.976561+00:00",
+  "checked_at": "2026-07-31T17:58:01.025081+00:00",
   "url": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/",
-  "release": "2026.07.31.21",
+  "release": "2026.07.31.22",
   "ai_health": {
     "ok": true,
     "service": "pedidos-pro-ai",
@@ -14,7 +14,7 @@
   "platform_health": {
     "ok": true,
     "service": "nuvasto",
-    "version": "2.0.0-alpha.21",
+    "version": "2.0.0-alpha.22",
     "databaseConfigured": true,
     "databaseInitialized": true,
     "schemaVersion": "21",
@@ -67,7 +67,7 @@
     "masterFloatingNavigation": true,
     "pdfLayoutV18": true,
     "environment": "production",
-    "timestamp": "2026-07-31T17:07:20.844Z",
+    "timestamp": "2026-07-31T17:57:50.083Z",
     "r2Required": false,
     "r2Ready": false,
     "invoicePendingOnly": true,
@@ -97,7 +97,12 @@
     "productName": "Nuvasto",
     "productTagline": "Compras claras. Abastecimiento inteligente.",
     "nuvastoBrand": true,
-    "nuvastoIdentityAssets": true
+    "nuvastoIdentityAssets": true,
+    "nuvastoUxV22": true,
+    "masterEnterNavigation": true,
+    "batchShareZipFallback": true,
+    "orderPdfVersion": 22,
+    "smoothMotion": true
   },
   "security_checks": {
     "unauthenticated_me_http": 401,
