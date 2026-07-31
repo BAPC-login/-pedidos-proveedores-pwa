@@ -38,9 +38,9 @@ assert.match(pdf,/createProfessionalOrderPdfV22/);
 assert.match(storage,/pdf-order-v22\.js/);
 assert.match(storage,/pdfVersion:22/);
 assert.match(orderCore,/Number\(metadata\.pdfVersion\|\|0\)>=22/);
-assert.match(sw,/nuvasto-v22-orders-pdf-motion/);
+assert.match(sw,/(?:nuvasto-v22-orders-pdf-motion|nuvasto-v23-auth-keyboard)/);
 assert.match(sw,/app-ux-v22\.js/);
-assert.match(pkg,/2\.0\.0-alpha\.22/);
+assert.match(pkg,/2\.0\.0-alpha\.(?:22|23)/);
 assert.match(pkg,/index-v22\.js/);
 assert.match(indexV22,/X-Nuvasto-Version','22'/);
 assert.match(indexV22,/masterEnterNavigation:true/);
@@ -49,4 +49,4 @@ assert.match(indexV22,/orderPdfVersion:22/);
 assert.match(combined,/index-v22\.js/);
 assert.match(combined,/2026\.07\.31\.22/);
 
-console.log('workflow v22 UX and PDF tests: OK');
+console.log('workflow v22 UX and PDF compatibility: OK');
