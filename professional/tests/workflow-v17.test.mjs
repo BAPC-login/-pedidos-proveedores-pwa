@@ -60,7 +60,7 @@ assert.match(preview,/Crear respaldo y aplicar/);
 assert.match(preview,/punto de recuperación automático/);
 assert.match(enterprise,/Preparación comercial/);
 assert.match(enterprise,/9 módulos/);
-assert.match(serviceWorker,/(?:v17-readiness|v18-history-master-pdf|v19-workflow-r2|v20-professional-sso|nuvasto-v21-brand-platform)/);
+assert.match(serviceWorker,/(?:v17-readiness|v18-history-master-pdf|v19-workflow-r2|v20-professional-sso|nuvasto-v21-brand-platform|nuvasto-v22-orders-pdf-motion)/);
 assert.match(serviceWorker,/app-readiness-v17\.js/);
 assert.match(serviceWorker,/app-import-preview-v17\.js/);
 
