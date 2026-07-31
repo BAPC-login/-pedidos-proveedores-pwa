@@ -14,7 +14,7 @@ const [catalog,schema,operations,procurement,order,router,navigation,dashboard,e
   readFile(new URL('../web/index.html',import.meta.url),'utf8')
 ]);
 
-assert.match(schema,/SCHEMA_VERSION='(?:15|16|17)'/);
+assert.match(schema,/SCHEMA_VERSION='(?:15|16|17|18|19|20)'/);
 assert.match(schema,/categories','cost_center_id'/);
 assert.match(catalog,/Selecciona un centro de costo válido/);
 assert.match(catalog,/claimedSystemCategory/);
@@ -30,6 +30,7 @@ assert.doesNotMatch(order,/data-enter-next/);
 assert.match(router,/popstate/);
 assert.match(router,/sessionStorage/);
 assert.match(navigation,/renderDashboardV14/);
+assert.match(navigation,/professional/);
 assert.match(dashboard,/line-chart/);
 assert.match(dashboard,/donut/);
 assert.match(dashboard,/vertical-bars/);

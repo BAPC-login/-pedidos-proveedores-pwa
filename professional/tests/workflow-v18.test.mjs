@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
-const [history,master,pdfUi,fileActions,pdf,storage,pdfApi,scoped,app,serviceWorker]=await Promise.all([
+const [history,historySemantic,master,pdfUi,fileActions,pdf,storage,pdfApi,scoped,app,serviceWorker]=await Promise.all([
   readFile(new URL('../web/app-history-v18.js',import.meta.url),'utf8'),
+  readFile(new URL('../web/app-history-semantic-v20.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-master-v18.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-pdf-v18.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-file-actions.js',import.meta.url),'utf8'),
@@ -23,6 +24,8 @@ assert.match(history,/Recepciones/);
 assert.match(history,/Realizado por/);
 assert.match(history,/Total compra/);
 assert.match(history,/registerRouteRenderer\('history',renderHistoryV18\)/);
+assert.match(historySemantic,/Pendiente de factura/);
+assert.match(historySemantic,/invoicedGrossTotal/);
 
 assert.match(master,/v18-master-nav/);
 assert.match(master,/Siguiente ↵/);
@@ -56,9 +59,10 @@ assert.match(scoped,/pdfLayoutV18:true/);
 assert.match(app,/initializeMasterV18/);
 assert.match(app,/initializeHistoryV18/);
 assert.match(app,/initializePdfV18/);
-assert.match(serviceWorker,/v19-workflow-r2/);
+assert.match(app,/initializeHistorySemanticV20/);
+assert.match(serviceWorker,/(?:v19-workflow-r2|v20-professional-sso)/);
 assert.match(serviceWorker,/app-history-v18\.js/);
 assert.match(serviceWorker,/app-master-v18\.js/);
 assert.match(serviceWorker,/app-pdf-v18\.js/);
 
-console.log('workflow v18 history and master features preserved under PDF v19: OK');
+console.log('workflow v18 compatibility under professional v20: OK');
