@@ -1,6 +1,6 @@
 import {Buffer} from 'node:buffer';
 import {HttpError,nowIso,sanitizeFileName,sha256,uuid} from './core.js';
-import {createProfessionalOrderPdfV16} from './pdf-order-v16.js';
+import {createProfessionalOrderPdfV18} from './pdf-order-v18.js';
 
 const CHUNK_BYTES=192*1024;
 const CHUNK_BATCH=20;
@@ -48,18 +48,20 @@ export async function recordSnapshot(env,actor,{entityType,entityId,locationId=n
 
 export async function archiveOrderPdf(env,actor,order){
   const requesterId=String(order.requestedById||''),requesterName=String(order.requestedBy||'');
-  const[organization,location,requester,supplier]=await Promise.all([
+  const[organization,location,requester,supplier,orderMeta]=await Promise.all([
     env.DB.prepare('SELECT name, settings_json FROM organizations WHERE id = ?').bind(actor.orgId).first(),
     env.DB.prepare('SELECT id, name, details_json FROM locations WHERE id = ? AND org_id = ?').bind(order.locationId,actor.orgId).first(),
     env.DB.prepare(`SELECT display_name, profile_json FROM users WHERE id = ? OR (? = '' AND display_name = ?) ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END LIMIT 1`).bind(requesterId,requesterId,requesterName,requesterId).first(),
-    env.DB.prepare('SELECT id,name,settings_json FROM suppliers WHERE id = ? AND org_id = ?').bind(order.supplierId,actor.orgId).first()
+    env.DB.prepare('SELECT id,name,settings_json FROM suppliers WHERE id = ? AND org_id = ?').bind(order.supplierId,actor.orgId).first(),
+    env.DB.prepare('SELECT emitted_at,sent_at,created_at,delivery_date FROM orders WHERE id=? AND org_id=?').bind(order.id,actor.orgId).first()
   ]);
   const settings=safeJson(organization?.settings_json,{}),business=settings.business||{},branding=settings.branding||{},supplierSettings=safeJson(supplier?.settings_json,{}),supplierBranding=supplierSettings.identity||{};
   let logoBytes=null,supplierLogoBytes=null;
   if(branding.logoKey){try{const logo=await readStoredBytes(env,actor,branding.logoKey);if(isJpeg(logo.bytes,logo.contentType))logoBytes=logo.bytes}catch(error){console.warn('order_pdf_logo_skipped',error?.message||error)}}
   if(supplierBranding.logoKey){try{const logo=await readStoredBytes(env,actor,supplierBranding.logoKey);if(isJpeg(logo.bytes,logo.contentType))supplierLogoBytes=logo.bytes}catch(error){console.warn('supplier_pdf_logo_skipped',error?.message||error)}}
-  const bytes=createProfessionalOrderPdfV16({organization:{name:organization?.name||actor.organization?.name||'Plataforma de compras'},business,branding,supplierBranding,location:{id:location?.id||order.locationId,name:location?.name||order.locationName,details:safeJson(location?.details_json,{})},requester:{displayName:requester?.display_name||order.requestedBy||actor.displayName,profile:safeJson(requester?.profile_json,{})},order,logoBytes,supplierLogoBytes});
+  const pdfOrder={...order,emittedAt:order.emittedAt||orderMeta?.emitted_at||orderMeta?.sent_at||orderMeta?.created_at||order.createdAt,sentAt:order.sentAt||orderMeta?.sent_at||null,createdAt:order.createdAt||orderMeta?.created_at,deliveryDate:order.deliveryDate||orderMeta?.delivery_date};
+  const bytes=createProfessionalOrderPdfV18({organization:{name:organization?.name||actor.organization?.name||'Plataforma de compras'},business,branding,supplierBranding,location:{id:location?.id||order.locationId,name:location?.name||order.locationName,details:safeJson(location?.details_json,{})},requester:{displayName:requester?.display_name||order.requestedBy||actor.displayName,profile:safeJson(requester?.profile_json,{})},order:pdfOrder,logoBytes,supplierLogoBytes});
   const supplierName=sanitizeFileName(order.supplierName||supplier?.name||'proveedor').replace(/\s+/g,'-');
-  const file=await storeBytes(env,actor,{bytes,fileName:`${order.folio}-${supplierName}.pdf`,contentType:'application/pdf',purpose:'order-pdf',entityType:'order',entityId:order.id,documentKind:'order_pdf',revision:order.revision,metadata:{pdfVersion:16,folio:order.folio,status:order.status,deliveryDate:order.deliveryDate||'',emittedAt:order.emittedAt||'',locationId:order.locationId,supplierId:order.supplierId,supplierLogoKey:supplierBranding.logoKey||'',brandLogoKey:branding.logoKey||'',requestedBy:requester?.display_name||order.requestedBy||''}});
-  await recordSnapshot(env,actor,{entityType:'order',entityId:order.id,locationId:order.locationId,revision:order.revision,snapshot:order});return file;
+  const file=await storeBytes(env,actor,{bytes,fileName:`${order.folio}-${supplierName}.pdf`,contentType:'application/pdf',purpose:'order-pdf',entityType:'order',entityId:order.id,documentKind:'order_pdf',revision:order.revision,metadata:{pdfVersion:18,folio:order.folio,status:order.status,deliveryDate:pdfOrder.deliveryDate||'',emittedAt:pdfOrder.emittedAt||'',locationId:order.locationId,supplierId:order.supplierId,supplierLogoKey:supplierBranding.logoKey||'',brandLogoKey:branding.logoKey||'',requestedBy:requester?.display_name||order.requestedBy||'',costCenterName:order.costCenterName||''}});
+  await recordSnapshot(env,actor,{entityType:'order',entityId:order.id,locationId:order.locationId,revision:order.revision,snapshot:pdfOrder});return file;
 }
