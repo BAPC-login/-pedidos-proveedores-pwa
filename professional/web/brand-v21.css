@@ -1,0 +1,34 @@
+:root{
+  --nuvasto-navy:#08111f;
+  --nuvasto-indigo:#4c43d7;
+  --nuvasto-deep:#27166f;
+  --nuvasto-mint:#2bd6a0;
+  --nuvasto-cloud:#f4f7fb;
+  --primary:#4031b8;
+  --primary2:#178f73;
+  --sidebar:#08111f;
+}
+html[data-theme=dark]{--primary:#9187ff;--primary2:#35d7a5;--sidebar:#050b14}
+@media(prefers-color-scheme:dark){html[data-theme=system]{--primary:#9187ff;--primary2:#35d7a5;--sidebar:#050b14}}
+.ambient-a{background:radial-gradient(circle,rgba(76,67,215,.72),transparent 70%)}
+.ambient-b{background:radial-gradient(circle,rgba(43,214,160,.46),transparent 70%)}
+.brand-mark{overflow:visible;background:transparent!important;box-shadow:none!important;border-radius:0!important}
+.brand-mark img{display:block;width:100%;height:100%;object-fit:contain}
+.brand-mark.small img,.brand-mark.tiny img{width:100%;height:100%}
+.auth-brand strong,.sidebar-brand strong{font-weight:850;letter-spacing:-.035em}
+.auth-brand span,.sidebar-brand span{letter-spacing:.12em}
+.mobile-workspace-button .brand-mark{flex:0 0 auto}
+.nuvasto-wordmark{display:flex;align-items:center;gap:10px;min-width:0}
+.nuvasto-wordmark-copy{min-width:0}
+.nuvasto-wordmark-copy strong,.nuvasto-wordmark-copy span{display:block}
+.nuvasto-wordmark-copy strong{font-size:17px;font-weight:850;letter-spacing:-.04em}
+.nuvasto-wordmark-copy span{margin-top:2px;color:var(--muted);font-size:8px;font-weight:750;letter-spacing:.12em}
+.sidebar .nuvasto-wordmark-copy span{color:#77859d}
+.auth-copy .eyebrow{color:var(--nuvasto-indigo)}
+.btn.primary,.bottom-create{background:linear-gradient(135deg,var(--nuvasto-deep),var(--nuvasto-indigo) 58%,var(--nuvasto-mint));border-color:transparent}
+.status-dot,.sync-chip i{background:var(--nuvasto-mint)}
+.nuvasto-brand-panel{display:grid;grid-template-columns:96px minmax(0,1fr);gap:18px;align-items:center;padding:18px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,color-mix(in srgb,var(--nuvasto-mint) 8%,var(--card)),color-mix(in srgb,var(--nuvasto-indigo) 8%,var(--card)))}
+.nuvasto-brand-panel img{width:96px;height:96px}
+.nuvasto-brand-panel h3{margin:0;font-size:24px;letter-spacing:-.045em}
+.nuvasto-brand-panel p{margin:6px 0 0;color:var(--muted);font-size:10px;line-height:1.55}
+@media(max-width:560px){.nuvasto-brand-panel{grid-template-columns:68px 1fr}.nuvasto-brand-panel img{width:68px;height:68px}.nuvasto-brand-panel h3{font-size:20px}}
