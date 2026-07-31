@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Nuvasto</title>
+  <desc id="desc">Símbolo N de flujo y abastecimiento</desc>
+  <defs>
+    <linearGradient id="nuvastoGradient" x1="72" y1="68" x2="442" y2="444" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2BD6A0"/>
+      <stop offset="0.48" stop-color="#4C43D7"/>
+      <stop offset="1" stop-color="#27166F"/>
+    </linearGradient>
+  </defs>
+  <path d="M256 42 430 142v228L256 470 82 370V142L256 42Z" fill="none" stroke="url(#nuvastoGradient)" stroke-width="28" stroke-linejoin="round"/>
+  <path d="M158 350V166l196 184V166" fill="none" stroke="url(#nuvastoGradient)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m337 166 17-17 17 17-17 17-17-17Z" fill="#2BD6A0"/>
+</svg>
