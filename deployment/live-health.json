@@ -1,9 +1,9 @@
 {
   "status": "failed",
   "application_shell": false,
-  "checked_at": "2026-07-31T10:28:12.289196+00:00",
+  "checked_at": "2026-07-31T17:07:32.976561+00:00",
   "url": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/",
-  "release": "2026.07.31.20",
+  "release": "2026.07.31.21",
   "ai_health": {
     "ok": true,
     "service": "pedidos-pro-ai",
@@ -13,11 +13,11 @@
   },
   "platform_health": {
     "ok": true,
-    "service": "pedidos-pro-platform",
-    "version": "2.0.0-alpha.20",
+    "service": "nuvasto",
+    "version": "2.0.0-alpha.21",
     "databaseConfigured": true,
     "databaseInitialized": true,
-    "schemaVersion": "20",
+    "schemaVersion": "21",
     "catalogReady": true,
     "catalogProducts": 195,
     "catalogSuppliers": 13,
@@ -67,7 +67,7 @@
     "masterFloatingNavigation": true,
     "pdfLayoutV18": true,
     "environment": "production",
-    "timestamp": "2026-07-31T10:28:01.586Z",
+    "timestamp": "2026-07-31T17:07:20.844Z",
     "r2Required": false,
     "r2Ready": false,
     "invoicePendingOnly": true,
@@ -79,7 +79,7 @@
     "pdfLayoutV19": true,
     "outboundOrderApiReady": false,
     "outboundOrderApiReason": "vendor_credentials_and_official_api_required",
-    "schemaTarget": 20,
+    "schemaTarget": 21,
     "storageFallback": "d1-chunks-temporary",
     "r2SubscriptionRequiredToBind": true,
     "cloudflareAccessSso": false,
@@ -93,7 +93,11 @@
     "reconciliationQueue": true,
     "brandWorkspace": true,
     "securityCenter": true,
-    "professionalSuiteV20": true
+    "professionalSuiteV20": true,
+    "productName": "Nuvasto",
+    "productTagline": "Compras claras. Abastecimiento inteligente.",
+    "nuvastoBrand": true,
+    "nuvastoIdentityAssets": true
   },
   "security_checks": {
     "unauthenticated_me_http": 401,
