@@ -60,7 +60,7 @@ assert.match(preview,/Crear respaldo y aplicar/);
 assert.match(preview,/punto de recuperación automático/);
 assert.match(enterprise,/Preparación comercial/);
 assert.match(enterprise,/9 módulos/);
-assert.match(serviceWorker,/(?:v17-readiness|v18-history-master-pdf)/);
+assert.match(serviceWorker,/(?:v17-readiness|v18-history-master-pdf|v19-workflow-r2)/);
 assert.match(serviceWorker,/app-readiness-v17\.js/);
 assert.match(serviceWorker,/app-import-preview-v17\.js/);
 

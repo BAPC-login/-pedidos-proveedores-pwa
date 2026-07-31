@@ -1,11 +1,12 @@
 import {Buffer} from 'node:buffer';
 import {HttpError,nowIso,sanitizeFileName,sha256,uuid} from './core.js';
-import {createProfessionalOrderPdfV18} from './pdf-order-v18.js';
+import {createProfessionalOrderPdfV19} from './pdf-order-v19.js';
 
 const CHUNK_BYTES=192*1024;
 const CHUNK_BATCH=20;
 function safeJson(value,fallback={}){try{return JSON.parse(value||'')}catch{return fallback}}
 function isJpeg(bytes,contentType=''){const data=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes||[]);return String(contentType||'').toLowerCase().startsWith('image/jpeg')||(data.length>2&&data[0]===0xff&&data[1]===0xd8&&data[2]===0xff)}
+function r2Required(env){return String(env.REQUIRE_R2||'').toLowerCase()==='true'}
 
 async function storeD1Chunks(env,fileId,data,createdAt){
   const bytes=data instanceof Uint8Array?data:new Uint8Array(data),pending=[];
@@ -18,6 +19,7 @@ async function storeD1Chunks(env,fileId,data,createdAt){
 }
 
 export async function storeBytes(env,actor,{bytes,fileName,contentType='application/octet-stream',purpose='general',entityType='',entityId='',documentKind='',revision=1,metadata={}}){
+  if(r2Required(env)&&!env.FILES)throw new HttpError(503,'R2 es obligatorio para almacenar facturas, imágenes y documentos. Configura el binding FILES.','r2_required');
   const data=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes),fileId=uuid(),safeName=sanitizeFileName(fileName||'archivo'),backend=env.FILES?'r2':'d1',key=`${backend}/${actor.orgId}/${purpose}/${new Date().toISOString().slice(0,10)}/${fileId}-${safeName}`,digest=await sha256(data),createdAt=nowIso();
   if(env.FILES)await env.FILES.put(key,data,{httpMetadata:{contentType},customMetadata:{orgId:actor.orgId,uploadedBy:actor.userId,sha256:digest,purpose,entityType,entityId}});
   try{
@@ -60,8 +62,8 @@ export async function archiveOrderPdf(env,actor,order){
   if(branding.logoKey){try{const logo=await readStoredBytes(env,actor,branding.logoKey);if(isJpeg(logo.bytes,logo.contentType))logoBytes=logo.bytes}catch(error){console.warn('order_pdf_logo_skipped',error?.message||error)}}
   if(supplierBranding.logoKey){try{const logo=await readStoredBytes(env,actor,supplierBranding.logoKey);if(isJpeg(logo.bytes,logo.contentType))supplierLogoBytes=logo.bytes}catch(error){console.warn('supplier_pdf_logo_skipped',error?.message||error)}}
   const pdfOrder={...order,emittedAt:order.emittedAt||orderMeta?.emitted_at||orderMeta?.sent_at||orderMeta?.created_at||order.createdAt,sentAt:order.sentAt||orderMeta?.sent_at||null,createdAt:order.createdAt||orderMeta?.created_at,deliveryDate:order.deliveryDate||orderMeta?.delivery_date};
-  const bytes=createProfessionalOrderPdfV18({organization:{name:organization?.name||actor.organization?.name||'Plataforma de compras'},business,branding,supplierBranding,location:{id:location?.id||order.locationId,name:location?.name||order.locationName,details:safeJson(location?.details_json,{})},requester:{displayName:requester?.display_name||order.requestedBy||actor.displayName,profile:safeJson(requester?.profile_json,{})},order:pdfOrder,logoBytes,supplierLogoBytes});
+  const bytes=createProfessionalOrderPdfV19({organization:{name:organization?.name||actor.organization?.name||'Plataforma de compras'},business,branding,supplierBranding,location:{id:location?.id||order.locationId,name:location?.name||order.locationName,details:safeJson(location?.details_json,{})},requester:{displayName:requester?.display_name||order.requestedBy||actor.displayName,profile:safeJson(requester?.profile_json,{})},order:pdfOrder,logoBytes,supplierLogoBytes});
   const supplierName=sanitizeFileName(order.supplierName||supplier?.name||'proveedor').replace(/\s+/g,'-');
-  const file=await storeBytes(env,actor,{bytes,fileName:`${order.folio}-${supplierName}.pdf`,contentType:'application/pdf',purpose:'order-pdf',entityType:'order',entityId:order.id,documentKind:'order_pdf',revision:order.revision,metadata:{pdfVersion:18,folio:order.folio,status:order.status,deliveryDate:pdfOrder.deliveryDate||'',emittedAt:pdfOrder.emittedAt||'',locationId:order.locationId,supplierId:order.supplierId,supplierLogoKey:supplierBranding.logoKey||'',brandLogoKey:branding.logoKey||'',requestedBy:requester?.display_name||order.requestedBy||'',costCenterName:order.costCenterName||''}});
+  const file=await storeBytes(env,actor,{bytes,fileName:`${order.folio}-${supplierName}.pdf`,contentType:'application/pdf',purpose:'order-pdf',entityType:'order',entityId:order.id,documentKind:'order_pdf',revision:order.revision,metadata:{pdfVersion:19,folio:order.folio,status:order.status,deliveryDate:pdfOrder.deliveryDate||'',emittedAt:pdfOrder.emittedAt||'',locationId:order.locationId,supplierId:order.supplierId,supplierLogoKey:supplierBranding.logoKey||'',brandLogoKey:branding.logoKey||'',requestedBy:requester?.display_name||order.requestedBy||'',costCenterName:order.costCenterName||''}});
   await recordSnapshot(env,actor,{entityType:'order',entityId:order.id,locationId:order.locationId,revision:order.revision,snapshot:pdfOrder});return file;
 }

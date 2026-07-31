@@ -20,13 +20,14 @@ GEMINI_MODEL = "gemini-3.5-flash"
 ENVIRONMENT = "production"
 AI_ENDPOINT = "https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
 ALLOWED_ORIGINS = "https://bapc-login.github.io,https://pedidos-pro-ai.botreservasmultilocal.workers.dev,http://localhost:8787,http://127.0.0.1:8787,http://localhost:8788,http://127.0.0.1:8788"
+REQUIRE_R2 = "true"
 
 [[d1_databases]]
 binding = "DB"
 
-# R2 puede activarse cuando se requiera conservar archivos legales en nube.
-# [[r2_buckets]]
-# binding = "FILES"
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "pedidos-pro-files"
 
 # Rate limiting administrado por Cloudflare puede activarse sin cambiar la API.
 # [[ratelimits]]
