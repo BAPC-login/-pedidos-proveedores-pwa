@@ -13,7 +13,7 @@ const [schema,migration,readiness,catalogV17,scoped,center,preview,enterprise,se
   readFile(new URL('../web/sw.js',import.meta.url),'utf8')
 ]);
 
-assert.match(schema,/SCHEMA_VERSION='(?:17|18|19|20)'/);
+assert.match(schema,/SCHEMA_VERSION='(?:17|18|19|20|21)'/);
 assert.match(schema,/0007_commercial_readiness_v17\.sql/);
 assert.match(migration,/CREATE TABLE IF NOT EXISTS readiness_runs/);
 assert.match(migration,/CREATE TABLE IF NOT EXISTS onboarding_progress/);
@@ -60,7 +60,7 @@ assert.match(preview,/Crear respaldo y aplicar/);
 assert.match(preview,/punto de recuperación automático/);
 assert.match(enterprise,/Preparación comercial/);
 assert.match(enterprise,/9 módulos/);
-assert.match(serviceWorker,/(?:v17-readiness|v18-history-master-pdf|v19-workflow-r2|v20-professional-sso)/);
+assert.match(serviceWorker,/(?:v17-readiness|v18-history-master-pdf|v19-workflow-r2|v20-professional-sso|nuvasto-v21-brand-platform)/);
 assert.match(serviceWorker,/app-readiness-v17\.js/);
 assert.match(serviceWorker,/app-import-preview-v17\.js/);
 
