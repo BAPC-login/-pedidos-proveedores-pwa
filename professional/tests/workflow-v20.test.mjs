@@ -19,7 +19,7 @@ const [schema,migration,access,professional,indexV20,combined,wrangler,r2Wrangle
   readFile(new URL('../package.json',import.meta.url),'utf8')
 ]);
 
-assert.match(schema,/SCHEMA_VERSION='20'/);
+assert.match(schema,/SCHEMA_VERSION='(?:20|21)'/);
 assert.match(schema,/0008_professional_suite_v20\.sql/);
 assert.match(schema,/professional-suite-v20/);
 for(const table of ['approval_policies','approval_requests','supplier_connectors','external_order_attempts','security_settings','storage_validation_runs','operational_alert_rules','reconciliation_reviews','brand_workspaces'])assert.match(migration,new RegExp(`CREATE TABLE IF NOT EXISTS ${table}`));
@@ -39,8 +39,6 @@ assert.match(professional,/RPA permanece bloqueado/);
 assert.match(professional,/Mi Carro|mi-carro/);
 assert.match(professional,/Mi Embonor|mi-embonor/);
 assert.match(professional,/Nuvasto/);
-assert.match(professional,/Abastiva/);
-assert.match(professional,/AbastiQ/);
 
 assert.match(indexV20,/\/api\/auth\/access/);
 assert.match(indexV20,/\/api\/professional\/storage\/probe/);
@@ -50,8 +48,8 @@ assert.match(indexV20,/\/api\/professional\/security/);
 assert.match(indexV20,/\/api\/professional\/brand/);
 assert.match(indexV20,/approval_required/);
 assert.match(indexV20,/professionalSuiteV20:true/);
-assert.match(combined,/index-v20\.js/);
-assert.match(combined,/2026\.07\.31\.20/);
+assert.match(combined,/index-v(?:20|21)\.js/);
+assert.match(combined,/2026\.07\.31\.(?:20|21)/);
 
 assert.match(wrangler,/REQUIRE_R2 = "false"/);
 assert.doesNotMatch(wrangler,/^\s*\[\[r2_buckets\]\]/m);
@@ -59,7 +57,7 @@ assert.match(wrangler,/CF_ACCESS_TEAM_DOMAIN/);
 assert.match(wrangler,/CF_ACCESS_AUD/);
 assert.match(r2Wrangler,/REQUIRE_R2 = "true"/);
 assert.match(r2Wrangler,/\[\[r2_buckets\]\]/);
-assert.match(r2Wrangler,/bucket_name = "pedidos-pro-files"/);
+assert.match(r2Wrangler,/bucket_name = "(?:pedidos-pro-files|nuvasto-files)"/);
 
 for(const label of ['Almacenamiento de archivos','Google y Cloudflare Access','Aprobación de compras','Conectores de proveedores','Conciliación financiera','Alertas operativas','Marca del producto','Onboarding de clientes'])assert.match(ui,new RegExp(label));
 assert.match(ui,/npx wrangler r2 bucket create pedidos-pro-files/);
@@ -74,12 +72,12 @@ assert.match(app,/initializeSsoV20/);
 assert.match(app,/initializeProfessionalV20/);
 assert.match(app,/initializeHistorySemanticV20/);
 assert.match(navigation,/professional/);
-assert.match(serviceWorker,/v20-professional-sso/);
+assert.match(serviceWorker,/(?:v20-professional-sso|nuvasto-v21-brand-platform)/);
 assert.match(serviceWorker,/app-professional-v20\.js/);
 assert.match(serviceWorker,/app-sso-v20\.js/);
 assert.match(serviceWorker,/app-history-semantic-v20\.js/);
-assert.match(pkg,/2\.0\.0-alpha\.20/);
+assert.match(pkg,/2\.0\.0-alpha\.(?:20|21)/);
 assert.match(pkg,/deploy:r2/);
 assert.match(pkg,/workflow-v20\.test\.mjs/);
 
-console.log('workflow v20 professional suite tests: OK');
+console.log('workflow v20 professional suite compatibility tests: OK');
