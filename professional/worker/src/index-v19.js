@@ -1,0 +1,10 @@
+import platformWorker from './index-scoped.js';
+import {authenticate} from './auth.js';
+import {corsHeaders,errorResponse,ok,routeMatch,securityHeaders} from './core.js';
+import {ensureSchema} from './schema.js';
+import {ensureOrderPdfV19} from './api/order-pdf-v19.js';
+
+function addPlatformHeaders(response,request,env){const headers=new Headers(response.headers),origin=request.headers.get('Origin')||'';for(const[name,value]of Object.entries(corsHeaders(origin,env)))headers.set(name,value);for(const[name,value]of Object.entries(securityHeaders()))headers.set(name,value);return new Response(response.body,{status:response.status,statusText:response.statusText,headers})}
+async function enrichedHealth(request,env,ctx){const response=await platformWorker.fetch(request,env,ctx);if(!response.ok)return response;const payload=await response.clone().json().catch(()=>null);if(!payload)return response;return addPlatformHeaders(ok({...payload,version:'2.0.0-alpha.19',r2Required:String(env.REQUIRE_R2||'').toLowerCase()==='true',r2Ready:Boolean(env.FILES),invoicePendingOnly:true,invoiceCheckoutV19:true,pendingBatchWorkflowV19:true,keyboardNextV19:true,deliveryExceptionsV19:true,bottomNavigationStableV19:true,pdfLayoutV19:true,outboundOrderApiReady:false,outboundOrderApiReason:'vendor_credentials_and_official_api_required'},request,env),request,env)}
+
+export default{async fetch(request,env,ctx){const url=new URL(request.url),method=request.method.toUpperCase(),path=url.pathname,orderPdfParams=routeMatch(path,'/api/orders/:id/pdf');if(method==='GET'&&path==='/health')return enrichedHealth(request,env,ctx);if(!(orderPdfParams&&method==='POST'))return platformWorker.fetch(request,env,ctx);try{await ensureSchema(env);const actor=await authenticate(request,env);return addPlatformHeaders(ok({document:await ensureOrderPdfV19(request,env,actor,orderPdfParams.id)},request,env),request,env)}catch(error){if(Number(error?.status||500)>=500)console.error('v19_request_failed',error);return addPlatformHeaders(errorResponse(error,request,env),request,env)}}};
