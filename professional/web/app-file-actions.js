@@ -23,7 +23,7 @@ export function warmDocuments(documents=[]){
 function previewShell(name){return `<div class="document-preview-shell"><div id="documentPreviewFrame" class="document-preview-loading"><span class="spinner"></span><strong>Abriendo ${esc(name)}</strong><small>La vista aparecerá en cuanto el PDF esté listo.</small></div><div class="document-preview-actions"><button class="btn primary" type="button" data-preview-download disabled>Guardar archivo</button><button class="btn" type="button" data-preview-share disabled>Compartir</button></div></div>`}
 
 export async function previewDocument(key,name='pedido.pdf'){
-  openModal({eyebrow:'DOCUMENTO',title:name,subtitle:'Vista previa dentro de Pedidos Pro.',size:'large',hideSubmit:true,body:previewShell(name)});
+  openModal({eyebrow:'DOCUMENTO',title:name,subtitle:'Vista previa dentro de la plataforma.',size:'large',hideSubmit:true,body:previewShell(name)});
   let url='';
   try{
     const {blob}=await fetchDocument(key,name);url=URL.createObjectURL(blob);
@@ -63,10 +63,9 @@ export async function shareDocument(key,name='pedido.pdf'){
 }
 
 export async function ensureOrderDocument(order){
-  if(order.pdfKey)return {key:order.pdfKey,name:order.pdfName||`${order.folio}.pdf`};
   const response=await fetch(`/api/orders/${encodeURIComponent(order.id)}/pdf`,{method:'POST',headers:{Authorization:`Bearer ${state.token}`,'Content-Type':'application/json'},body:'{}'}),payload=await response.json().catch(()=>({}));
   if(!response.ok||payload.ok===false)throw new Error(payload.error||'No se pudo generar el PDF');
-  const document=payload.document||{};order.pdfKey=document.key||'';order.pdfName=document.name||`${order.folio}.pdf`;return {key:order.pdfKey,name:order.pdfName};
+  const document=payload.document||{};const previousKey=order.pdfKey;order.pdfKey=document.key||order.pdfKey||'';order.pdfName=document.name||order.pdfName||`${order.folio}.pdf`;if(previousKey&&previousKey!==order.pdfKey)cache.delete(previousKey);return {key:order.pdfKey,name:order.pdfName};
 }
 
 export function initializeFileActions(){
