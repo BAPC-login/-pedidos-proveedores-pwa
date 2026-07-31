@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+
+const [ux,app,pdf,storage,orderCore,sw,pkg]=await Promise.all([
+  readFile(new URL('../web/app-ux-v22.js',import.meta.url),'utf8'),
+  readFile(new URL('../web/app.js',import.meta.url),'utf8'),
+  readFile(new URL('../worker/src/pdf-order-v22.js',import.meta.url),'utf8'),
+  readFile(new URL('../worker/src/storage.js',import.meta.url),'utf8'),
+  readFile(new URL('../worker/src/api/order-core-v4.js',import.meta.url),'utf8'),
+  readFile(new URL('../web/sw.js',import.meta.url),'utf8'),
+  readFile(new URL('../package.json',import.meta.url),'utf8')
+]);
+
+assert.match(ux,/installNewOrderGuard/);
+assert.match(ux,/if\(isNew\)return/);
+assert.match(ux,/dialog\.append\(toolbar\)/);
+assert.match(ux,/Enter ↵/);
+assert.match(ux,/data-core-quantity/);
+assert.match(ux,/Crear documento/);
+assert.match(ux,/prepareBatchShare/);
+assert.match(ux,/zipFiles/);
+assert.match(ux,/navigator\.share/);
+assert.match(ux,/v22Spin/);
+assert.match(ux,/prefers-reduced-motion/);
+
+assert.match(app,/initializeNuvastoUXV22/);
+assert.ok(app.indexOf('initializeNuvastoUXV22()')<app.indexOf('initializeWorkflowV19()'),'v22 must wrap the legacy pending-order interceptor before workflow v19 registers it');
+
+assert.match(pdf,/FECHA EMISIÓN/);
+assert.match(pdf,/FECHA ENTREGA/);
+assert.match(pdf,/CENTRO DE COSTO/);
+assert.match(pdf,/PRODUCTOS/);
+assert.match(pdf,/drawImageFit\(pdf,supplierLogo,x\+64,supplierY\+9,52/);
+assert.match(pdf,/Documento generado por Nuvasto/);
+assert.match(pdf,/createProfessionalOrderPdfV22/);
+assert.match(storage,/pdf-order-v22\.js/);
+assert.match(storage,/pdfVersion:22/);
+assert.match(orderCore,/metadata\.pdfVersion\|\|0\)>=22/);
+assert.match(sw,/nuvasto-v22-orders-pdf-motion/);
+assert.match(sw,/app-ux-v22\.js/);
+assert.match(pkg,/2\.0\.0-alpha\.22/);
+
+console.log('workflow v22 UX and PDF tests: OK');
