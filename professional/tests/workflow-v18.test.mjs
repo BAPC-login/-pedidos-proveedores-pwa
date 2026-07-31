@@ -6,9 +6,9 @@ const [history,master,pdfUi,fileActions,pdf,storage,pdfApi,scoped,app,serviceWor
   readFile(new URL('../web/app-master-v18.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-pdf-v18.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-file-actions.js',import.meta.url),'utf8'),
-  readFile(new URL('../worker/src/pdf-order-v18.js',import.meta.url),'utf8'),
+  readFile(new URL('../worker/src/pdf-order-v19.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/storage.js',import.meta.url),'utf8'),
-  readFile(new URL('../worker/src/api/order-pdf-v18.js',import.meta.url),'utf8'),
+  readFile(new URL('../worker/src/api/order-pdf-v19.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/index-scoped.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app.js',import.meta.url),'utf8'),
   readFile(new URL('../web/sw.js',import.meta.url),'utf8')
@@ -36,17 +36,17 @@ assert.match(master,/v18-single-supplier/);
 assert.match(master,/v16-next-quantity\{display:none!important/);
 
 assert.match(pdf,/FECHA DE EMISIÓN/);
-assert.match(pdf,/FECHA DE RECEPCIÓN/);
+assert.match(pdf,/FECHA DE ENTREGA/);
 assert.match(pdf,/SOLICITADO POR/);
 assert.match(pdf,/CENTRO DE COSTO/);
 assert.match(pdf,/PROVEEDOR:/);
 assert.match(pdf,/supplierLogo/);
 assert.match(pdf,/companyLogo/);
-assert.match(pdf,/createProfessionalOrderPdfV18/);
-assert.match(storage,/createProfessionalOrderPdfV18/);
-assert.match(storage,/pdfVersion:18/);
+assert.match(pdf,/createProfessionalOrderPdfV19/);
+assert.match(storage,/createProfessionalOrderPdfV19/);
+assert.match(storage,/pdfVersion:19/);
 assert.match(storage,/costCenterName/);
-assert.match(pdfApi,/pdfVersion\|\|0\)>=18/);
+assert.match(pdfApi,/pdfVersion\|\|0\)>=19/);
 assert.match(fileActions,/\/api\/orders\/\$\{encodeURIComponent\(order.id\)\}\/pdf/);
 assert.doesNotMatch(fileActions,/if\(order\.pdfKey\)return/);
 assert.match(pdfUi,/ensureOrderDocument/);
@@ -56,9 +56,9 @@ assert.match(scoped,/pdfLayoutV18:true/);
 assert.match(app,/initializeMasterV18/);
 assert.match(app,/initializeHistoryV18/);
 assert.match(app,/initializePdfV18/);
-assert.match(serviceWorker,/v18-history-master-pdf/);
+assert.match(serviceWorker,/v19-workflow-r2/);
 assert.match(serviceWorker,/app-history-v18\.js/);
 assert.match(serviceWorker,/app-master-v18\.js/);
 assert.match(serviceWorker,/app-pdf-v18\.js/);
 
-console.log('workflow v18 history, master and PDF tests: OK');
+console.log('workflow v18 history and master features preserved under PDF v19: OK');
