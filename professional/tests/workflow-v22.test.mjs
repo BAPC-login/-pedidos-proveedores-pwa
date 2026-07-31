@@ -35,7 +35,7 @@ assert.match(pdf,/Documento generado por Nuvasto/);
 assert.match(pdf,/createProfessionalOrderPdfV22/);
 assert.match(storage,/pdf-order-v22\.js/);
 assert.match(storage,/pdfVersion:22/);
-assert.match(orderCore,/metadata\.pdfVersion\|\|0\)>=22/);
+assert.match(orderCore,/Number\(metadata\.pdfVersion\|\|0\)>=22/);
 assert.match(sw,/nuvasto-v22-orders-pdf-motion/);
 assert.match(sw,/app-ux-v22\.js/);
 assert.match(pkg,/2\.0\.0-alpha\.22/);
