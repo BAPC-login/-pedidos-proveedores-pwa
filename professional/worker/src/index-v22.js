@@ -1,0 +1,6 @@
+import platformWorker from './index-v21.js';
+import {corsHeaders,ok,securityHeaders} from './core.js';
+
+function addHeaders(response,request,env){const headers=new Headers(response.headers),origin=request.headers.get('Origin')||'';for(const[name,value]of Object.entries(corsHeaders(origin,env)))headers.set(name,value);for(const[name,value]of Object.entries(securityHeaders()))headers.set(name,value);headers.set('X-Nuvasto-Version','22');return new Response(response.body,{status:response.status,statusText:response.statusText,headers})}
+async function health(request,env,ctx){const response=await platformWorker.fetch(request,env,ctx);if(!response.ok)return addHeaders(response,request,env);const payload=await response.clone().json().catch(()=>({}));return addHeaders(ok({...payload,version:'2.0.0-alpha.22',schemaTarget:21,nuvastoUxV22:true,masterEnterNavigation:true,batchShareZipFallback:true,orderPdfVersion:22,smoothMotion:true},request,env),request,env)}
+export default{async fetch(request,env,ctx){const url=new URL(request.url);if(request.method.toUpperCase()==='GET'&&url.pathname==='/health')return health(request,env,ctx);return addHeaders(await platformWorker.fetch(request,env,ctx),request,env)}};

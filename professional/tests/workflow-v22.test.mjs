@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
-const [ux,app,pdf,storage,orderCore,sw,pkg]=await Promise.all([
+const [ux,app,pdf,storage,orderCore,sw,pkg,indexV22,combined]=await Promise.all([
   readFile(new URL('../web/app-ux-v22.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/pdf-order-v22.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/storage.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/api/order-core-v4.js',import.meta.url),'utf8'),
   readFile(new URL('../web/sw.js',import.meta.url),'utf8'),
-  readFile(new URL('../package.json',import.meta.url),'utf8')
+  readFile(new URL('../package.json',import.meta.url),'utf8'),
+  readFile(new URL('../worker/src/index-v22.js',import.meta.url),'utf8'),
+  readFile(new URL('../../worker/src/combined.js',import.meta.url),'utf8')
 ]);
 
 assert.match(ux,/installNewOrderGuard/);
@@ -39,5 +41,12 @@ assert.match(orderCore,/Number\(metadata\.pdfVersion\|\|0\)>=22/);
 assert.match(sw,/nuvasto-v22-orders-pdf-motion/);
 assert.match(sw,/app-ux-v22\.js/);
 assert.match(pkg,/2\.0\.0-alpha\.22/);
+assert.match(pkg,/index-v22\.js/);
+assert.match(indexV22,/X-Nuvasto-Version','22'/);
+assert.match(indexV22,/masterEnterNavigation:true/);
+assert.match(indexV22,/batchShareZipFallback:true/);
+assert.match(indexV22,/orderPdfVersion:22/);
+assert.match(combined,/index-v22\.js/);
+assert.match(combined,/2026\.07\.31\.22/);
 
 console.log('workflow v22 UX and PDF tests: OK');

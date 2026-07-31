@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 
 const [workflow,pdf,storage,pdfApi,indexV19,combined,wrangler,r2Wrangler,app,serviceWorker]=await Promise.all([
   readFile(new URL('../web/app-workflow-v19.js',import.meta.url),'utf8'),
-  readFile(new URL('../worker/src/pdf-order-v19.js',import.meta.url),'utf8'),
+  readFile(new URL('../worker/src/pdf-order-v22.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/storage.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/api/order-pdf-v19.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/index-v19.js',import.meta.url),'utf8'),
@@ -32,10 +32,10 @@ assert.match(workflow,/bottom-nav/);
 assert.match(workflow,/registerRouteRenderer\('receiving',renderReceivingV19\)/);
 assert.match(workflow,/openRoute\('dashboard'/);
 
-assert.match(pdf,/createProfessionalOrderPdfV19/);
+assert.match(pdf,/createProfessionalOrderPdfV22/);
 assert.match(pdf,/CENTRO DE COSTO/);
-assert.match(pdf,/FECHA DE ENTREGA/);
-assert.match(pdf,/FECHA DE EMISIÓN/);
+assert.match(pdf,/FECHA ENTREGA/);
+assert.match(pdf,/FECHA EMISIÓN/);
 assert.match(pdf,/PRODUCTOS/);
 assert.match(pdf,/metaRow/);
 assert.match(pdf,/supplierLogo/);
@@ -43,15 +43,15 @@ assert.match(pdf,/companyLogo/);
 
 assert.match(storage,/REQUIRE_R2/);
 assert.match(storage,/r2_required/);
-assert.match(storage,/createProfessionalOrderPdfV19/);
-assert.match(storage,/pdfVersion:19/);
+assert.match(storage,/createProfessionalOrderPdfV22/);
+assert.match(storage,/pdfVersion:22/);
 assert.match(pdfApi,/pdfVersion\|\|0\)>=19/);
 assert.match(indexV19,/r2Ready:Boolean\(env\.FILES\)/);
 assert.match(indexV19,/invoicePendingOnly:true/);
 assert.match(indexV19,/pendingBatchWorkflowV19:true/);
 assert.match(indexV19,/outboundOrderApiReady:false/);
-assert.match(combined,/index-v(?:20|21)\.js/);
-assert.match(combined,/2026\.07\.31\.(?:20|21)/);
+assert.match(combined,/index-v(?:20|21|22)\.js/);
+assert.match(combined,/2026\.07\.31\.(?:20|21|22)/);
 assert.match(wrangler,/REQUIRE_R2 = "false"/);
 assert.doesNotMatch(wrangler,/^\s*\[\[r2_buckets\]\]/m);
 assert.match(r2Wrangler,/REQUIRE_R2 = "true"/);
@@ -59,7 +59,7 @@ assert.match(r2Wrangler,/\[\[r2_buckets\]\]/);
 assert.match(r2Wrangler,/binding = "FILES"/);
 assert.match(r2Wrangler,/bucket_name = "(?:pedidos-pro-files|nuvasto-files)"/);
 assert.match(app,/initializeWorkflowV19/);
-assert.match(serviceWorker,/(?:v19-workflow-r2|v20-professional-sso|nuvasto-v21-brand-platform)/);
+assert.match(serviceWorker,/(?:v19-workflow-r2|v20-professional-sso|nuvasto-v21-brand-platform|nuvasto-v22-orders-pdf-motion)/);
 assert.match(serviceWorker,/app-workflow-v19\.js/);
 
-console.log('workflow v19 compatibility under Nuvasto v21: OK');
+console.log('workflow v19 compatibility under Nuvasto v22: OK');
