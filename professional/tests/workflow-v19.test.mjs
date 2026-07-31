@@ -59,7 +59,7 @@ assert.match(r2Wrangler,/\[\[r2_buckets\]\]/);
 assert.match(r2Wrangler,/binding = "FILES"/);
 assert.match(r2Wrangler,/bucket_name = "(?:pedidos-pro-files|nuvasto-files)"/);
 assert.match(app,/initializeWorkflowV19/);
-assert.match(serviceWorker,/(?:v19-workflow-r2|v20-professional-sso|nuvasto-v21-brand-platform|nuvasto-v22-orders-pdf-motion)/);
+assert.match(serviceWorker,/(?:v19-workflow-r2|v20-professional-sso|nuvasto-v21-brand-platform|nuvasto-v22-orders-pdf-motion|nuvasto-v23-auth-keyboard)/);
 assert.match(serviceWorker,/app-workflow-v19\.js/);
 
-console.log('workflow v19 compatibility under Nuvasto v22: OK');
+console.log('workflow v19 compatibility under Nuvasto v23: OK');
