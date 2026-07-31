@@ -20,14 +20,18 @@ GEMINI_MODEL = "gemini-3.5-flash"
 ENVIRONMENT = "production"
 AI_ENDPOINT = "https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
 ALLOWED_ORIGINS = "https://bapc-login.github.io,https://pedidos-pro-ai.botreservasmultilocal.workers.dev,http://localhost:8787,http://127.0.0.1:8787,http://localhost:8788,http://127.0.0.1:8788"
-REQUIRE_R2 = "true"
+REQUIRE_R2 = "false"
+
+# Cloudflare Access SSO se activa después de crear la aplicación en Zero Trust.
+# CF_ACCESS_TEAM_DOMAIN = "tu-equipo.cloudflareaccess.com"
+# CF_ACCESS_AUD = "audience-tag-de-la-aplicacion"
 
 [[d1_databases]]
 binding = "DB"
 
-[[r2_buckets]]
-binding = "FILES"
-bucket_name = "pedidos-pro-files"
+# Este archivo despliega con almacenamiento temporal en D1 para no bloquear la app
+# mientras la cuenta aún no tiene una suscripción R2 habilitada.
+# Después de activar R2 y crear el bucket, usa wrangler.r2.toml.
 
 # Rate limiting administrado por Cloudflare puede activarse sin cambiar la API.
 # [[ratelimits]]
