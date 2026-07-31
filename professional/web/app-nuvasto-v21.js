@@ -12,8 +12,8 @@ const exactReplacements=new Map([
 function replaceText(root=document){
   const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode(node){const parent=node.parentElement;if(!parent||['SCRIPT','STYLE','TEXTAREA','INPUT','OPTION'].includes(parent.tagName))return NodeFilter.FILTER_REJECT;return NodeFilter.FILTER_ACCEPT}});
   const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
-  for(const node of nodes){const value=node.nodeValue;if(exactReplacements.has(value?.trim()))node.nodeValue=value.replace(value.trim(),exactReplacements.get(value.trim()));else if(value?.includes('Pedidos Pro'))node.nodeValue=value.replaceAll('Pedidos Pro','Nuvasto')}
-  for(const input of root.querySelectorAll?.('input,textarea')||[]){if(input.placeholder?.includes('Pedidos Pro'))input.placeholder=input.placeholder.replaceAll('Pedidos Pro','Nuvasto');if(input.name==='footerText'&&(!input.value||input.value==='Documento generado por Pedidos Pro'))input.value='Documento generado por Nuvasto'}
+  for(const node of nodes){const value=node.nodeValue;if(exactReplacements.has(value?.trim()))node.nodeValue=value.replace(value.trim(),exactReplacements.get(value.trim()));else if(value?.includes('Pedidos Pro')||value?.includes('pedidos-pro-files'))node.nodeValue=value.replaceAll('Pedidos Pro','Nuvasto').replaceAll('pedidos-pro-files','nuvasto-files')}
+  for(const input of root.querySelectorAll?.('input,textarea')||[]){if(input.placeholder?.includes('Pedidos Pro'))input.placeholder=input.placeholder.replaceAll('Pedidos Pro','Nuvasto');if(input.name==='footerText'&&(!input.value||['Documento generado por Pedidos Pro','Documento de compra generado por la plataforma'].includes(input.value)))input.value='Documento generado por Nuvasto'}
 }
 function mountMarks(root=document){
   for(const mark of root.querySelectorAll?.('.brand-mark')||[]){if(mark.querySelector('img[data-nuvasto-mark]'))continue;mark.textContent='';const image=document.createElement('img');image.src='./nuvasto-mark.svg';image.alt='';image.dataset.nuvastoMark='1';mark.append(image)}
