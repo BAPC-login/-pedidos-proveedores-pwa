@@ -18,6 +18,7 @@ run_worker_first = ["/api/*", "/health", "/v1/*", "/platform/health"]
 [vars]
 GEMINI_MODEL = "gemini-3.5-flash"
 ENVIRONMENT = "production"
+PRODUCT_NAME = "Nuvasto"
 AI_ENDPOINT = "https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
 ALLOWED_ORIGINS = "https://bapc-login.github.io,https://pedidos-pro-ai.botreservasmultilocal.workers.dev,http://localhost:8787,http://127.0.0.1:8787,http://localhost:8788,http://127.0.0.1:8788"
 REQUIRE_R2 = "false"
@@ -29,12 +30,6 @@ REQUIRE_R2 = "false"
 [[d1_databases]]
 binding = "DB"
 
-# Este archivo despliega con almacenamiento temporal en D1 para no bloquear la app
-# mientras la cuenta aún no tiene una suscripción R2 habilitada.
-# Después de activar R2 y crear el bucket, usa wrangler.r2.toml.
-
-# Rate limiting administrado por Cloudflare puede activarse sin cambiar la API.
-# [[ratelimits]]
-# name = "RATE_LIMITER"
-# namespace_id = "1001"
-# simple = { limit = 60, period = 60 }
+# Este perfil mantiene el almacenamiento temporal en D1 mientras R2 no esté habilitado.
+# Después de activar R2 y crear el bucket nuvasto-files, usa wrangler.r2.toml.
+# El nombre técnico del Worker se conserva para no cortar la URL y la base D1 actuales.
