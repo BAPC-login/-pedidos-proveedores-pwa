@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
-const [workflow,pdf,storage,pdfApi,indexV19,combined,wrangler,app,serviceWorker]=await Promise.all([
+const [workflow,pdf,storage,pdfApi,indexV19,combined,wrangler,r2Wrangler,app,serviceWorker]=await Promise.all([
   readFile(new URL('../web/app-workflow-v19.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/pdf-order-v19.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/storage.js',import.meta.url),'utf8'),
@@ -9,6 +9,7 @@ const [workflow,pdf,storage,pdfApi,indexV19,combined,wrangler,app,serviceWorker]
   readFile(new URL('../worker/src/index-v19.js',import.meta.url),'utf8'),
   readFile(new URL('../../worker/src/combined.js',import.meta.url),'utf8'),
   readFile(new URL('../wrangler.toml',import.meta.url),'utf8'),
+  readFile(new URL('../wrangler.r2.toml',import.meta.url),'utf8'),
   readFile(new URL('../web/app.js',import.meta.url),'utf8'),
   readFile(new URL('../web/sw.js',import.meta.url),'utf8')
 ]);
@@ -49,14 +50,16 @@ assert.match(indexV19,/r2Ready:Boolean\(env\.FILES\)/);
 assert.match(indexV19,/invoicePendingOnly:true/);
 assert.match(indexV19,/pendingBatchWorkflowV19:true/);
 assert.match(indexV19,/outboundOrderApiReady:false/);
-assert.match(combined,/index-v19\.js/);
-assert.match(combined,/2026\.07\.31\.19/);
-assert.match(wrangler,/REQUIRE_R2 = "true"/);
-assert.match(wrangler,/\[\[r2_buckets\]\]/);
-assert.match(wrangler,/binding = "FILES"/);
-assert.match(wrangler,/bucket_name = "pedidos-pro-files"/);
+assert.match(combined,/index-v20\.js/);
+assert.match(combined,/2026\.07\.31\.20/);
+assert.match(wrangler,/REQUIRE_R2 = "false"/);
+assert.doesNotMatch(wrangler,/^\s*\[\[r2_buckets\]\]/m);
+assert.match(r2Wrangler,/REQUIRE_R2 = "true"/);
+assert.match(r2Wrangler,/\[\[r2_buckets\]\]/);
+assert.match(r2Wrangler,/binding = "FILES"/);
+assert.match(r2Wrangler,/bucket_name = "pedidos-pro-files"/);
 assert.match(app,/initializeWorkflowV19/);
-assert.match(serviceWorker,/v19-workflow-r2/);
+assert.match(serviceWorker,/(?:v19-workflow-r2|v20-professional-sso)/);
 assert.match(serviceWorker,/app-workflow-v19\.js/);
 
-console.log('workflow v19 pending orders, invoice checkout, R2 and PDF tests: OK');
+console.log('workflow v19 compatibility under professional v20: OK');
