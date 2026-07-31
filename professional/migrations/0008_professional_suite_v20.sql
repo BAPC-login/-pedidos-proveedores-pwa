@@ -114,11 +114,11 @@ CREATE TABLE IF NOT EXISTS reconciliation_reviews (
 
 CREATE TABLE IF NOT EXISTS brand_workspaces (
   org_id TEXT PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
-  product_name TEXT NOT NULL DEFAULT 'Pedidos Pro',
-  tagline TEXT NOT NULL DEFAULT 'Compras y abastecimiento inteligente',
-  status TEXT NOT NULL DEFAULT 'exploring' CHECK(status IN ('exploring','selected','registered')),
-  candidates_json TEXT NOT NULL DEFAULT '[]',
-  palette_json TEXT NOT NULL DEFAULT '{}',
+  product_name TEXT NOT NULL DEFAULT 'Nuvasto',
+  tagline TEXT NOT NULL DEFAULT 'Compras claras. Abastecimiento inteligente.',
+  status TEXT NOT NULL DEFAULT 'selected' CHECK(status IN ('exploring','selected','registered')),
+  candidates_json TEXT NOT NULL DEFAULT '[{"name":"Nuvasto","tagline":"Compras claras. Abastecimiento inteligente.","status":"selected"}]',
+  palette_json TEXT NOT NULL DEFAULT '{"navy":"#08111F","primary":"#4031B8","secondary":"#178F73","accent":"#2BD6A0","cloud":"#F4F7FB"}',
   updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
   updated_at TEXT NOT NULL
 );
