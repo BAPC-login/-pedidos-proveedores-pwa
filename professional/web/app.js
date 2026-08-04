@@ -23,8 +23,9 @@ import {initializeHistorySemanticV20} from './app-history-semantic-v20.js';
 import {initializeNuvastoV21} from './app-nuvasto-v21.js';
 import {initializeNuvastoUXV22} from './app-ux-v22.js';
 import {initializeNuvastoV23} from './app-nuvasto-v23.js';
+import {initializeProfessionalHotfixV24} from './app-professional-hotfix-v24.js';
 
-initializeScreenStateHotfix();initializeNuvastoV21();initializeNuvastoV23();initializeBrandingFeatures();initializeProcurementSettings();initializeProcurementEntry();initializeOrderCoreV15();initializeCompanyLogoUploader();initializeFileActions();initializeSettingsPanelsV13();initializeExperience();initializeTelemetryV13();initializeNavigationV14();initializeCommercialV16();initializeImportPreviewV17();initializeMasterV18();initializeNuvastoUXV22();initializeHistoryV18();initializePdfV18();initializeWorkflowV19();initializeSsoV20();initializeProfessionalV20();initializeHistorySemanticV20();
+initializeScreenStateHotfix();initializeNuvastoV21();initializeNuvastoV23();initializeBrandingFeatures();initializeProcurementSettings();initializeProcurementEntry();initializeOrderCoreV15();initializeCompanyLogoUploader();initializeFileActions();initializeSettingsPanelsV13();initializeExperience();initializeTelemetryV13();initializeNavigationV14();initializeCommercialV16();initializeImportPreviewV17();initializeMasterV18();initializeNuvastoUXV22();initializeHistoryV18();initializePdfV18();initializeWorkflowV19();initializeSsoV20();initializeProfessionalV20();initializeHistorySemanticV20();initializeProfessionalHotfixV24();
 
 let startupFinished=false;
 let startupWatchdog=null;
