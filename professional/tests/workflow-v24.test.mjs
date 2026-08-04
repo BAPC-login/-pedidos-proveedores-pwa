@@ -39,7 +39,7 @@ const text=new TextDecoder('latin1').decode(bytes);
 assert.match(text,/%NuvastoPDFV24/);
 assert.doesNotMatch(text,/ re 0\.25\n/);
 assert.doesNotMatch(text,/ re 0\.3\n/);
-assert.match(text,/FECHA EMISIÓN/);
+assert.match(text,/FECHA EMISI\\323N/);
 assert.match(text,/FECHA ENTREGA/);
 assert.match(text,/CENTRO DE COSTO/);
 assert.match(text,/PRODUCTOS/);
