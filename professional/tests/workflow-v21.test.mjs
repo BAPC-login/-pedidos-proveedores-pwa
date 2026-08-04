@@ -51,9 +51,9 @@ assert.match(sw,/(?:nuvasto-v21-brand-platform|nuvasto-v22-orders-pdf-motion|nuv
 assert.match(sw,/app-nuvasto-v21\.js/);
 assert.match(sw,/nuvasto-logo\.svg/);
 assert.match(pkg,/"name": "nuvasto-platform"/);
-assert.match(pkg,/2\.0\.0-alpha\.(?:21|22|23)/);
+assert.match(pkg,/2\.0\.0-alpha\.(?:21|22|23|24)/);
 assert.match(pkg,/nuvasto-files/);
 assert.match(wranglerR2,/bucket_name = "nuvasto-files"/);
 assert.match(readme,/# Nuvasto/);
 
-console.log('workflow v21 Nuvasto brand compatibility: OK');
+console.log('workflow v21 Nuvasto brand compatibility under v24: OK');
