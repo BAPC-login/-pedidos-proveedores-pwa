@@ -1,7 +1,7 @@
 {
   "status": "failed",
   "application_shell": false,
-  "checked_at": "2026-08-04T23:25:22.095696+00:00",
+  "checked_at": "2026-08-04T23:37:59.533943+00:00",
   "url": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/",
   "release": "2026.07.31.22",
   "ai_health": {
@@ -67,7 +67,7 @@
     "masterFloatingNavigation": true,
     "pdfLayoutV18": true,
     "environment": "production",
-    "timestamp": "2026-08-04T23:25:11.409Z",
+    "timestamp": "2026-08-04T23:37:48.848Z",
     "r2Required": false,
     "r2Ready": false,
     "invoicePendingOnly": true,
