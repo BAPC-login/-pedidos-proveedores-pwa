@@ -1,0 +1,73 @@
+import {$} from './app-core.js';
+
+let initialized=false;
+let applying=false;
+let observer=null;
+
+const screens={
+  startup:'#startupScreen',
+  auth:'#authScreen',
+  app:'#appShell'
+};
+
+function detectedScreen(){
+  const app=$(screens.app),auth=$(screens.auth);
+  if(app&&!app.classList.contains('hidden'))return'app';
+  if(auth&&!auth.classList.contains('hidden'))return'auth';
+  return'startup';
+}
+
+function applyScreen(screen){
+  if(applying)return;
+  applying=true;
+  try{
+    document.body.dataset.uiScreen=screen;
+    for(const[name,selector]of Object.entries(screens)){
+      const node=$(selector);
+      if(!node)continue;
+      const visible=name===screen;
+      node.hidden=!visible;
+      node.inert=!visible;
+      node.setAttribute('aria-hidden',String(!visible));
+      node.classList.toggle('hidden',!visible);
+      if(visible)node.style.removeProperty('display');
+      else node.style.setProperty('display','none','important');
+    }
+    requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'auto'}));
+  }finally{
+    applying=false;
+  }
+}
+
+function syncScreen(){
+  applyScreen(detectedScreen());
+}
+
+function injectGuardStyles(){
+  if($('#nuvastoScreenStateGuard'))return;
+  const style=document.createElement('style');
+  style.id='nuvastoScreenStateGuard';
+  style.textContent=`
+    #startupScreen[hidden],#authScreen[hidden],#appShell[hidden]{display:none!important;visibility:hidden!important;pointer-events:none!important}
+    body[data-ui-screen="startup"] #authScreen,body[data-ui-screen="startup"] #appShell,
+    body[data-ui-screen="auth"] #startupScreen,body[data-ui-screen="auth"] #appShell,
+    body[data-ui-screen="app"] #startupScreen,body[data-ui-screen="app"] #authScreen{display:none!important;visibility:hidden!important;pointer-events:none!important}
+  `;
+  document.head.append(style);
+}
+
+export function initializeScreenStateHotfix(){
+  if(initialized)return;
+  initialized=true;
+  injectGuardStyles();
+  syncScreen();
+  observer=new MutationObserver(records=>{
+    if(applying)return;
+    if(records.some(record=>record.type==='attributes'))queueMicrotask(syncScreen);
+  });
+  for(const selector of Object.values(screens)){
+    const node=$(selector);
+    if(node)observer.observe(node,{attributes:true,attributeFilter:['class']});
+  }
+  window.addEventListener('pageshow',syncScreen);
+}
