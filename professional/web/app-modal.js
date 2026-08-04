@@ -16,7 +16,7 @@ export function openModal({eyebrow='PEDIDOS PRO',title,subtitle='',body,submitLa
   $('#modalBody').innerHTML=body;
   $('#modalFoot').innerHTML=`
     <button class="btn" type="button" data-modal-close>Cancelar</button>
-    ${hideSubmit?'':`<button class="btn primary" type="button" id="modalSubmit">${esc(submitLabel)}</button>`}
+    ${hideSubmit?'':`<button class="btn primary" type="submit" id="modalSubmit">${esc(submitLabel)}</button>`}
   `;
   if(dialog.open)dialog.close('replace');
   dialog.showModal();
@@ -26,16 +26,25 @@ export function openModal({eyebrow='PEDIDOS PRO',title,subtitle='',body,submitLa
   dialog.oncancel=event=>{event.preventDefault();closeModal('cancel')};
   dialog.onclick=event=>{if(event.target===dialog)closeModal('backdrop')};
 
+  frame.onsubmit=null;
   if(!hideSubmit){
-    $('#modalSubmit').onclick=async()=>{
+    frame.onsubmit=async event=>{
+      event.preventDefault();
+      event.stopPropagation();
       if(!frame.reportValidity())return;
       const button=$('#modalSubmit');
-      setBusy(button,true,'Guardando…');
+      if(!button||button.disabled)return;
+      setBusy(button,true,title==='Lista maestra'?'Creando documento…':'Guardando…');
       try{
+        if(typeof onSubmit!=='function')throw new Error('La acción de guardado no está disponible');
         await onSubmit(new FormData(frame),frame);
         closeModal('saved');
-      }catch(error){toast(error.message,'error')}
-      finally{setBusy(button,false)}
+      }catch(error){
+        console.error('modal_submit_failed',error);
+        toast(error?.message||'No se pudo completar la operación','error');
+      }finally{
+        setBusy(button,false);
+      }
     };
   }
   return dialog;
