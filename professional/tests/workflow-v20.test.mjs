@@ -76,7 +76,7 @@ assert.match(serviceWorker,/(?:v20-professional-sso|nuvasto-v21-brand-platform|n
 assert.match(serviceWorker,/app-professional-v20\.js/);
 assert.match(serviceWorker,/app-sso-v20\.js/);
 assert.match(serviceWorker,/app-history-semantic-v20\.js/);
-assert.match(pkg,/2\.0\.0-alpha\.(?:20|21|22|23)/);
+assert.match(pkg,/2\.0\.0-alpha\.(?:20|21|22|23|24)/);
 assert.match(pkg,/deploy:r2/);
 assert.match(pkg,/workflow-v20\.test\.mjs/);
 
