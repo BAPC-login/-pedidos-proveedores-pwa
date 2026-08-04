@@ -1,4 +1,4 @@
-const VERSION='nuvasto-v23-auth-keyboard';
+const VERSION='nuvasto-v23-auth-keyboard-startup-recovery';
 const SHELL=[
   './','./index.html','./styles.css','./pro-ui.css','./experience.css','./design-system-v13.css','./design-system-v14.css','./brand-v21.css',
   './app.js','./app-core.js','./app-views.js','./app-actions.js','./app-router-v14.js','./app-navigation-v14.js','./app-dashboard-v14.js','./app-enterprise-v15.js','./app-commercial-v16.js','./app-xlsx-v16.js','./app-readiness-v17.js','./app-import-preview-v17.js','./app-master-v18.js','./app-history-v18.js','./app-pdf-v18.js','./app-workflow-v19.js','./app-sso-v20.js','./app-professional-v20.js','./app-history-semantic-v20.js','./app-nuvasto-v21.js','./app-ux-v22.js','./app-nuvasto-v23.js',
