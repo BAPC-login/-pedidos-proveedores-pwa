@@ -43,9 +43,9 @@ assert.match(pdf,/companyLogo/);
 
 assert.match(storage,/REQUIRE_R2/);
 assert.match(storage,/r2_required/);
-assert.match(storage,/createProfessionalOrderPdfV22/);
-assert.match(storage,/pdfVersion:22/);
-assert.match(pdfApi,/pdfVersion\|\|0\)>=19/);
+assert.match(storage,/createProfessionalOrderPdfV24/);
+assert.match(storage,/pdfVersion:24/);
+assert.match(pdfApi,/pdfVersion\|\|0\)>=24/);
 assert.match(indexV19,/r2Ready:Boolean\(env\.FILES\)/);
 assert.match(indexV19,/invoicePendingOnly:true/);
 assert.match(indexV19,/pendingBatchWorkflowV19:true/);
@@ -62,4 +62,4 @@ assert.match(app,/initializeWorkflowV19/);
 assert.match(serviceWorker,/(?:v19-workflow-r2|v20-professional-sso|nuvasto-v21-brand-platform|nuvasto-v22-orders-pdf-motion|nuvasto-v23-auth-keyboard)/);
 assert.match(serviceWorker,/app-workflow-v19\.js/);
 
-console.log('workflow v19 compatibility under Nuvasto v23: OK');
+console.log('workflow v19 compatibility under Nuvasto v24: OK');
