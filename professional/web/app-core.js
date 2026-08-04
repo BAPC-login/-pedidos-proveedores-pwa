@@ -17,12 +17,16 @@ const state = {
 const responseCache=new Map();
 const pendingRequests=new Map();
 const GET_TTL=30000;
+const DEFAULT_REQUEST_TIMEOUT=15000;
 let sessionValidationPromise=null;
+
+function requestTimeoutError(){return Object.assign(new Error('La solicitud tardó demasiado. Revisa tu conexión e intenta nuevamente.'),{code:'request_timeout',status:0})}
 async function sessionStillValid(){
   if(!state.token)return false;
   if(sessionValidationPromise)return sessionValidationPromise;
-  sessionValidationPromise=fetch('/api/me',{method:'GET',cache:'no-store',headers:{Authorization:`Bearer ${state.token}`}})
-    .then(response=>response.ok?true:response.status===401?false:true).catch(()=>true).finally(()=>{sessionValidationPromise=null});
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6000);
+  sessionValidationPromise=fetch('/api/me',{method:'GET',cache:'no-store',headers:{Authorization:`Bearer ${state.token}`},signal:controller.signal})
+    .then(response=>response.ok?true:response.status===401?false:true).catch(()=>true).finally(()=>{clearTimeout(timer);sessionValidationPromise=null});
   return sessionValidationPromise;
 }
 function clearResponseCache(){responseCache.clear();pendingRequests.clear()}
@@ -37,18 +41,29 @@ const api = async (path, options={}) => {
   const request=(async()=>{
     const headers = new Headers(options.headers || {});
     if (state.token) headers.set('Authorization',`Bearer ${state.token}`);
-    const requestOptions={...options,method,headers,cache:'no-store'};
-    delete requestOptions.json;delete requestOptions.fresh;delete requestOptions.ttl;
+    const controller=new AbortController();
+    const upstreamSignal=options.signal;
+    if(upstreamSignal?.aborted)controller.abort(upstreamSignal.reason);
+    else upstreamSignal?.addEventListener?.('abort',()=>controller.abort(upstreamSignal.reason),{once:true});
+    const timeout=Math.max(1000,Number(options.timeout||DEFAULT_REQUEST_TIMEOUT));
+    const timer=setTimeout(()=>controller.abort(),timeout);
+    const requestOptions={...options,method,headers,cache:'no-store',signal:controller.signal};
+    delete requestOptions.json;delete requestOptions.fresh;delete requestOptions.ttl;delete requestOptions.timeout;
     if (options.json !== undefined) {headers.set('Content-Type','application/json');requestOptions.body=JSON.stringify(options.json)}
-    const response = await fetch(path,requestOptions);
-    const payload = await response.json().catch(()=>({ok:false,error:`HTTP ${response.status}`}));
-    if (response.status === 401 && state.token) {
-      const invalid=String(path)==='/api/me'||String(payload.code||'').includes('session_')||!(await sessionStillValid());
-      if(invalid)logoutLocal();
-    }
-    if (!response.ok || payload.ok === false) throw Object.assign(new Error(payload.error || 'No se pudo completar la operación'),{code:payload.code,status:response.status,details:payload.details});
-    if(method==='GET')responseCache.set(cacheKey,{time:Date.now(),value:payload});else clearResponseCache();
-    return payload;
+    try{
+      const response = await fetch(path,requestOptions);
+      const payload = await response.json().catch(()=>({ok:false,error:`HTTP ${response.status}`}));
+      if (response.status === 401 && state.token) {
+        const invalid=String(path)==='/api/me'||String(payload.code||'').includes('session_')||!(await sessionStillValid());
+        if(invalid)logoutLocal();
+      }
+      if (!response.ok || payload.ok === false) throw Object.assign(new Error(payload.error || 'No se pudo completar la operación'),{code:payload.code,status:response.status,details:payload.details});
+      if(method==='GET')responseCache.set(cacheKey,{time:Date.now(),value:payload});else clearResponseCache();
+      return payload;
+    }catch(error){
+      if(error?.name==='AbortError')throw requestTimeoutError();
+      throw error;
+    }finally{clearTimeout(timer)}
   })();
   if(method==='GET')pendingRequests.set(cacheKey,request);
   try{return await request}finally{if(method==='GET')pendingRequests.delete(cacheKey)}
@@ -61,11 +76,22 @@ function canBuy(){return ['owner','admin','purchaser','approver'].includes(state
 function setBusy(button,busy,label='Guardando…'){if(!button)return;if(busy){button.dataset.label=button.innerHTML;button.textContent=label;button.disabled=true}else{button.innerHTML=button.dataset.label||button.innerHTML;button.disabled=false}}
 function setTheme(theme){document.documentElement.dataset.theme=theme;localStorage.setItem('pp:theme',theme)}
 setTheme(localStorage.getItem('pp:theme') || 'system');
-async function openDb(){return new Promise((resolve,reject)=>{const request=indexedDB.open('pedidos-pro-platform',1);request.onupgradeneeded=()=>request.result.createObjectStore('mutations',{keyPath:'id'});request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)})}
-async function queueMutation(path,method,json){const db=await openDb();const mutation={id:crypto.randomUUID(),path,method,json,createdAt:new Date().toISOString()};await new Promise((resolve,reject)=>{const tx=db.transaction('mutations','readwrite');tx.objectStore('mutations').put(mutation);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});await updateSyncChip();return mutation}
-async function readMutations(){const db=await openDb();return new Promise((resolve,reject)=>{const r=db.transaction('mutations').objectStore('mutations').getAll();r.onsuccess=()=>resolve(r.result||[]);r.onerror=()=>reject(r.error)})}
-async function removeMutation(id){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction('mutations','readwrite');tx.objectStore('mutations').delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)})}
-async function syncMutations(){if(!navigator.onLine||!state.token)return;for(const mutation of await readMutations()){try{await api(mutation.path,{method:mutation.method,json:mutation.json,headers:{'Idempotency-Key':mutation.id}});await removeMutation(mutation.id)}catch(error){if(error.status===401)break;console.warn('sync_failed',mutation,error)}}await updateSyncChip()}
+function openDb(){return new Promise((resolve,reject)=>{
+  let settled=false;
+  const finish=(fn,value)=>{if(settled)return;settled=true;clearTimeout(timer);fn(value)};
+  const timer=setTimeout(()=>finish(reject,Object.assign(new Error('indexeddb_timeout'),{code:'indexeddb_timeout'})),2500);
+  try{
+    const request=indexedDB.open('pedidos-pro-platform',1);
+    request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains('mutations'))request.result.createObjectStore('mutations',{keyPath:'id'})};
+    request.onsuccess=()=>{if(settled){request.result.close();return}finish(resolve,request.result)};
+    request.onerror=()=>finish(reject,request.error||new Error('indexeddb_error'));
+    request.onblocked=()=>finish(reject,Object.assign(new Error('indexeddb_blocked'),{code:'indexeddb_blocked'}));
+  }catch(error){finish(reject,error)}
+})}
+async function queueMutation(path,method,json){const db=await openDb();const mutation={id:crypto.randomUUID(),path,method,json,createdAt:new Date().toISOString()};await new Promise((resolve,reject)=>{const tx=db.transaction('mutations','readwrite');tx.objectStore('mutations').put(mutation);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close();updateSyncChip().catch(()=>{});return mutation}
+async function readMutations(){const db=await openDb();return new Promise((resolve,reject)=>{let settled=false;const finish=(fn,value)=>{if(settled)return;settled=true;clearTimeout(timer);db.close();fn(value)};const timer=setTimeout(()=>finish(resolve,[]),1800);try{const r=db.transaction('mutations').objectStore('mutations').getAll();r.onsuccess=()=>finish(resolve,r.result||[]);r.onerror=()=>finish(reject,r.error)}catch(error){finish(reject,error)}})}
+async function removeMutation(id){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction('mutations','readwrite');tx.objectStore('mutations').delete(id);tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{db.close();reject(tx.error)}})}
+async function syncMutations(){if(!navigator.onLine||!state.token)return;for(const mutation of await readMutations().catch(()=>[])){try{await api(mutation.path,{method:mutation.method,json:mutation.json,headers:{'Idempotency-Key':mutation.id}});await removeMutation(mutation.id)}catch(error){if(error.status===401)break;console.warn('sync_failed',mutation,error)}}await updateSyncChip()}
 async function updateSyncChip(){const count=(await readMutations().catch(()=>[])).length;const chip=$('#syncChip');if(!chip)return;chip.querySelector('span').textContent=!navigator.onLine?'Sin conexión':count?`${count} pendiente${count===1?'':'s'}`:'Sincronizado';chip.classList.toggle('pending',count>0||!navigator.onLine)}
 function hideStartup(){$('#startupScreen')?.classList.add('hidden')}
 function showAuth(){hideStartup();$('#authScreen')?.classList.remove('hidden');$('#appShell')?.classList.add('hidden')}

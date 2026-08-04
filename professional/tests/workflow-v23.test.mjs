@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
-const [v23,app,sw,pkg]=await Promise.all([
+const [v23,app,appCore,sw,pkg]=await Promise.all([
   readFile(new URL('../web/app-nuvasto-v23.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app.js',import.meta.url),'utf8'),
+  readFile(new URL('../web/app-core.js',import.meta.url),'utf8'),
   readFile(new URL('../web/sw.js',import.meta.url),'utf8'),
   readFile(new URL('../package.json',import.meta.url),'utf8')
 ]);
@@ -32,9 +33,18 @@ assert.match(v23,/initializeNuvastoV23/);
 assert.match(app,/initializeNuvastoV23/);
 assert.ok(app.indexOf('initializeNuvastoV23()')<app.indexOf('initializeMasterV18()'),'v23 must block legacy v18 keyboard listeners first');
 assert.ok(app.indexOf('initializeNuvastoV23()')<app.indexOf('initializeNuvastoUXV22()'),'v23 must block legacy v22 keyboard listeners first');
-assert.match(sw,/nuvasto-v23-auth-keyboard/);
+assert.match(app,/startupWatchdog=setTimeout/);
+assert.match(app,/recoverStartup/);
+assert.match(app,/timeout:8000/);
+assert.match(app,/updateSyncChip\(\)\.catch/);
+assert.match(app,/initialize\(\)\.catch/);
+assert.match(appCore,/DEFAULT_REQUEST_TIMEOUT=15000/);
+assert.match(appCore,/requestTimeoutError/);
+assert.match(appCore,/indexeddb_timeout/);
+assert.match(appCore,/request\.onblocked/);
+assert.match(sw,/nuvasto-v23-auth-keyboard-startup-recovery/);
 assert.match(sw,/app-nuvasto-v23\.js/);
 assert.match(pkg,/2\.0\.0-alpha\.23/);
 assert.match(pkg,/workflow-v23\.test\.mjs/);
 
-console.log('workflow v23 professional auth and persistent keyboard tests: OK');
+console.log('workflow v23 auth, keyboard and startup recovery tests: OK');

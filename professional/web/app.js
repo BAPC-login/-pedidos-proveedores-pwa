@@ -24,12 +24,45 @@ import {initializeNuvastoUXV22} from './app-ux-v22.js';
 import {initializeNuvastoV23} from './app-nuvasto-v23.js';
 
 initializeNuvastoV21();initializeNuvastoV23();initializeBrandingFeatures();initializeProcurementSettings();initializeProcurementEntry();initializeOrderCoreV15();initializeCompanyLogoUploader();initializeFileActions();initializeSettingsPanelsV13();initializeExperience();initializeTelemetryV13();initializeNavigationV14();initializeCommercialV16();initializeImportPreviewV17();initializeMasterV18();initializeNuvastoUXV22();initializeHistoryV18();initializePdfV18();initializeWorkflowV19();initializeSsoV20();initializeProfessionalV20();initializeHistorySemanticV20();
+
+let startupFinished=false;
+let startupWatchdog=null;
+function finishStartup(){startupFinished=true;if(startupWatchdog){clearTimeout(startupWatchdog);startupWatchdog=null}}
+function recoverStartup(message='No pudimos restaurar la sesión automáticamente. Ingresa nuevamente para continuar.'){
+  if(startupFinished)return;
+  finishStartup();
+  showAuth();
+  const email=localStorage.getItem('nuvasto:last-email')||'';
+  if($('#loginEmail')&&!$('#loginEmail').value)$('#loginEmail').value=email;
+  toast(message,'error');
+}
+startupWatchdog=setTimeout(()=>recoverStartup('La restauración tardó demasiado. Mostramos el acceso para que puedas continuar.'),9000);
+
 function preloadOperations(){if(!state.token)return;Promise.allSettled([api('/api/orders').then(payload=>state.cache.orders=payload.orders||[]),api('/api/invoices').then(payload=>state.cache.invoices=payload.invoices||[]),api('/api/categories').then(payload=>state.cache.categories=payload.categories||[]),api('/api/cost-centers').then(payload=>state.cache.costCenters=payload.costCenters||[]),api('/api/suppliers').then(payload=>state.cache.suppliers=payload.suppliers||[]),api('/api/notifications'),api('/api/dashboard/layout')])}
-$('#loginForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;setBusy(button,true,'Ingresando…');try{const response=await api('/api/auth/login',{method:'POST',json:{email:$('#loginEmail').value,password:$('#loginPassword').value}});state.token=response.token;localStorage.setItem('pp:token',state.token);state.me=await api('/api/me');try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}showApp();preloadOperations();await openRoute('dashboard','',{replace:true});toast('Sesión iniciada')}catch(error){toast(error.message,'error')}finally{setBusy(button,false)}});
+$('#loginForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;setBusy(button,true,'Ingresando…');try{const email=$('#loginEmail').value.trim();const response=await api('/api/auth/login',{method:'POST',timeout:12000,json:{email,password:$('#loginPassword').value}});state.token=response.token;localStorage.setItem('pp:token',state.token);localStorage.setItem('nuvasto:last-email',email);state.me=await api('/api/me',{fresh:true,timeout:10000});try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}showApp();finishStartup();preloadOperations();await openRoute('dashboard','',{replace:true});toast('Sesión iniciada')}catch(error){toast(error.message,'error')}finally{setBusy(button,false)}});
 $('#openBootstrap').onclick=openBootstrap;$('#logoutButton').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST',json:{}})}catch{}logoutLocal()};$('#primaryAction').onclick=()=>handleAction(state.view==='invoices'?'analyze-invoice':state.view==='catalog'?'new-product':state.view==='suppliers'?'new-supplier':state.view==='team'?'new-user':'new-order');$('#mobileCreate').onclick=()=>openOrder();$('#themeButton').onclick=()=>{const current=document.documentElement.dataset.theme;setTheme(current==='system'?'light':current==='light'?'dark':'system')};$('#syncChip').onclick=syncMutations;$('#workspaceCard').addEventListener('click',openWorkspaceSwitcher);$('#mobileWorkspaceButton').addEventListener('click',openWorkspaceSwitcher);$('#mobileUserButton').addEventListener('click',openWorkspaceSwitcher);$('#globalSearch').addEventListener('focus',()=>openCommand());$('#globalSearch').addEventListener('keydown',event=>{if(event.key==='Enter')openCommand()});
 function openCommand(){$('#commandMenu').classList.remove('hidden');$('#commandInput').value='';renderCommands();setTimeout(()=>$('#commandInput').focus(),0)}
 function renderCommands(){const query=$('#commandInput').value.toLowerCase(),commands=[['dashboard','Ir a Resumen'],['receiving','Abrir pedidos por emitir'],['invoices','Ir a Documentos'],['history','Abrir historial'],['operations','Abrir Operaciones'],...(isAdmin()?[['professional','Control profesional Nuvasto'],['enterprise','Centro profesional y SaaS'],['team','Administrar usuarios'],['audit','Ver auditoría']]:[]),['settings','Abrir configuración']].filter(([,label])=>label.toLowerCase().includes(query));$('#commandResults').innerHTML=commands.map(([view,label])=>`<button class="command-result" data-command="${view}"><span>${label}</span><span>↵</span></button>`).join('');$$('[data-command]').forEach(node=>node.onclick=()=>{$('#commandMenu').classList.add('hidden');openRoute(node.dataset.command,node.dataset.command==='operations'?'home':'').catch(error=>toast(error.message,'error'))})}
-$('#commandInput').addEventListener('input',renderCommands);$('#commandMenu').addEventListener('click',event=>{if(event.target===$('#commandMenu'))$('#commandMenu').classList.add('hidden')});document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();openCommand()}if(event.key==='Escape')$('#commandMenu').classList.add('hidden')});window.addEventListener('online',()=>{state.online=true;updateSyncChip();syncMutations();toast('Conexión recuperada')});window.addEventListener('offline',()=>{state.online=false;updateSyncChip();toast('Modo offline','error')});
+$('#commandInput').addEventListener('input',renderCommands);$('#commandMenu').addEventListener('click',event=>{if(event.target===$('#commandMenu'))$('#commandMenu').classList.add('hidden')});document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();openCommand()}if(event.key==='Escape')$('#commandMenu').classList.add('hidden')});window.addEventListener('online',()=>{state.online=true;updateSyncChip().catch(()=>{});syncMutations().catch(error=>console.warn('sync_recovery_failed',error));toast('Conexión recuperada')});window.addEventListener('offline',()=>{state.online=false;updateSyncChip().catch(()=>{});toast('Modo offline','error')});
 if('serviceWorker'in navigator){navigator.serviceWorker.register('./sw.js').then(registration=>registration.update().catch(()=>{})).catch(console.warn);navigator.serviceWorker.addEventListener('controllerchange',()=>console.info('service_worker_updated'))}
-async function initialize(){await updateSyncChip();$('#openBootstrap').classList.add('hidden');if(!state.token){$('#loginEmail').value='';showAuth();return}try{state.me=await api('/api/me')}catch(error){if(error.status===401)logoutLocal();else toast('No se pudo validar la sesión. Reintentaremos al recuperar conexión.','error');return}try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}showApp();preloadOperations();try{await openInitialRouteV14()}catch(error){console.warn('initial_route_failed',error);await openRoute('dashboard','',{replace:true}).catch(()=>{});toast('La sesión sigue activa. Reintenta cargar el panel.','error')}syncMutations()}
-initialize();
+async function initialize(){
+  updateSyncChip().catch(error=>console.warn('sync_chip_startup_failed',error));
+  $('#openBootstrap').classList.add('hidden');
+  if(!state.token){
+    const email=localStorage.getItem('nuvasto:last-email')||'';
+    if($('#loginEmail'))$('#loginEmail').value=email;
+    showAuth();finishStartup();return;
+  }
+  try{state.me=await api('/api/me',{fresh:true,timeout:8000})}
+  catch(error){
+    console.warn('session_restore_failed',error);
+    if(error.status===401)logoutLocal();
+    else recoverStartup(error.code==='request_timeout'?'No fue posible validar la sesión a tiempo. Ingresa nuevamente para continuar.':'No se pudo restaurar la sesión. Ingresa nuevamente para continuar.');
+    finishStartup();return;
+  }
+  try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}
+  showApp();finishStartup();preloadOperations();
+  try{await openInitialRouteV14()}catch(error){console.warn('initial_route_failed',error);await openRoute('dashboard','',{replace:true}).catch(()=>{});toast('La sesión sigue activa. Reintenta cargar el panel.','error')}
+  syncMutations().catch(error=>console.warn('sync_startup_failed',error));
+}
+initialize().catch(error=>{console.error('startup_failed',error);recoverStartup('Ocurrió un error al iniciar Nuvasto. Ingresa nuevamente para continuar.')});
