@@ -44,7 +44,7 @@ assert.match(appCore,/indexeddb_timeout/);
 assert.match(appCore,/request\.onblocked/);
 assert.match(sw,/nuvasto-v23-auth-keyboard-startup-recovery/);
 assert.match(sw,/app-nuvasto-v23\.js/);
-assert.match(pkg,/2\.0\.0-alpha\.(?:23|24)/);
+assert.match(pkg,/2\.0\.0-alpha\.(?:23|24|25)/);
 assert.match(pkg,/workflow-v23\.test\.mjs/);
 
-console.log('workflow v23 compatibility under Nuvasto v24: OK');
+console.log('workflow v23 compatibility under Nuvasto v25: OK');
