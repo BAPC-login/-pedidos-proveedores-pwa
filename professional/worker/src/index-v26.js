@@ -57,7 +57,7 @@ async function analyzeInvoiceV26(request,env,actor){
   const orderFile=form.get('orderFile');
   let context={};try{context=JSON.parse(String(form.get('context')||'{}'))}catch{throw new HttpError(400,'Contexto de cotejo inválido','invalid_context')}
   context={...context,organizationId:actor.orgId,requestedBy:actor.userId,normalizationVersion:26};
-  const sourceFile=await storeFile(env,actor,file,{purpose:'invoice-source',entityType:'invoice-analysis',entityId:crypto.randomUUID(),documentKind:'invoice_original_pending',metadata:{providerName:String(context.providerName||''),folio:String(context.folio||''),locationId:String(context.locationId||'')}});
+  const sourceFile=await storeFile(env,actor,file,{purpose:'invoice-source'});
   await incrementUsage(env,actor.orgId,'file_bytes',file.size);
   const raw=await callInvoiceAi(env,{file,orderFile,context});
   const normalized=normalizeInvoiceAnalysis({...raw,sourceFile},context);
