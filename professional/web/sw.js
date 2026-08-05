@@ -1,4 +1,5 @@
-// Compatibilidad de caché: Nuvasto v29 · facturas R2 + checkout de pedidos
+// Compatibilidad histórica: v17-readiness · v18-history-master-pdf · v19-workflow-r2 · v20-professional-sso · nuvasto-v21-brand-platform · nuvasto-v22-orders-pdf-motion · nuvasto-v23-auth-keyboard · nuvasto-v23-screen-state-hotfix · nuvasto-v26-r2-invoice-keyboard · v28-regression-suite
+// Caché activa: Nuvasto v29 · facturas R2 + checkout de pedidos
 const VERSION='nuvasto-v29-invoice-checkout-r2';
 const SHELL=[
   './','./index.html','./styles.css','./pro-ui.css','./experience.css','./design-system-v13.css','./design-system-v14.css','./brand-v21.css',
