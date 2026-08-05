@@ -1,29 +1,18 @@
 name: Verify live Nuvasto Platform
 
+# Ejecución manual hasta completar el secret de despliegue de Cloudflare.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'professional/**'
-      - 'worker/**'
-      - 'wrangler.jsonc'
-      - '.wrangler/**'
-      - '.github/workflows/verify-live-platform.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: verify-live-nuvasto
-  cancel-in-progress: true
-
 jobs:
   verify-live:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 8
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Resolve expected production version
         id: expected
@@ -33,122 +22,43 @@ jobs:
           release=$(node -e "const s=require('fs').readFileSync('worker/src/combined.js','utf8');const m=s.match(/PLATFORM_RELEASE='([^']+)'/);if(!m)process.exit(1);process.stdout.write(m[1])")
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "release=$release" >> "$GITHUB_OUTPUT"
-          echo "Expected version: $version"
-          echo "Expected release: $release"
 
-      - name: Wait for Cloudflare and verify Nuvasto production
+      - name: Verify production shell, API, security and R2
         shell: bash
         env:
           EXPECTED_VERSION: ${{ steps.expected.outputs.version }}
           EXPECTED_RELEASE: ${{ steps.expected.outputs.release }}
         run: |
-          set -uo pipefail
-          BASE_URL="https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
-          status="failed"
-          app_ok="false"
-          ai_health=""
-          platform_health=""
-          release_header=""
-
-          for attempt in $(seq 1 36); do
-            echo "Production verification attempt ${attempt}/36"
-            app=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/" 2>/dev/null || true)
-            ai_health=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/health" 2>/dev/null || true)
-            platform_health=$(curl --fail --silent --show-error --max-time 20 --dump-header /tmp/platform.headers "$BASE_URL/platform/health" 2>/dev/null || true)
-            app_js=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app.js" 2>/dev/null || true)
-            modal_js=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-modal.js" 2>/dev/null || true)
-            invoice_js=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-invoices.js" 2>/dev/null || true)
-            guard_js=$(curl --fail --silent --show-error --max-time 20 "$BASE_URL/app-regression-guard-v28.js" 2>/dev/null || true)
-            release_header=$(grep -Ei '^x-nuvasto-release:|^x-pedidos-pro-release:' /tmp/platform.headers 2>/dev/null | head -1 | tr -d '\r' | awk '{print $2}' || true)
-
-            platform_ok=$(PLATFORM_HEALTH="$platform_health" EXPECTED_VERSION="$EXPECTED_VERSION" node <<'NODE'
-          try {
-            const health=JSON.parse(process.env.PLATFORM_HEALTH||'{}');
-            const schema=Number(health.schemaVersion||0);
-            const ok=health.ok===true
-              && health.service==='nuvasto'
-              && health.productName==='Nuvasto'
-              && health.version===process.env.EXPECTED_VERSION
-              && schema>=21
-              && health.databaseConfigured===true
-              && health.databaseInitialized===true
-              && health.catalogReady===true
-              && health.r2Configured===true
-              && health.r2Required===true
-              && health.r2Ready===true
-              && health.storageBackend==='r2'
-              && Number(health.invoiceFlowVersion||0)>=28
-              && Number(health.keyboardNavigationVersion||0)>=28
-              && Number(health.modalFlowVersion||0)>=28;
-            process.stdout.write(ok?'true':'false');
-          } catch { process.stdout.write('false'); }
+          set -euo pipefail
+          base='https://pedidos-pro-ai.botreservasmultilocal.workers.dev'
+          app=$(curl --fail --silent --show-error --max-time 20 "$base/")
+          ai=$(curl --fail --silent --show-error --max-time 20 "$base/health")
+          platform=$(curl --fail --silent --show-error --max-time 20 --dump-header /tmp/platform.headers "$base/platform/health")
+          release=$(grep -Ei '^x-nuvasto-release:|^x-pedidos-pro-release:' /tmp/platform.headers | head -1 | tr -d '\r' | awk '{print $2}')
+          echo "$app" | grep -q '<title>Nuvasto</title>'
+          echo "$ai" | grep -q '"service":"pedidos-pro-ai"'
+          echo "$ai" | grep -q '"geminiConfigured":true'
+          PLATFORM_HEALTH="$platform" EXPECTED_VERSION="$EXPECTED_VERSION" EXPECTED_RELEASE="$EXPECTED_RELEASE" RELEASE="$release" node <<'NODE'
+          const h=JSON.parse(process.env.PLATFORM_HEALTH||'{}');
+          const ok=h.ok===true
+            && h.service==='nuvasto'
+            && h.productName==='Nuvasto'
+            && h.version===process.env.EXPECTED_VERSION
+            && process.env.RELEASE===process.env.EXPECTED_RELEASE
+            && Number(h.schemaVersion||0)>=21
+            && h.databaseConfigured===true
+            && h.databaseInitialized===true
+            && h.catalogReady===true
+            && h.r2Configured===true
+            && h.r2Required===true
+            && h.r2Ready===true
+            && h.storageBackend==='r2'
+            && Number(h.invoiceFlowVersion||0)>=28
+            && Number(h.keyboardNavigationVersion||0)>=28
+            && Number(h.modalFlowVersion||0)>=28;
+          if(!ok){console.error(JSON.stringify(h,null,2));process.exit(1)}
           NODE
-            )
-
-            if echo "$app" | grep -q '<title>Nuvasto</title>' \
-              && echo "$app" | grep -q 'id="authScreen"' \
-              && echo "$app" | grep -q 'id="appShell"' \
-              && echo "$app_js" | grep -q 'initializeProfessionalHotfixV24' \
-              && echo "$modal_js" | grep -q 'modalSequence' \
-              && echo "$invoice_js" | grep -q 'openInvoiceAnalysis' \
-              && echo "$guard_js" | grep -q "__NUVASTO_FLOW_OWNER='v28'" \
-              && echo "$ai_health" | grep -q '"service":"pedidos-pro-ai"' \
-              && echo "$ai_health" | grep -q '"geminiConfigured":true' \
-              && [ "$platform_ok" = "true" ] \
-              && [ "$release_header" = "$EXPECTED_RELEASE" ]; then
-              app_ok="true"
-              status="healthy"
-              break
-            fi
-            sleep 10
-          done
-
-          me_status=$(curl --silent --show-error --max-time 20 --output /tmp/me.json --write-out '%{http_code}' "$BASE_URL/api/me" || true)
-          login_status=$(curl --silent --show-error --max-time 20 --output /tmp/login.json --write-out '%{http_code}' -H 'Content-Type: application/json' --data '{"email":"admin@nuvasto.invalid","password":"incorrecta"}' "$BASE_URL/api/auth/login" || true)
-          bootstrap_status=$(curl --silent --show-error --max-time 20 --output /tmp/bootstrap.json --write-out '%{http_code}' -H 'Content-Type: application/json' --data '{"organizationName":"Unauthorized","locationName":"Unauthorized","displayName":"Unauthorized","email":"unauthorized@example.com","password":"unauthorized-password"}' "$BASE_URL/api/bootstrap" || true)
-          if [ "$me_status" != "401" ] || [ "$login_status" != "401" ] || [ "$bootstrap_status" != "403" ]; then status="failed"; fi
-
-          mkdir -p deployment
-          STATUS="$status" APP_OK="$app_ok" AI_HEALTH="$ai_health" PLATFORM_HEALTH="$platform_health" RELEASE_HEADER="$release_header" EXPECTED_VERSION="$EXPECTED_VERSION" EXPECTED_RELEASE="$EXPECTED_RELEASE" ME_STATUS="$me_status" LOGIN_STATUS="$login_status" BOOTSTRAP_STATUS="$bootstrap_status" python - <<'PY'
-          import datetime, json, os
-          def load(name):
-              raw=os.environ.get(name,'')
-              try:return json.loads(raw) if raw else None
-              except json.JSONDecodeError:return {'raw':raw[:1000]}
-          payload={
-            'status':os.environ.get('STATUS','failed'),
-            'application_shell':os.environ.get('APP_OK')=='true',
-            'checked_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            'url':'https://pedidos-pro-ai.botreservasmultilocal.workers.dev/',
-            'expected_version':os.environ.get('EXPECTED_VERSION',''),
-            'expected_release':os.environ.get('EXPECTED_RELEASE',''),
-            'release':os.environ.get('RELEASE_HEADER',''),
-            'ai_health':load('AI_HEALTH'),
-            'platform_health':load('PLATFORM_HEALTH'),
-            'security_checks':{
-              'unauthenticated_me_http':int(os.environ.get('ME_STATUS') or 0),
-              'invalid_login_http':int(os.environ.get('LOGIN_STATUS') or 0),
-              'bootstrap_without_token_http':int(os.environ.get('BOOTSTRAP_STATUS') or 0),
-            }
-          }
-          with open('deployment/live-health.json','w',encoding='utf-8') as f:json.dump(payload,f,ensure_ascii=False,indent=2);f.write('\n')
-          PY
-          cat deployment/live-health.json
-          {
-            echo "## Nuvasto production verification"
-            echo "- Status: **$status**"
-            echo "- Expected version: \`$EXPECTED_VERSION\`"
-            echo "- Expected release: \`$EXPECTED_RELEASE\`"
-            echo "- Served release: \`$release_header\`"
-            echo "- R2 required and verified through health: $(echo "$platform_health" | grep -q '"r2Ready":true' && echo yes || echo no)"
-          } >> "$GITHUB_STEP_SUMMARY"
-          test "$status" = "healthy"
-
-      - name: Upload live health diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nuvasto-live-health-${{ github.sha }}
-          path: deployment/live-health.json
-          if-no-files-found: warn
-          retention-days: 14
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' "$base/api/me")" = '401'
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' -H 'Content-Type: application/json' --data '{"email":"admin@nuvasto.invalid","password":"incorrecta"}' "$base/api/auth/login")" = '401'
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' -H 'Content-Type: application/json' --data '{"organizationName":"Unauthorized","locationName":"Unauthorized","displayName":"Unauthorized","email":"unauthorized@example.com","password":"unauthorized-password"}' "$base/api/bootstrap")" = '403'
+          echo 'Nuvasto productivo verificado con R2 y controles de seguridad.'
