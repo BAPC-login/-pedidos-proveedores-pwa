@@ -46,6 +46,7 @@ assert.match(invoice,/orderPdf\(orderId\)/);
 assert.match(entry,/data-v16-invoice/);
 assert.match(entry,/stopImmediatePropagation/);
 assert.match(entry,/app-checkout-upgrade-v29\.js/);
+assert.match(entry,/app-runtime-v30\.js/);
 assert.match(ui,/v29-invoice-line/);
 assert.match(ui,/stopProgress/);
 
@@ -64,13 +65,13 @@ assert.match(indexV29,/invoiceFlowVersion:29/);
 assert.match(indexV29,/checkoutFlowVersion:29/);
 assert.match(indexV29,/folioRenumberingVersion:29/);
 assert.match(combined,/index-v29\.js/);
-assert.match(combined,/2026\.08\.05\.30/);
+assert.match(combined,/index-v30\.js/);
+assert.match(combined,/2026\.08\.05\.31/);
 assert.match(app,/app-invoice-entry-v29\.js/);
 assert.match(app,/initializeCheckoutInvoiceV29/);
 assert.match(sw,/nuvasto-v29-invoice-checkout-r2/);
-assert.match(sw,/app-invoice-v29\.js/);
 assert.match(sw,/app-checkout-upgrade-v29\.js/);
 assert.match(pkg,/app-checkout-upgrade-v29\.js/);
-assert.match(pkg,/2\.0\.0-alpha\.29/);
+assert.match(pkg,/2\.0\.0-alpha\.30/);
 
-console.log('workflow v29 invoice, checkout upgrade, R2 and folio renumbering: OK');
+console.log('workflow v29 checkout compatibility under Nuvasto v30: OK');
