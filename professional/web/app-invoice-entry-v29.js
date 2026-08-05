@@ -16,7 +16,7 @@ async function orderForTrigger(trigger){
 }
 
 window.addEventListener('click',async event=>{
-  const detail=event.target.closest?.('#attachInvoice,#attachInvoiceBottom,#v30AttachInvoice,#v30AttachInvoiceBottom');
+  const detail=event.target.closest?.('#attachInvoice,#attachInvoiceBottom');
   const history=event.target.closest?.('[data-v16-invoice]');
   const home=event.target.closest?.('[data-action="analyze-invoice"]');
   const primary=event.target.closest?.('#primaryAction');
