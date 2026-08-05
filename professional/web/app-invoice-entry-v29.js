@@ -1,3 +1,4 @@
+import './app-v29-ui.js';
 import {$,state,api,toast,setBusy} from './app-core.js';
 import {openInvoiceAnalysisV29} from './app-invoice-v29.js';
 
