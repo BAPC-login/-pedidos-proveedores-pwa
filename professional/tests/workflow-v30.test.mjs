@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
-const [analysis,indexV30,runtime,invoice,detail,detailWrapper,invoiceWrapper,entry,combined,sw,pkg,readiness]=await Promise.all([
+const [analysis,indexV30,runtime,invoice,orders,detail,detailWrapper,invoiceWrapper,entry,combined,sw,pkg,readiness]=await Promise.all([
   readFile(new URL('../worker/src/api/invoice-analysis-v30.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/index-v30.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-runtime-v30.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-invoice-v30.js',import.meta.url),'utf8'),
+  readFile(new URL('../web/app-orders-v30.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-order-detail-v30.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-order-detail.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-invoices.js',import.meta.url),'utf8'),
@@ -46,6 +47,15 @@ assert.match(invoice,/openInvoiceAnalysisV30/);
 assert.match(invoice,/timeout:124000/);
 assert.match(invoice,/Producto del pedido/);
 
+assert.match(orders,/registerRouteRenderer\('orders'/);
+assert.match(orders,/Subir factura/);
+assert.match(orders,/Registrar recepción/);
+assert.match(orders,/Compartir/);
+assert.match(orders,/loadCapabilitiesV30/);
+assert.match(orders,/Factura pendiente/);
+assert.match(orders,/Recepción pendiente/);
+assert.match(entry,/setTimeout\(\(\)=>initializeOrdersV30\(\),0\)/);
+
 assert.match(detail,/v30-reception-card/);
 assert.match(detail,/Cantidad inferior al pedido/);
 assert.match(detail,/Conciliación incompleta/);
@@ -58,15 +68,18 @@ assert.match(detailWrapper,/app-order-detail-v30\.js/);
 assert.match(invoiceWrapper,/app-invoice-v30\.js/);
 assert.match(entry,/app-runtime-v30\.js/);
 assert.match(entry,/openInvoiceAnalysisV30/);
+assert.match(entry,/app-orders-v30\.js/);
 
 assert.match(combined,/index-v30\.js/);
 assert.match(combined,/2026\.08\.05\.31/);
-assert.match(sw,/nuvasto-v30-reliability-mobile/);
+assert.match(sw,/nuvasto-v30-operational-orders/);
 assert.match(sw,/app-runtime-v30\.js/);
 assert.match(sw,/app-order-detail-v30\.js/);
+assert.match(sw,/app-orders-v30\.js/);
 assert.match(pkg,/2\.0\.0-alpha\.30/);
 assert.match(pkg,/workflow-v30\.test\.mjs/);
+assert.match(pkg,/app-orders-v30\.js/);
 
 for(const feature of ['runInvoiceBenchmarkV17','runIsolationAuditV17','saveOnboardingV17','manageSubscriptionV17','verifyRecoveryV17','createSupportTicketV17','saveLegalV17'])assert.match(readiness,new RegExp(feature));
 
-console.log('workflow v30 internal invoice fallback, mobile menus and role capabilities: OK');
+console.log('workflow v30 invoice fallback, mobile menus, role capabilities and order cards: OK');
