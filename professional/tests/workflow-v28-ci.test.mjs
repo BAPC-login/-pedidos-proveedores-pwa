@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
-const [rootWrangler,professionalWrangler,combined,indexV28,verifyWorkflow,browserWorkflow,browserTest,pkg]=await Promise.all([
+const [rootWrangler,professionalWrangler,deployRedirect,combined,indexV28,verifyWorkflow,browserWorkflow,browserTest,pkg]=await Promise.all([
   readFile(new URL('../../wrangler.jsonc',import.meta.url),'utf8'),
   readFile(new URL('../wrangler.toml',import.meta.url),'utf8'),
+  readFile(new URL('../../.wrangler/deploy/config.json',import.meta.url),'utf8'),
   readFile(new URL('../../worker/src/combined.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/index-v28.js',import.meta.url),'utf8'),
   readFile(new URL('../../.github/workflows/verify-live-platform.yml',import.meta.url),'utf8'),
@@ -13,9 +14,11 @@ const [rootWrangler,professionalWrangler,combined,indexV28,verifyWorkflow,browse
 ]);
 
 const rootConfig=JSON.parse(rootWrangler);
+const redirectConfig=JSON.parse(deployRedirect);
 assert.equal(rootConfig.vars.PRODUCT_NAME,'Nuvasto');
 assert.equal(rootConfig.vars.REQUIRE_R2,'true');
 assert.ok(rootConfig.r2_buckets?.some(binding=>binding.binding==='FILES'&&binding.bucket_name==='nuvasto-files'));
+assert.equal(redirectConfig.configPath,'../../professional/wrangler.toml');
 assert.match(professionalWrangler,/binding = "FILES"/);
 assert.match(professionalWrangler,/bucket_name = "nuvasto-files"/);
 assert.match(professionalWrangler,/REQUIRE_R2 = "true"/);
@@ -50,4 +53,4 @@ assert.match(browserTest,/analyze-invoice/);
 assert.match(browserTest,/data-view=.*orders/);
 assert.match(pkg,/2\.0\.0-alpha\.28/);
 
-console.log('workflow v28 CI, deployment, R2 and live browser alignment: OK');
+console.log('workflow v28 CI, explicit deploy config, R2 and live browser alignment: OK');
