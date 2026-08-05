@@ -7,6 +7,7 @@ on:
       - 'professional/**'
       - 'worker/**'
       - 'wrangler.jsonc'
+      - '.wrangler/**'
       - '.github/workflows/verify-live-platform.yml'
   workflow_dispatch:
 
