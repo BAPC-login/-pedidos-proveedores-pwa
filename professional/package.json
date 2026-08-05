@@ -1,6 +1,7 @@
 {
   "name": "nuvasto-platform",
   "version": "2.0.0-alpha.27",
+  "compatibilityVersion": "2.0.0-alpha.26",
   "private": true,
   "type": "module",
   "scripts": {
