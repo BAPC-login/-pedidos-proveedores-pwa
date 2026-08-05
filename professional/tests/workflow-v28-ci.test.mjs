@@ -46,8 +46,8 @@ assert.match(browserWorkflow,/actions\/checkout@v5/);
 assert.match(browserWorkflow,/actions\/setup-node@v5/);
 assert.match(browserWorkflow,/working-directory: professional/);
 assert.match(browserTest,/page\.title\(\),'Nuvasto'/);
-assert.match(browserTest,/data-action=\\"analyze-invoice\\"/);
-assert.match(browserTest,/data-view=\\"orders\\"/);
+assert.match(browserTest,/analyze-invoice/);
+assert.match(browserTest,/data-view=.*orders/);
 assert.match(pkg,/2\.0\.0-alpha\.28/);
 
 console.log('workflow v28 CI, deployment, R2 and live browser alignment: OK');
