@@ -8,16 +8,25 @@ const ANALYSIS_TIMEOUT_MS=112000;
 const rows=result=>result?.results||[];
 
 async function usageValue(env,orgId,metric){
-  const row=await env.DB.prepare('SELECT quantity FROM usage_counters WHERE org_id=? AND month_key=? AND metric=?').bind(orgId,monthKey(),metric).first();
-  return Number(row?.quantity||0);
+  try{
+    const row=await env.DB.prepare('SELECT quantity FROM usage_counters WHERE org_id=? AND month_key=? AND metric=?').bind(orgId,monthKey(),metric).first();
+    return Number(row?.quantity||0);
+  }catch(error){
+    console.warn('invoice_usage_read_failed',error?.message||error);
+    return 0;
+  }
 }
 
 async function incrementUsage(env,orgId,metric,amount=1){
-  await env.DB.prepare(`INSERT INTO usage_counters(org_id,month_key,metric,quantity,updated_at)
-    VALUES(?,?,?,?,?)
-    ON CONFLICT(org_id,month_key,metric)
-    DO UPDATE SET quantity=usage_counters.quantity+excluded.quantity,updated_at=excluded.updated_at`)
-    .bind(orgId,monthKey(),metric,amount,nowIso()).run();
+  try{
+    await env.DB.prepare(`INSERT INTO usage_counters(org_id,month_key,metric,quantity,updated_at)
+      VALUES(?,?,?,?,?)
+      ON CONFLICT(org_id,month_key,metric)
+      DO UPDATE SET quantity=usage_counters.quantity+excluded.quantity,updated_at=excluded.updated_at`)
+      .bind(orgId,monthKey(),metric,amount,nowIso()).run();
+  }catch(error){
+    console.warn('invoice_usage_write_failed',metric,error?.message||error);
+  }
 }
 
 async function recordClientEvent(env,actor,eventType,message,metadata={}){
@@ -129,12 +138,16 @@ export async function analyzeInvoiceV30(request,env,actor){
   let context={};
   try{context=JSON.parse(String(form.get('context')||'{}'))}
   catch{throw new HttpError(400,'El contexto del pedido no es válido.','invalid_context')}
-  context={...context,organizationId:actor.orgId,requestedBy:actor.userId,normalizationVersion:26,flowVersion:30,brand:'Nuvasto'};
+  context={...context,organizationId:actor.orgId,requestedBy:actor.userId,normalizationVersion:26,flowVersion:31,brand:'Nuvasto'};
 
   const analysisId=crypto.randomUUID();
+  // El archivo se registra primero en la tabla files y en R2, pero todavía no se
+  // vincula a document_links. Ese vínculo se crea al confirmar la factura, cuando
+  // ya existe un invoice_id real. Antes se usaba entity_type="invoice-analysis",
+  // valor no admitido por el CHECK de document_links, por lo que D1 revertía la
+  // operación antes de llegar al motor de lectura.
   const sourceFile=await storeFile(env,actor,file,{
-    purpose:'invoice-source',entityType:'invoice-analysis',entityId:analysisId,documentKind:'invoice_original_pending',
-    metadata:{providerName:String(context.providerName||''),folio:String(context.folio||''),locationId:String(context.locationId||''),flowVersion:30}
+    purpose:'invoice-source'
   });
   await incrementUsage(env,actor.orgId,'file_bytes',file.size);
   const started=Date.now();
@@ -147,16 +160,18 @@ export async function analyzeInvoiceV30(request,env,actor){
     const elapsedMs=Date.now()-started;
     normalized.elapsedMs=elapsedMs;
     normalized.degraded=false;
+    normalized.flowVersion=31;
     await incrementUsage(env,actor.orgId,'ai_documents',1);
-    await recordClientEvent(env,actor,'invoice.analysis.success','Documento leído y cotejado',{analysisId,folio:String(context.folio||''),fileName:file.name,lineCount:lines.length,matched:lines.filter(line=>line.productId).length,elapsedMs,model:normalized.model||raw.model||''});
-    await writeAudit(env,actor,request,'invoice.analyze','invoice-analysis',analysisId,{status:'success',fileName:file.name,sourceFileId:sourceFile.id,flowVersion:30,folio:String(context.folio||''),lineCount:lines.length,elapsedMs,model:normalized.model||raw.model||''});
+    await recordClientEvent(env,actor,'invoice.analysis.success','Documento leído y cotejado',{analysisId,folio:String(context.folio||''),fileName:file.name,lineCount:lines.length,matched:lines.filter(line=>line.productId).length,elapsedMs,model:normalized.model||raw.model||'',sourceFileId:sourceFile.id,flowVersion:31});
+    await writeAudit(env,actor,request,'invoice.analyze','invoice-analysis',analysisId,{status:'success',fileName:file.name,sourceFileId:sourceFile.id,flowVersion:31,folio:String(context.folio||''),lineCount:lines.length,elapsedMs,model:normalized.model||raw.model||''});
     return normalized;
   }catch(error){
     const elapsedMs=Date.now()-started;
     const fallback=degradedAnalysis(context,sourceFile,error,elapsedMs);
+    fallback.flowVersion=31;
     await incrementUsage(env,actor.orgId,'ai_documents',1);
-    await recordClientEvent(env,actor,'invoice.analysis.degraded','Lectura automática derivada a revisión manual',{analysisId,folio:String(context.folio||''),fileName:file.name,elapsedMs,errorCode:error?.code||'analysis_failed',errorMessage:String(error?.message||error),attempts:error?.details?.attempts||[]});
-    await writeAudit(env,actor,request,'invoice.analyze','invoice-analysis',analysisId,{status:'degraded',fileName:file.name,sourceFileId:sourceFile.id,flowVersion:30,folio:String(context.folio||''),elapsedMs,errorCode:error?.code||'analysis_failed'});
+    await recordClientEvent(env,actor,'invoice.analysis.degraded','Lectura automática derivada a revisión manual',{analysisId,folio:String(context.folio||''),fileName:file.name,elapsedMs,errorCode:error?.code||'analysis_failed',errorMessage:String(error?.message||error),attempts:error?.details?.attempts||[],sourceFileId:sourceFile.id,flowVersion:31});
+    await writeAudit(env,actor,request,'invoice.analyze','invoice-analysis',analysisId,{status:'degraded',fileName:file.name,sourceFileId:sourceFile.id,flowVersion:31,folio:String(context.folio||''),elapsedMs,errorCode:error?.code||'analysis_failed'});
     return fallback;
   }
 }

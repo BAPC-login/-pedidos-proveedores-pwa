@@ -25,9 +25,10 @@ assert.match(professionalWrangler,/bucket_name = "nuvasto-files"/);
 assert.match(professionalWrangler,/REQUIRE_R2 = "true"/);
 
 assert.match(combined,/index-v30\.js/);
-assert.match(combined,/2026\.08\.05\.31/);
-assert.match(indexCurrent,/2\.0\.0-alpha\.30/);
-assert.match(indexCurrent,/invoiceFlowVersion:30/);
+assert.match(combined,/2026\.08\.05\.32/);
+assert.match(indexCurrent,/2\.0\.0-alpha\.31/);
+assert.match(indexCurrent,/invoiceFlowVersion:31/);
+assert.match(indexCurrent,/invoiceStorageLinkFix:true/);
 assert.match(indexCurrent,/invoiceFallbackReview:true/);
 assert.match(indexCurrent,/capabilityMatrixVersion:30/);
 assert.match(indexCurrent,/responsiveOperationalModals:true/);
@@ -62,6 +63,6 @@ assert.match(browserWorkflow,/working-directory: professional/);
 assert.match(browserTest,/page\.title\(\),'Nuvasto'/);
 assert.match(browserTest,/analyze-invoice/);
 assert.match(browserTest,/data-view=.*orders/);
-assert.match(pkg,/2\.0\.0-alpha\.30/);
+assert.match(pkg,/2\.0\.0-alpha\.31/);
 
-console.log('workflow v30 automatic Cloudflare deploy, R2 and manual live checks alignment: OK');
+console.log('workflow v31 automatic Cloudflare deploy, R2 and manual live checks alignment: OK');
