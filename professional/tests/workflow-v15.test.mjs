@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
-const [schema,legacy,enterprise,index,scoped,orderCore,keyboard,orderDetail,dashboard,settings,admin,liveBrowser,serviceWorker,migration]=await Promise.all([
+const [schema,legacy,enterprise,index,scoped,orderCore,keyboard,orderDetailWrapper,orderDetail,dashboard,settings,admin,liveBrowser,serviceWorker,migration]=await Promise.all([
   readFile(new URL('../worker/src/schema.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/legacyCatalog.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/api/enterprise-v15.js',import.meta.url),'utf8'),
@@ -10,6 +10,7 @@ const [schema,legacy,enterprise,index,scoped,orderCore,keyboard,orderDetail,dash
   readFile(new URL('../web/app-order-core-v15.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-experience-keyboard.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-order-detail.js',import.meta.url),'utf8'),
+  readFile(new URL('../web/app-order-detail-v30.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-dashboard-v14.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-enterprise-v15.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-experience-admin.js',import.meta.url),'utf8'),
@@ -61,10 +62,12 @@ assert.doesNotMatch(orderCore,/quantity-keyboard-toolbar/);
 assert.doesNotMatch(keyboard,/createElement\('div'\)/);
 assert.doesNotMatch(keyboard,/quantity-keyboard-toolbar/);
 assert.match(keyboard,/focusNext/);
-assert.match(orderDetail,/Recepción avanzada/);
-assert.match(orderDetail,/Conciliar 3 vías/);
+assert.match(orderDetailWrapper,/app-order-detail-v30\.js/);
+assert.match(orderDetail,/Registrar recepción/);
+assert.match(orderDetail,/Conciliar pedido/);
 assert.match(orderDetail,/Duplicar/);
 assert.match(orderDetail,/order-edit:/);
+assert.match(orderDetail,/Papelera|Eliminar/);
 assert.match(dashboard,/dashboard\/layout/);
 assert.match(settings,/Papelera y restauración/);
 assert.match(settings,/Exportación ejecutiva/);
@@ -73,4 +76,4 @@ assert.match(liveBrowser,/WebKit iPhone/);
 assert.match(liveBrowser,/WebKit iPad/);
 assert.match(serviceWorker,/addEventListener\('push'/);
 
-console.log('workflow v15 compatibility tests: OK');
+console.log('workflow v15 compatibility tests through Nuvasto v30: OK');
