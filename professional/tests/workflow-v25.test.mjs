@@ -22,9 +22,9 @@ assert.match(completion,/visualViewport\?\.addEventListener\('resize'/);
 assert.match(completion,/NuvastoDiagnostics/);
 assert.match(completion,/SKIP_WAITING/);
 assert.match(hotfix,/app-commercial-completion-v25\.js/);
-assert.match(sw,/v25-commercial-completion-date-keyboard/);
+assert.match(sw,/(?:v25-commercial-completion-date-keyboard|nuvasto-v26-r2-invoice-keyboard)/);
 assert.match(sw,/app-commercial-completion-v25\.js/);
-assert.match(pkg,/2\.0\.0-alpha\.25/);
+assert.match(pkg,/2\.0\.0-alpha\.(?:25|26)/);
 assert.match(pkg,/workflow-v25\.test\.mjs/);
 
-console.log('workflow v25 commercial completion: OK');
+console.log('workflow v25 commercial completion compatibility: OK');

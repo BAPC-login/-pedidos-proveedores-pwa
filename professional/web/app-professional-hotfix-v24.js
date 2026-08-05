@@ -1,4 +1,5 @@
 import './app-commercial-completion-v25.js';
+import './app-r2-invoice-keyboard-v26.js';
 import {$,$$,toast} from './app-core.js';
 
 let initialized=false;

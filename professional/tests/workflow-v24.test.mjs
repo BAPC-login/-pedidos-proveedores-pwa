@@ -17,6 +17,7 @@ assert.match(hotfix,/keepVisible/);
 assert.match(hotfix,/toolbarTop-12/);
 assert.match(hotfix,/v24-legal-locked/);
 assert.match(hotfix,/position:fixed!important/);
+assert.match(hotfix,/app-r2-invoice-keyboard-v26\.js/);
 assert.match(modal,/type="submit" id="modalSubmit"/);
 assert.match(modal,/frame\.onsubmit=async/);
 assert.match(modal,/Creando documento/);
@@ -27,7 +28,7 @@ assert.match(storage,/createProfessionalOrderPdfV24/);
 assert.match(storage,/pdfVersion:24/);
 assert.match(pdfApi,/metadata\.pdfVersion\|\|0\)>=24/);
 assert.match(app,/initializeProfessionalHotfixV24/);
-assert.match(sw,/v24-professional/);
+assert.match(sw,/(?:v24-professional|nuvasto-v26-r2-invoice-keyboard)/);
 assert.match(sw,/app-professional-hotfix-v24\.js/);
 
 const bytes=createProfessionalOrderPdfV24({
@@ -44,4 +45,4 @@ assert.match(text,/FECHA ENTREGA/);
 assert.match(text,/CENTRO DE COSTO/);
 assert.match(text,/PRODUCTOS/);
 
-console.log('workflow v24 professional fixes: OK');
+console.log('workflow v24 professional fixes compatibility: OK');

@@ -61,9 +61,9 @@ assert.match(app,/initializeMasterV18/);
 assert.match(app,/initializeHistoryV18/);
 assert.match(app,/initializePdfV18/);
 assert.match(app,/initializeHistorySemanticV20/);
-assert.match(serviceWorker,/(?:v19-workflow-r2|v20-professional-sso|nuvasto-v21-brand-platform|nuvasto-v22-orders-pdf-motion|nuvasto-v23-auth-keyboard)/);
+assert.match(serviceWorker,/(?:v19-workflow-r2|v20-professional-sso|nuvasto-v21-brand-platform|nuvasto-v22-orders-pdf-motion|nuvasto-v23-auth-keyboard|nuvasto-v26-r2-invoice-keyboard)/);
 assert.match(serviceWorker,/app-history-v18\.js/);
 assert.match(serviceWorker,/app-master-v18\.js/);
 assert.match(serviceWorker,/app-pdf-v18\.js/);
 
-console.log('workflow v18 compatibility under Nuvasto v24: OK');
+console.log('workflow v18 compatibility under Nuvasto v26: OK');
