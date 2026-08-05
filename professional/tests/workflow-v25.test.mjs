@@ -10,7 +10,7 @@ const [completion,hotfix,sw,pkg]=await Promise.all([
 
 assert.match(completion,/function normalizeMasterDates/);
 assert.match(completion,/setScopeAll/);
-assert.match(completion,/scope\.value==='except'&&!configuredExceptions\(\)/);
+assert.match(completion,/scope\?\.value==='except'&&!configuredExceptions\(\)/);
 assert.match(completion,/Selecciona Hoy, Mañana o una fecha de entrega/);
 assert.match(completion,/\.delivery-base-buttons \[data-delivery-base\]/);
 assert.match(completion,/document\.addEventListener\('submit'/);
