@@ -22,7 +22,7 @@ assert.match(completion,/visualViewport\?\.addEventListener\('resize'/);
 assert.match(completion,/NuvastoDiagnostics/);
 assert.match(completion,/SKIP_WAITING/);
 assert.match(hotfix,/app-commercial-completion-v25\.js/);
-assert.match(sw,/nuvasto-v25-commercial-completion-date-keyboard/);
+assert.match(sw,/v25-commercial-completion-date-keyboard/);
 assert.match(sw,/app-commercial-completion-v25\.js/);
 assert.match(pkg,/2\.0\.0-alpha\.25/);
 assert.match(pkg,/workflow-v25\.test\.mjs/);
