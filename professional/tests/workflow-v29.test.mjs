@@ -66,12 +66,12 @@ assert.match(indexV29,/checkoutFlowVersion:29/);
 assert.match(indexV29,/folioRenumberingVersion:29/);
 assert.match(combined,/index-v29\.js/);
 assert.match(combined,/index-v30\.js/);
-assert.match(combined,/2026\.08\.05\.31/);
+assert.match(combined,/2026\.08\.05\.32/);
 assert.match(app,/app-invoice-entry-v29\.js/);
 assert.match(app,/initializeCheckoutInvoiceV29/);
 assert.match(sw,/nuvasto-v29-invoice-checkout-r2/);
 assert.match(sw,/app-checkout-upgrade-v29\.js/);
 assert.match(pkg,/app-checkout-upgrade-v29\.js/);
-assert.match(pkg,/2\.0\.0-alpha\.30/);
+assert.match(pkg,/2\.0\.0-alpha\.31/);
 
-console.log('workflow v29 checkout compatibility under Nuvasto v30: OK');
+console.log('workflow v29 checkout compatibility under Nuvasto v31: OK');
