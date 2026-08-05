@@ -24,7 +24,7 @@ assert.match(combined,/index-v27\.js/);
 assert.match(combined,/2026\.08\.05\.27/);
 assert.match(sw,/v28-regression-suite/);
 assert.match(sw,/app-flow-stability-v27\.js/);
-assert.match(pkg,/2\.0\.0-alpha\.(?:27|28|29|30)/);
+assert.match(pkg,/2\.0\.0-alpha\.(?:27|28|29|30|31)/);
 assert.match(pkg,/workflow-v27\.test\.mjs/);
 
-console.log('workflow v27 backend and v30 compatibility wrapper: OK');
+console.log('workflow v27 backend and v31 compatibility wrapper: OK');
