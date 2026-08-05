@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
 const files=await Promise.all([
-  '../web/app.js','../web/app-navigation-v14.js','../web/app-order-core-v15.js','../web/app-order-detail.js','../web/app-enterprise-v15.js','../worker/src/index.js','../worker/src/index-scoped.js'
+  '../web/app.js','../web/app-navigation-v14.js','../web/app-order-core-v15.js','../web/app-order-detail.js','../web/app-order-detail-v30.js','../web/app-enterprise-v15.js','../worker/src/index.js','../worker/src/index-scoped.js'
 ].map(path=>readFile(new URL(path,import.meta.url),'utf8')));
-const [app,navigation,master,detail,enterprise,index,scoped]=files;
+const [app,navigation,master,detailWrapper,detail,enterprise,index,scoped]=files;
 
+assert.match(detailWrapper,/app-order-detail-v30\.js/);
 const contracts=[
   ['login→dashboard',app.includes("openRoute('dashboard'"),navigation.includes("registerRouteRenderer('dashboard'")],
   ['dashboard→master order',app.includes('initializeOrderCoreV15'),master.includes("target.dataset.action==='new-order'")],
@@ -29,5 +30,6 @@ const devices=[{name:'iPhone 390',width:390},{name:'iPhone large',width:440},{na
 assert.equal(devices.every(device=>device.width>=390),true);
 assert.match(master,/@media\(max-width:460px\)/);
 assert.match(enterprise,/@media\(max-width:560px\)/);
+assert.match(detail,/v30-reception-card/);
 
-console.log(`e2e v15 contracts: ${contracts.length} flows · ${devices.map(device=>device.name).join(', ')} OK`);
+console.log(`e2e v15 contracts through v30: ${contracts.length} flows · ${devices.map(device=>device.name).join(', ')} OK`);
