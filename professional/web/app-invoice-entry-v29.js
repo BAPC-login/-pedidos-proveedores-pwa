@@ -1,7 +1,8 @@
 import './app-v29-ui.js';
+import './app-runtime-v30.js';
 import './app-checkout-upgrade-v29.js';
 import {$,state,api,toast,setBusy} from './app-core.js';
-import {openInvoiceAnalysisV29} from './app-invoice-v29.js';
+import {openInvoiceAnalysisV30} from './app-invoice-v30.js';
 
 let opening=false;
 
@@ -15,7 +16,7 @@ async function orderForTrigger(trigger){
 }
 
 window.addEventListener('click',async event=>{
-  const detail=event.target.closest?.('#attachInvoice,#attachInvoiceBottom');
+  const detail=event.target.closest?.('#attachInvoice,#attachInvoiceBottom,#v30AttachInvoice,#v30AttachInvoiceBottom');
   const history=event.target.closest?.('[data-v16-invoice]');
   const home=event.target.closest?.('[data-action="analyze-invoice"]');
   const primary=event.target.closest?.('#primaryAction');
@@ -25,7 +26,7 @@ window.addEventListener('click',async event=>{
   try{
     const orderId=detail||history?await orderForTrigger(trigger):'';
     if((detail||history)&&!orderId)throw new Error('No se pudo identificar el pedido pendiente');
-    await openInvoiceAnalysisV29(orderId?{orderId,returnToHistory:true}:{});
+    await openInvoiceAnalysisV30(orderId?{orderId,returnToHistory:true}:{});
   }catch(error){toast(error.message||'No se pudo abrir el ingreso de factura','error')}
   finally{if(trigger?.isConnected)setBusy(trigger,false);opening=false}
 },true);
