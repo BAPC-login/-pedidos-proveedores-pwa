@@ -2,6 +2,7 @@ import './app-v29-ui.js';
 import './app-runtime-v30.js';
 import './app-checkout-upgrade-v29.js';
 import './app-history-bridge-v31.js';
+import './app-v32-entry.js';
 import {$,state,api,toast,setBusy} from './app-core.js';
 import {openInvoiceAnalysisV30} from './app-invoice-v30.js';
 import {initializeOrdersV30} from './app-orders-v30.js';
