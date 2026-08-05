@@ -16,7 +16,7 @@ assert.match(guard,/document\.body\.dataset\.uiScreen=screen/);
 assert.match(guard,/MutationObserver/);
 assert.match(app,/initializeScreenStateHotfix/);
 assert.ok(app.indexOf('initializeScreenStateHotfix()')<app.indexOf('initializeNuvastoV23()'),'screen guard must run before v23 styles');
-assert.match(sw,/nuvasto-v23-auth-keyboard-startup-recovery-screen-state-hotfix/);
+assert.match(sw,/(?:nuvasto-v23-auth-keyboard-startup-recovery-screen-state-hotfix|nuvasto-v26-r2-invoice-keyboard)/);
 assert.match(sw,/app-screen-state-hotfix\.js/);
 
-console.log('workflow v23 exclusive screen state: OK');
+console.log('workflow v23 exclusive screen state compatibility: OK');
