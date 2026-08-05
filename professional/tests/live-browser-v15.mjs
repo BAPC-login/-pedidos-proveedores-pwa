@@ -1,3 +1,4 @@
+// Nuvasto v28: este flujo también verifica el despliegue R2 antes de ejecutar navegadores.
 import assert from 'node:assert/strict';
 import {chromium,webkit} from 'playwright';
 
