@@ -3,7 +3,7 @@ import {writeAudit} from '../auth.js';
 import {storeFile} from '../storage.js';
 import {normalizeInvoiceAnalysis} from '../invoice-normalizer-v26.js';
 
-const AI_TIMEOUT_MS=90000;
+const AI_TIMEOUT_MS=84000;
 
 async function usageValue(env,orgId,metric){
   const row=await env.DB.prepare('SELECT quantity FROM usage_counters WHERE org_id=? AND month_key=? AND metric=?').bind(orgId,monthKey(),metric).first();
