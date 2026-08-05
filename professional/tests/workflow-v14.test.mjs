@@ -14,7 +14,7 @@ const [catalog,schema,operations,procurement,order,router,navigation,dashboard,e
   readFile(new URL('../web/index.html',import.meta.url),'utf8')
 ]);
 
-assert.match(schema,/SCHEMA_VERSION='(?:15|16|17|18|19|20|21)'/);
+assert.match(schema,/SCHEMA_VERSION='(?:15|16|17|18|19|20|21|32)'/);
 assert.match(schema,/categories','cost_center_id'/);
 assert.match(catalog,/Selecciona un centro de costo válido/);
 assert.match(catalog,/claimedSystemCategory/);
@@ -38,4 +38,4 @@ assert.doesNotMatch(experience,/MutationObserver/);
 assert.match(html,/id="routeBack"/);
 assert.match(html,/design-system-v14\.css/);
 
-console.log('workflow v14 compatibility tests: OK');
+console.log('workflow v14 compatibility tests through schema 32: OK');
