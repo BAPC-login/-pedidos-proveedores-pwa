@@ -5,7 +5,7 @@ import {$,state,api,toast,setBusy} from './app-core.js';
 import {openInvoiceAnalysisV30} from './app-invoice-v30.js';
 import {initializeOrdersV30} from './app-orders-v30.js';
 
-initializeOrdersV30();
+setTimeout(()=>initializeOrdersV30(),0);
 let opening=false;
 
 async function freshOrders(){const payload=await api('/api/orders',{fresh:true,timeout:20000});state.cache.orders=payload.orders||[];return state.cache.orders}
