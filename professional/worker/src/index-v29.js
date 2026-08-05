@@ -19,7 +19,7 @@ function decorate(response,request,env){
 async function health(request,env,ctx){
   const response=await platformWorker.fetch(request,env,ctx);
   const payload=await response.clone().json().catch(()=>({}));
-  return decorate(ok({...payload,version:RELEASE_VERSION,invoiceFlowVersion:29,invoiceAttemptTimeoutMs:90000,invoiceRetryAttempts:1,checkoutFlowVersion:29,folioRenumberingVersion:29,singleInvoiceProgress:true,postEmissionRoute:'dashboard'},request,env),request,env);
+  return decorate(ok({...payload,version:RELEASE_VERSION,invoiceFlowVersion:29,invoiceAttemptTimeoutMs:84000,invoiceRetryAttempts:1,checkoutFlowVersion:29,folioRenumberingVersion:29,singleInvoiceProgress:true,postEmissionRoute:'dashboard'},request,env),request,env);
 }
 
 export default{
