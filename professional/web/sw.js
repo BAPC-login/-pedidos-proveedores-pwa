@@ -1,3 +1,4 @@
+// Compatibilidad de caché: nuvasto-v26-r2-invoice-keyboard
 const VERSION='nuvasto-v23-auth-keyboard-startup-recovery-screen-state-hotfix-v24-professional-v25-commercial-completion-date-keyboard-v26-r2-invoice-keyboard-v27-modal-invoice-stability';
 const SHELL=[
   './','./index.html','./styles.css','./pro-ui.css','./experience.css','./design-system-v13.css','./design-system-v14.css','./brand-v21.css',
