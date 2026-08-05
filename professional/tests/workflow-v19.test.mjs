@@ -51,7 +51,7 @@ assert.match(indexV19,/invoicePendingOnly:true/);
 assert.match(indexV19,/pendingBatchWorkflowV19:true/);
 assert.match(indexV19,/outboundOrderApiReady:false/);
 assert.match(combined,/index-v(?:20|21|22|26|27|28)\.js/);
-assert.match(combined,/2026\.(?:07\.31\.(?:20|21|22)|08\.(?:04\.26|05\.(?:27|28)))/);
+assert.match(combined,/2026\.(?:07\.31\.(?:20|21|22)|08\.(?:04\.26|05\.(?:27|28|29)))/);
 assert.match(wrangler,/REQUIRE_R2 = "true"/);
 assert.match(wrangler,/\[\[r2_buckets\]\]/);
 assert.match(wrangler,/binding = "FILES"/);
@@ -64,4 +64,4 @@ assert.match(app,/initializeWorkflowV19/);
 assert.match(serviceWorker,/(?:v19-workflow-r2|v20-professional-sso|nuvasto-v21-brand-platform|nuvasto-v22-orders-pdf-motion|nuvasto-v23-auth-keyboard|nuvasto-v26-r2-invoice-keyboard|v28-regression-suite)/);
 assert.match(serviceWorker,/app-workflow-v19\.js/);
 
-console.log('workflow v19 compatibility under Nuvasto v28: OK');
+console.log('workflow v19 compatibility under Nuvasto direct deploy revision 29: OK');
