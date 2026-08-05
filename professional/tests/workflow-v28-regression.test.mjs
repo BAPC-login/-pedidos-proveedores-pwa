@@ -9,8 +9,10 @@ const all=[...web.values()].join('\n');
 const modal=web.get('app-modal.js');
 const guard=web.get('app-regression-guard-v28.js');
 const actions=web.get('app-actions.js');
-const invoices=web.get('app-invoices.js');
-const orderDetail=web.get('app-order-detail.js');
+const invoicesWrapper=web.get('app-invoices.js');
+const invoices=web.get('app-invoice-v30.js');
+const orderDetailWrapper=web.get('app-order-detail.js');
+const orderDetail=web.get('app-order-detail-v30.js');
 const v27=web.get('app-flow-stability-v27.js');
 const sw=web.get('sw.js');
 
@@ -39,11 +41,13 @@ assert.doesNotMatch(guard,/behavior:'smooth'/);
 assert.match(guard,/unhandledrejection/);
 assert.match(guard,/stopProgress/);
 
-assert.match(invoices,/openInvoiceReview/);
+assert.match(invoicesWrapper,/app-invoice-v30\.js/);
+assert.match(invoices,/openReview/);
 assert.match(invoices,/sourceFileId/);
-assert.match(invoices,/returnToOrder/);
-assert.match(orderDetail,/#attachInvoice/);
-assert.match(orderDetail,/#attachInvoiceBottom/);
+assert.match(invoices,/returnToHistory/);
+assert.match(orderDetailWrapper,/app-order-detail-v30\.js/);
+assert.match(orderDetail,/v30AttachInvoice/);
+assert.match(orderDetail,/v30AttachInvoiceBottom/);
 assert.match(sw,/app-regression-guard-v28\.js/);
 assert.match(sw,/v28-regression-suite/);
 
@@ -52,8 +56,8 @@ for(const source of web.values())for(const match of source.matchAll(/data-action
 const handledSource=`${actions}\n${guard}`;
 for(const action of actionTokens)assert.ok(handledSource.includes(`'${action}'`)||handledSource.includes(`"${action}"`),`Acción sin manejador: ${action}`);
 
-const criticalModules=['app-core.js','app-actions.js','app-modal.js','app-order-detail.js','app-invoices.js','app-navigation-v14.js','app-dashboard-v14.js','app-workflow-v19.js','app-history-v18.js','app-file-actions.js','app-regression-guard-v28.js'];
+const criticalModules=['app-core.js','app-actions.js','app-modal.js','app-order-detail-v30.js','app-invoice-v30.js','app-navigation-v14.js','app-dashboard-v14.js','app-workflow-v19.js','app-history-v18.js','app-file-actions.js','app-regression-guard-v28.js','app-runtime-v30.js'];
 for(const name of criticalModules)assert.ok(web.get(name)?.length>100,`Módulo crítico ausente o vacío: ${name}`);
 
 assert.doesNotMatch(all,/\.submit\(\)/);
-console.log(`workflow v28 regression audit: OK · ${names.length} módulos · ${actionTokens.size} acciones verificadas`);
+console.log(`workflow v28 regression audit under v30: OK · ${names.length} módulos · ${actionTokens.size} acciones verificadas`);
