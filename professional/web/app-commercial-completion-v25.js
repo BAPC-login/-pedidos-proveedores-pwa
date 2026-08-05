@@ -22,9 +22,9 @@ function injectStyles(){
   const style=document.createElement('style');
   style.id='nuvastoCommercialV25Styles';
   style.textContent=`
-    .modal-body.v25-keyboard-space{scroll-padding-top:18px!important;scroll-padding-bottom:260px!important;overscroll-behavior:contain}
-    .v25-keyboard-spacer{display:block;width:1px;height:250px;pointer-events:none;visibility:hidden}
-    .order-file-row.v25-active-row{position:relative;z-index:1;scroll-margin-top:18px;scroll-margin-bottom:250px;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--primary) 52%,transparent)}
+    .modal-body.v25-keyboard-space{scroll-padding-top:18px!important;scroll-padding-bottom:280px!important;overscroll-behavior:contain}
+    .v25-keyboard-spacer{display:block;width:1px;height:270px;pointer-events:none;visibility:hidden}
+    .order-file-row.v25-active-row{position:relative;z-index:1;scroll-margin-top:18px;scroll-margin-bottom:270px;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--primary) 52%,transparent)}
     .v25-date-repaired{animation:v25DateRepair .26s ease both}
     @keyframes v25DateRepair{from{box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 20%,transparent)}to{box-shadow:none}}
     @media(prefers-reduced-motion:reduce){.v25-date-repaired{animation:none}}
@@ -37,6 +37,8 @@ function generalDate(){return $('#orderFileGeneralDate')}
 function customDate(){return $('#orderFileCustomDate')}
 function activeDateMode(){return $('[data-delivery-base].active')?.dataset.deliveryBase||'tomorrow'}
 function configuredExceptions(){
+  const wizardDates=$$('[data-wizard-date]').filter(input=>validDate(input.value));
+  if(wizardDates.length)return true;
   const summary=$('#exceptionSummary');
   const title=$('#exceptionSummaryTitle')?.textContent||'';
   const details=$('#exceptionSummaryDetail')?.textContent||'';
@@ -109,11 +111,6 @@ function installDateGuard(){
     const submit=event.target.closest?.('#modalSubmit');
     if(submit&&isMasterModal())normalizeMasterDates({fallbackScope:true,announce:true});
   },true);
-  new MutationObserver(()=>{
-    if(!isMasterModal())return;
-    const scope=dateScope();
-    if(scope?.value==='except'&&!configuredExceptions())setTimeout(()=>normalizeMasterDates({fallbackScope:true}),0);
-  }).observe(document.body,{subtree:true,childList:true});
 }
 
 function scrollableAncestor(element){
@@ -136,8 +133,7 @@ function toolbarTop(){
   return Number.isFinite(top)?top:null;
 }
 function keyboardLikelyOpen(){
-  const toolbar=$('.v23-master-nav.keyboard-open');
-  if(toolbar)return true;
+  if($('.v23-master-nav.keyboard-open'))return true;
   const viewport=window.visualViewport;
   return Boolean(viewport&&window.innerHeight-(viewport.height+viewport.offsetTop)>110);
 }
@@ -172,11 +168,11 @@ function keepQuantityVisible(input=activeQuantity,behavior='auto'){
   const viewport=window.visualViewport;
   const visibleTop=(viewport?.offsetTop||0)+14;
   const top=toolbarTop();
-  const visibleBottom=(top??((viewport?.offsetTop||0)+(viewport?.height||window.innerHeight)))-18;
+  const visibleBottom=(top??((viewport?.offsetTop||0)+(viewport?.height||window.innerHeight)))-22;
   let rect=row.getBoundingClientRect();
   const host=scrollableAncestor(row);
   if(rect.bottom>visibleBottom){
-    scrollHostBy(host,rect.bottom-visibleBottom+20,behavior);
+    scrollHostBy(host,rect.bottom-visibleBottom+24,behavior);
     rect=row.getBoundingClientRect();
   }
   if(rect.top<visibleTop)scrollHostBy(host,rect.top-visibleTop-12,behavior);
@@ -210,7 +206,10 @@ function installKeyboardViewportGuard(){
   };
   window.visualViewport?.addEventListener('resize',sync);
   window.visualViewport?.addEventListener('scroll',sync);
-  new MutationObserver(sync).observe(document.body,{subtree:true,attributes:true,attributeFilter:['class']});
+  document.addEventListener('click',event=>{
+    if(event.target.closest?.('[data-v23-next],[data-v23-prev]'))setTimeout(sync,30);
+    if(event.target.closest?.('[data-v23-done]'))setTimeout(removeSpacer,80);
+  },false);
 }
 
 function installFreshServiceWorker(){
