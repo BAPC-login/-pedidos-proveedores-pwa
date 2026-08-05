@@ -17,7 +17,7 @@ assert.match(completion,/document\.addEventListener\('submit'/);
 assert.match(completion,/function scrollableAncestor/);
 assert.match(completion,/v25-keyboard-spacer/);
 assert.match(completion,/toolbarTop\(\)/);
-assert.match(completion,/rect\.bottom-visibleBottom\+20/);
+assert.match(completion,/rect\.bottom-visibleBottom\+24/);
 assert.match(completion,/visualViewport\?\.addEventListener\('resize'/);
 assert.match(completion,/NuvastoDiagnostics/);
 assert.match(completion,/SKIP_WAITING/);
