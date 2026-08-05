@@ -1,6 +1,7 @@
 import platformWorker from './index-v28.js';
 import {authenticate} from './auth.js';
 import {corsHeaders,errorResponse,ok,routeMatch,securityHeaders} from './core.js';
+import {analyzeInvoiceV29} from './api/invoice-analysis-v29.js';
 import {renumberDraftBatchV29} from './api/order-checkout-v29.js';
 
 const VERSION='29';
@@ -18,7 +19,7 @@ function decorate(response,request,env){
 async function health(request,env,ctx){
   const response=await platformWorker.fetch(request,env,ctx);
   const payload=await response.clone().json().catch(()=>({}));
-  return decorate(ok({...payload,version:RELEASE_VERSION,invoiceFlowVersion:29,checkoutFlowVersion:29,folioRenumberingVersion:29,singleInvoiceProgress:true,postEmissionRoute:'dashboard'},request,env),request,env);
+  return decorate(ok({...payload,version:RELEASE_VERSION,invoiceFlowVersion:29,invoiceAttemptTimeoutMs:90000,invoiceRetryAttempts:1,checkoutFlowVersion:29,folioRenumberingVersion:29,singleInvoiceProgress:true,postEmissionRoute:'dashboard'},request,env),request,env);
 }
 
 export default{
@@ -27,6 +28,10 @@ export default{
     const renumber=routeMatch(url.pathname,'/api/order-batches/:id/renumber');
     try{
       if(method==='GET'&&url.pathname==='/health')return health(request,env,ctx);
+      if(method==='POST'&&url.pathname==='/api/invoices/analyze'){
+        const actor=await authenticate(request,env);
+        return decorate(ok({analysis:await analyzeInvoiceV29(request,env,actor)},request,env),request,env);
+      }
       if(renumber&&method==='POST'){
         const actor=await authenticate(request,env);
         return decorate(ok(await renumberDraftBatchV29(request,env,actor,renumber.id),request,env),request,env);
