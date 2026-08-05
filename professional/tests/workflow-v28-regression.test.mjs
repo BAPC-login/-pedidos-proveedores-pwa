@@ -30,7 +30,7 @@ assert.match(guard,/blockLegacyKeyboardRegistrations/);
 assert.match(guard,/button:not\(\[type\]\)/);
 assert.match(guard,/event\.submitter!==submit/);
 assert.match(guard,/#attachInvoice,#attachInvoiceBottom/);
-assert.match(guard,/data-action=\\"analyze-invoice\\"/);
+assert.match(guard,/data-action="analyze-invoice"/);
 assert.match(guard,/state\.view==='invoices'/);
 assert.match(guard,/invoiceOpening/);
 assert.match(guard,/event\.stopImmediatePropagation\(\)/);
