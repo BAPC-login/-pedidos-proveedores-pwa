@@ -1,4 +1,4 @@
-name: Live browser E2E v15
+name: Nuvasto live browser E2E
 
 on:
   push:
@@ -7,7 +7,9 @@ on:
       - 'professional/web/**'
       - 'professional/worker/**'
       - 'professional/tests/live-browser-v15.mjs'
+      - 'professional/package.json'
       - 'worker/**'
+      - 'wrangler.jsonc'
       - '.github/workflows/e2e-live-v15.yml'
   workflow_dispatch:
 
@@ -15,37 +17,72 @@ permissions:
   contents: read
 
 concurrency:
-  group: live-browser-e2e-v15
+  group: nuvasto-live-browser-e2e
   cancel-in-progress: true
 
 jobs:
   browsers:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 22
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - name: Wait for production v15
+          package-manager-cache: false
+
+      - name: Resolve expected production version
+        id: expected
         shell: bash
         run: |
-          for attempt in $(seq 1 60); do
-            health=$(curl --silent --show-error --max-time 20 https://pedidos-pro-ai.botreservasmultilocal.workers.dev/platform/health || true)
-            if echo "$health" | grep -q '"version":"2.0.0-alpha.15"' && echo "$health" | grep -q '"schemaVersion":"15"'; then
+          version=$(node -p "JSON.parse(require('fs').readFileSync('professional/package.json','utf8')).version")
+          release=$(node -e "const s=require('fs').readFileSync('worker/src/combined.js','utf8');const m=s.match(/PLATFORM_RELEASE='([^']+)'/);if(!m)process.exit(1);process.stdout.write(m[1])")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for the matching Nuvasto production release
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ steps.expected.outputs.version }}
+          EXPECTED_RELEASE: ${{ steps.expected.outputs.release }}
+        run: |
+          for attempt in $(seq 1 36); do
+            health=$(curl --fail --silent --show-error --max-time 20 --dump-header /tmp/headers https://pedidos-pro-ai.botreservasmultilocal.workers.dev/platform/health 2>/dev/null || true)
+            release=$(grep -Ei '^x-nuvasto-release:|^x-pedidos-pro-release:' /tmp/headers 2>/dev/null | head -1 | tr -d '\r' | awk '{print $2}' || true)
+            ready=$(PLATFORM_HEALTH="$health" EXPECTED_VERSION="$EXPECTED_VERSION" node <<'NODE'
+          try {
+            const h=JSON.parse(process.env.PLATFORM_HEALTH||'{}');
+            const ok=h.ok===true
+              && h.service==='nuvasto'
+              && h.version===process.env.EXPECTED_VERSION
+              && h.r2Configured===true
+              && h.r2Ready===true
+              && Number(h.invoiceFlowVersion||0)>=28
+              && Number(h.keyboardNavigationVersion||0)>=28;
+            process.stdout.write(ok?'true':'false');
+          } catch { process.stdout.write('false'); }
+          NODE
+            )
+            if [ "$ready" = "true" ] && [ "$release" = "$EXPECTED_RELEASE" ]; then
+              echo "Nuvasto $EXPECTED_VERSION ($EXPECTED_RELEASE) is ready"
               exit 0
             fi
-            echo "Waiting for production ${attempt}/60"
+            echo "Waiting for production ${attempt}/36 · served release: ${release:-none}"
             sleep 10
           done
+          echo "Production did not reach the expected release in time" >&2
           exit 1
+
       - name: Install Playwright browsers
+        working-directory: professional
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium webkit
+
       - name: Run Chromium and WebKit flows
+        working-directory: professional
         env:
           E2E_BASE_URL: https://pedidos-pro-ai.botreservasmultilocal.workers.dev/
           E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
-        run: node professional/tests/live-browser-v15.mjs
+        run: node tests/live-browser-v15.mjs
