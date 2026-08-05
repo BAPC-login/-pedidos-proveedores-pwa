@@ -40,7 +40,8 @@ assert.match(deployWorkflow,/deploy --config wrangler\.toml --keep-vars/);
 assert.match(deployWorkflow,/r2Configured/);
 assert.match(deployWorkflow,/r2Ready/);
 assert.match(deployWorkflow,/workflow_dispatch/);
-assert.doesNotMatch(deployWorkflow,/\n\s*push:/);
+assert.match(deployWorkflow,/\n\s*push:/);
+assert.match(deployWorkflow,/branches: \[main\]/);
 
 for(const workflow of [verifyWorkflow,browserWorkflow]){
   assert.doesNotMatch(workflow,/2\.0\.0-alpha\.15/);
@@ -64,4 +65,4 @@ assert.match(browserTest,/analyze-invoice/);
 assert.match(browserTest,/data-view=.*orders/);
 assert.match(pkg,/2\.0\.0-alpha\.28/);
 
-console.log('workflow v28 manual Cloudflare deploy gate, R2 and live browser alignment: OK');
+console.log('workflow v28 automatic Cloudflare deploy, R2 and manual live checks alignment: OK');
