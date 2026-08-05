@@ -21,7 +21,7 @@ ENVIRONMENT = "production"
 PRODUCT_NAME = "Nuvasto"
 AI_ENDPOINT = "https://pedidos-pro-ai.botreservasmultilocal.workers.dev"
 ALLOWED_ORIGINS = "https://bapc-login.github.io,https://pedidos-pro-ai.botreservasmultilocal.workers.dev,http://localhost:8787,http://127.0.0.1:8787,http://localhost:8788,http://127.0.0.1:8788"
-REQUIRE_R2 = "false"
+REQUIRE_R2 = "true"
 
 # Cloudflare Access SSO se activa después de crear la aplicación en Zero Trust.
 # CF_ACCESS_TEAM_DOMAIN = "tu-equipo.cloudflareaccess.com"
@@ -30,6 +30,9 @@ REQUIRE_R2 = "false"
 [[d1_databases]]
 binding = "DB"
 
-# Este perfil mantiene el almacenamiento temporal en D1 mientras R2 no esté habilitado.
-# Después de activar R2 y crear el bucket nuvasto-files, usa wrangler.r2.toml.
-# El nombre técnico del Worker se conserva para no cortar la URL y la base D1 actuales.
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "nuvasto-files"
+
+# El nombre técnico del Worker y el binding DB se conservan para mantener la URL,
+# las sesiones, las migraciones y la base productiva existentes.
