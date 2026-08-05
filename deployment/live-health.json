@@ -1,9 +1,9 @@
 {
   "status": "failed",
   "application_shell": false,
-  "checked_at": "2026-08-05T00:31:46.678985+00:00",
+  "checked_at": "2026-08-05T02:51:42.974764+00:00",
   "url": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev/",
-  "release": "2026.07.31.22",
+  "release": "2026.08.04.26",
   "ai_health": {
     "ok": true,
     "service": "pedidos-pro-ai",
@@ -14,7 +14,7 @@
   "platform_health": {
     "ok": true,
     "service": "nuvasto",
-    "version": "2.0.0-alpha.22",
+    "version": "2.0.0-alpha.26",
     "databaseConfigured": true,
     "databaseInitialized": true,
     "schemaVersion": "21",
@@ -67,7 +67,7 @@
     "masterFloatingNavigation": true,
     "pdfLayoutV18": true,
     "environment": "production",
-    "timestamp": "2026-08-05T00:31:35.189Z",
+    "timestamp": "2026-08-05T02:51:32.248Z",
     "r2Required": false,
     "r2Ready": false,
     "invoicePendingOnly": true,
@@ -102,7 +102,11 @@
     "masterEnterNavigation": true,
     "batchShareZipFallback": true,
     "orderPdfVersion": 22,
-    "smoothMotion": true
+    "smoothMotion": true,
+    "r2Bucket": "nuvasto-files",
+    "invoiceNormalizationVersion": 26,
+    "invoiceRetryAttempts": 2,
+    "keyboardNavigationVersion": 26
   },
   "security_checks": {
     "unauthenticated_me_http": 401,
