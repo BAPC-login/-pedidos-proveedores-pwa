@@ -39,6 +39,8 @@ assert.match(deployWorkflow,/workingDirectory: professional/);
 assert.match(deployWorkflow,/deploy --config wrangler\.toml --keep-vars/);
 assert.match(deployWorkflow,/r2Configured/);
 assert.match(deployWorkflow,/r2Ready/);
+assert.match(deployWorkflow,/workflow_dispatch/);
+assert.doesNotMatch(deployWorkflow,/\n\s*push:/);
 
 for(const workflow of [verifyWorkflow,browserWorkflow]){
   assert.doesNotMatch(workflow,/2\.0\.0-alpha\.15/);
@@ -48,10 +50,11 @@ for(const workflow of [verifyWorkflow,browserWorkflow]){
   assert.match(workflow,/EXPECTED_RELEASE/);
   assert.match(workflow,/r2Configured/);
   assert.match(workflow,/r2Ready/);
+  assert.match(workflow,/workflow_dispatch/);
+  assert.doesNotMatch(workflow,/\n\s*push:/);
 }
 assert.doesNotMatch(verifyWorkflow,/git push/);
 assert.doesNotMatch(verifyWorkflow,/contents: write/);
-assert.match(verifyWorkflow,/actions\/upload-artifact@v4/);
 assert.match(verifyWorkflow,/<title>Nuvasto<\/title>/);
 assert.match(browserWorkflow,/actions\/checkout@v5/);
 assert.match(browserWorkflow,/actions\/setup-node@v5/);
@@ -61,4 +64,4 @@ assert.match(browserTest,/analyze-invoice/);
 assert.match(browserTest,/data-view=.*orders/);
 assert.match(pkg,/2\.0\.0-alpha\.28/);
 
-console.log('workflow v28 direct Cloudflare deploy, R2 and live browser alignment: OK');
+console.log('workflow v28 manual Cloudflare deploy gate, R2 and live browser alignment: OK');

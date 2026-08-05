@@ -1,14 +1,7 @@
 name: Deploy Nuvasto to Cloudflare
 
+# Activación manual mientras se incorpora CLOUDFLARE_API_TOKEN en GitHub Actions.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'professional/**'
-      - 'worker/**'
-      - 'wrangler.jsonc'
-      - '.wrangler/**'
-      - '.github/workflows/deploy-cloudflare.yml'
   workflow_dispatch:
 
 permissions:
@@ -33,6 +26,7 @@ jobs:
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
             echo "::error::Falta el secret CLOUDFLARE_API_TOKEN en GitHub Actions."
+            echo "Agrégalo en Settings > Secrets and variables > Actions y vuelve a ejecutar este workflow."
             exit 1
           fi
 

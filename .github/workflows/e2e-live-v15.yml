@@ -1,24 +1,11 @@
 name: Nuvasto live browser E2E
 
+# Se ejecuta manualmente después de un despliegue Cloudflare confirmado.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'professional/web/**'
-      - 'professional/worker/**'
-      - 'professional/tests/live-browser-v15.mjs'
-      - 'professional/package.json'
-      - 'worker/**'
-      - 'wrangler.jsonc'
-      - '.github/workflows/e2e-live-v15.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
-
-concurrency:
-  group: nuvasto-live-browser-e2e
-  cancel-in-progress: true
 
 jobs:
   browsers:
@@ -40,38 +27,26 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "release=$release" >> "$GITHUB_OUTPUT"
 
-      - name: Wait for the matching Nuvasto production release
+      - name: Confirm the matching Nuvasto production release and R2
         shell: bash
         env:
           EXPECTED_VERSION: ${{ steps.expected.outputs.version }}
           EXPECTED_RELEASE: ${{ steps.expected.outputs.release }}
         run: |
-          for attempt in $(seq 1 36); do
-            health=$(curl --fail --silent --show-error --max-time 20 --dump-header /tmp/headers https://pedidos-pro-ai.botreservasmultilocal.workers.dev/platform/health 2>/dev/null || true)
-            release=$(grep -Ei '^x-nuvasto-release:|^x-pedidos-pro-release:' /tmp/headers 2>/dev/null | head -1 | tr -d '\r' | awk '{print $2}' || true)
-            ready=$(PLATFORM_HEALTH="$health" EXPECTED_VERSION="$EXPECTED_VERSION" node <<'NODE'
-          try {
-            const h=JSON.parse(process.env.PLATFORM_HEALTH||'{}');
-            const ok=h.ok===true
-              && h.service==='nuvasto'
-              && h.version===process.env.EXPECTED_VERSION
-              && h.r2Configured===true
-              && h.r2Ready===true
-              && Number(h.invoiceFlowVersion||0)>=28
-              && Number(h.keyboardNavigationVersion||0)>=28;
-            process.stdout.write(ok?'true':'false');
-          } catch { process.stdout.write('false'); }
+          health=$(curl --fail --silent --show-error --max-time 20 --dump-header /tmp/headers https://pedidos-pro-ai.botreservasmultilocal.workers.dev/platform/health)
+          release=$(grep -Ei '^x-nuvasto-release:|^x-pedidos-pro-release:' /tmp/headers | head -1 | tr -d '\r' | awk '{print $2}')
+          PLATFORM_HEALTH="$health" EXPECTED_VERSION="$EXPECTED_VERSION" EXPECTED_RELEASE="$EXPECTED_RELEASE" RELEASE="$release" node <<'NODE'
+          const h=JSON.parse(process.env.PLATFORM_HEALTH||'{}');
+          const ok=h.ok===true
+            && h.service==='nuvasto'
+            && h.version===process.env.EXPECTED_VERSION
+            && process.env.RELEASE===process.env.EXPECTED_RELEASE
+            && h.r2Configured===true
+            && h.r2Ready===true
+            && Number(h.invoiceFlowVersion||0)>=28
+            && Number(h.keyboardNavigationVersion||0)>=28;
+          if(!ok){console.error(JSON.stringify(h,null,2));process.exit(1)}
           NODE
-            )
-            if [ "$ready" = "true" ] && [ "$release" = "$EXPECTED_RELEASE" ]; then
-              echo "Nuvasto $EXPECTED_VERSION ($EXPECTED_RELEASE) is ready"
-              exit 0
-            fi
-            echo "Waiting for production ${attempt}/36 · served release: ${release:-none}"
-            sleep 10
-          done
-          echo "Production did not reach the expected release in time" >&2
-          exit 1
 
       - name: Install Playwright browsers
         working-directory: professional
