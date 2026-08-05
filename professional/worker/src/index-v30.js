@@ -4,15 +4,15 @@ import {corsHeaders,errorResponse,ok,securityHeaders} from './core.js';
 import {ensureSchema} from './schema.js';
 import {analyzeInvoiceV30,invoiceAnalysisMetricsV30} from './api/invoice-analysis-v30.js';
 
-const VERSION='30';
-const RELEASE_VERSION='2.0.0-alpha.30';
+const VERSION='31';
+const RELEASE_VERSION='2.0.0-alpha.31';
 
 function decorate(response,request,env){
   const headers=new Headers(response.headers),origin=request.headers.get('Origin')||'';
   for(const[name,value]of Object.entries(corsHeaders(origin,env)))headers.set(name,value);
   for(const[name,value]of Object.entries(securityHeaders()))headers.set(name,value);
   headers.set('X-Nuvasto-Version',VERSION);
-  headers.set('X-Nuvasto-Invoice-Engine','internal-v30');
+  headers.set('X-Nuvasto-Invoice-Engine','internal-v31');
   headers.set('X-Nuvasto-Storage',env.FILES?'r2':'unavailable');
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
@@ -33,7 +33,7 @@ function capabilities(actor){
 async function health(request,env,ctx){
   const response=await platformWorker.fetch(request,env,ctx);
   const payload=await response.clone().json().catch(()=>({}));
-  return decorate(ok({...payload,version:RELEASE_VERSION,invoiceFlowVersion:30,invoiceEngine:'internal-worker',invoiceFallbackReview:true,brandSafeCopy:true,responsiveOperationalModals:true,capabilityMatrixVersion:30},request,env),request,env);
+  return decorate(ok({...payload,version:RELEASE_VERSION,invoiceFlowVersion:31,invoiceEngine:'internal-worker',invoiceFallbackReview:true,invoiceStorageLinkFix:true,brandSafeCopy:true,responsiveOperationalModals:true,capabilityMatrixVersion:30},request,env),request,env);
 }
 
 export default{
