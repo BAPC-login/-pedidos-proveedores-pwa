@@ -27,12 +27,20 @@
   "vars": {
     "GEMINI_MODEL": "gemini-3.5-flash",
     "ENVIRONMENT": "production",
+    "PRODUCT_NAME": "Nuvasto",
     "AI_ENDPOINT": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev",
-    "ALLOWED_ORIGINS": "https://bapc-login.github.io,https://pedidos-pro-ai.botreservasmultilocal.workers.dev,http://localhost:8787,http://127.0.0.1:8787,http://localhost:8788,http://127.0.0.1:8788"
+    "ALLOWED_ORIGINS": "https://bapc-login.github.io,https://pedidos-pro-ai.botreservasmultilocal.workers.dev,http://localhost:8787,http://127.0.0.1:8787,http://localhost:8788,http://127.0.0.1:8788",
+    "REQUIRE_R2": "true"
   },
   "d1_databases": [
     {
       "binding": "DB"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "FILES",
+      "bucket_name": "nuvasto-files"
     }
   ]
 }
