@@ -1,6 +1,9 @@
 import aiWorker from './index.js';
 import platformWorker from '../../professional/worker/src/index-v28.js';
 
+// Historial de compatibilidad validado por las suites acumulativas:
+// index-v20.js · 2026.07.31.20 | index-v21.js · 2026.07.31.21 | index-v22.js · 2026.07.31.22
+// index-v26.js · 2026.08.04.26 | index-v27.js · 2026.08.05.27 | index-v28.js · 2026.08.05.28
 const PLATFORM_RELEASE='2026.08.05.28';
 function rewritePath(request,pathname){const url=new URL(request.url);url.pathname=pathname;return new Request(url.toString(),request)}
 function isAiRoute(pathname){return pathname==='/health'||pathname.startsWith('/v1/')}
