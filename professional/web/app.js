@@ -1,4 +1,5 @@
 import {$,$$,state,api,toast,setBusy,setTheme,syncMutations,updateSyncChip,showAuth,showApp,logoutLocal,isAdmin} from './app-core.js';
+import './app-invoice-entry-v29.js';
 import {initializeCheckoutInvoiceV29} from './app-checkout-invoice-v29.js';
 import {initializeScreenStateHotfix} from './app-screen-state-hotfix.js';
 import {openBootstrap,openOrder,openWorkspaceSwitcher,handleAction} from './app-actions.js';
