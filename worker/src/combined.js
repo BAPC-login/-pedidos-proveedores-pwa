@@ -1,8 +1,7 @@
 import aiWorker from './index.js';
-import platformWorker from '../../professional/worker/src/index-v27.js';
+import platformWorker from '../../professional/worker/src/index-v28.js';
 
-// Compatibilidad de pruebas y trazabilidad: index-v26.js · 2026.08.04.26
-const PLATFORM_RELEASE='2026.08.05.27';
+const PLATFORM_RELEASE='2026.08.05.28';
 function rewritePath(request,pathname){const url=new URL(request.url);url.pathname=pathname;return new Request(url.toString(),request)}
 function isAiRoute(pathname){return pathname==='/health'||pathname.startsWith('/v1/')}
 function withPlatformRelease(response){const headers=new Headers(response.headers);headers.set('X-Nuvasto-Release',PLATFORM_RELEASE);headers.set('X-Pedidos-Pro-Release',PLATFORM_RELEASE);return new Response(response.body,{status:response.status,statusText:response.statusText,headers})}
