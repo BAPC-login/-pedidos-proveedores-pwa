@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
-const [analysis,indexV30,runtime,invoice,orders,detail,detailWrapper,invoiceWrapper,entry,combined,sw,pkg,readiness]=await Promise.all([
+const [analysis,indexV30,runtime,invoice,orders,historyBridge,detail,detailWrapper,invoiceWrapper,entry,combined,sw,pkg,readiness]=await Promise.all([
   readFile(new URL('../worker/src/api/invoice-analysis-v30.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/index-v30.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-runtime-v30.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-invoice-v30.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-orders-v30.js',import.meta.url),'utf8'),
+  readFile(new URL('../web/app-history-bridge-v31.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-order-detail-v30.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-order-detail.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-invoices.js',import.meta.url),'utf8'),
@@ -25,9 +26,15 @@ assert.match(analysis,/manualReviewLines/);
 assert.match(analysis,/invoice\.analysis\.success/);
 assert.match(analysis,/invoice\.analysis\.degraded/);
 assert.match(analysis,/storeFile/);
+assert.match(analysis,/purpose:'invoice-source'/);
+assert.doesNotMatch(analysis,/entityType:'invoice-analysis'/);
+assert.match(analysis,/flowVersion:31/);
+assert.match(analysis,/invoice_usage_write_failed/);
 assert.match(analysis,/Nuvasto guardó el documento/);
 
-assert.match(indexV30,/2\.0\.0-alpha\.30/);
+assert.match(indexV30,/2\.0\.0-alpha\.31/);
+assert.match(indexV30,/invoiceFlowVersion:31/);
+assert.match(indexV30,/invoiceStorageLinkFix:true/);
 assert.match(indexV30,/\/api\/capabilities/);
 assert.match(indexV30,/\/api\/operations\/invoice-analysis-metrics/);
 assert.match(indexV30,/invoiceFallbackReview:true/);
@@ -56,6 +63,11 @@ assert.match(orders,/Factura pendiente/);
 assert.match(orders,/Recepción pendiente/);
 assert.match(entry,/setTimeout\(\(\)=>initializeOrdersV30\(\),0\)/);
 
+assert.match(historyBridge,/\[data-v18-detail\]/);
+assert.match(historyBridge,/openOrderDetail/);
+assert.match(historyBridge,/stopImmediatePropagation/);
+assert.match(entry,/app-history-bridge-v31\.js/);
+
 assert.match(detail,/v30-reception-card/);
 assert.match(detail,/Cantidad inferior al pedido/);
 assert.match(detail,/Conciliación incompleta/);
@@ -71,15 +83,17 @@ assert.match(entry,/openInvoiceAnalysisV30/);
 assert.match(entry,/app-orders-v30\.js/);
 
 assert.match(combined,/index-v30\.js/);
-assert.match(combined,/2026\.08\.05\.31/);
-assert.match(sw,/nuvasto-v30-operational-orders/);
+assert.match(combined,/2026\.08\.05\.32/);
+assert.match(sw,/nuvasto-v31-invoice-storage-history/);
 assert.match(sw,/app-runtime-v30\.js/);
 assert.match(sw,/app-order-detail-v30\.js/);
 assert.match(sw,/app-orders-v30\.js/);
-assert.match(pkg,/2\.0\.0-alpha\.30/);
+assert.match(sw,/app-history-bridge-v31\.js/);
+assert.match(pkg,/2\.0\.0-alpha\.31/);
 assert.match(pkg,/workflow-v30\.test\.mjs/);
 assert.match(pkg,/app-orders-v30\.js/);
+assert.match(pkg,/app-history-bridge-v31\.js/);
 
 for(const feature of ['runInvoiceBenchmarkV17','runIsolationAuditV17','saveOnboardingV17','manageSubscriptionV17','verifyRecoveryV17','createSupportTicketV17','saveLegalV17'])assert.match(readiness,new RegExp(feature));
 
-console.log('workflow v30 invoice fallback, mobile menus, role capabilities and order cards: OK');
+console.log('workflow v31 invoice storage, fallback, history bridge and order cards: OK');
