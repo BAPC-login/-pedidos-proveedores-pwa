@@ -91,14 +91,17 @@ async function repairDuplicates(env){
 
 async function runIntegrity(env){
   await ensureLockTable(env);
-  const systemOrg='__system__',token=await acquireLock(env,systemOrg,'integrity',{ttlMs:45000,attempts:100});
+  const anchor=await env.DB.prepare('SELECT id FROM organizations ORDER BY created_at,id LIMIT 1').first();
+  if(!anchor?.id){
+    await env.DB.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_org_folio_unique ON orders(org_id,folio)').run();
+    return{ready:true,repaired:[],repairedCount:0,uniqueIndex:true,checkedAt:nowIso()};
+  }
+  const token=await acquireLock(env,anchor.id,'integrity-global',{ttlMs:45000,attempts:100});
   try{
-    // The global integrity lock protects the one-time repair. Folio writes use an
-    // organization lock afterwards, while the database index is the final guard.
     const repaired=await repairDuplicates(env);
     await env.DB.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_org_folio_unique ON orders(org_id,folio)').run();
     return{ready:true,repaired,repairedCount:repaired.length,uniqueIndex:true,checkedAt:nowIso()};
-  }finally{await releaseLock(env,systemOrg,'integrity',token)}
+  }finally{await releaseLock(env,anchor.id,'integrity-global',token)}
 }
 
 export async function ensureFolioIntegrityV34(env,{force=false}={}){
