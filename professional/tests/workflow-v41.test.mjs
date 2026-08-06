@@ -20,7 +20,7 @@ for(const token of ['ensureEnterpriseSchemaV41','payment_term_anchor','approval_
 for(const token of ['historical_date_confirmation_required','receivedAt','payment_term_days','createReceptionReturnV41','invoice_math_confirmation_required','credit_original_required','ensureApprovalsForBatchV41','recordSupplierConfirmationV41','listNotificationsV41','supplierScorecardV41'])assert.match(operations,new RegExp(token));
 assert.match(analytics,/periodBasis:'reception_date'/);assert.match(analytics,/receptions\.received_at|r\.received_at/);assert.match(analytics,/payment_schedules/);assert.match(analytics,/cost_center_budgets/);assert.match(analytics,/variationVsPrevious/);
 assert.match(index,/2\.0\.0-alpha\.41/);assert.match(index,/reportingPeriodBasis:'reception_date'/);assert.match(index,/historicalReceptionEntry:true/);assert.match(index,/normalizedSupplierPaymentTerms:true/);assert.match(index,/barcodeScanning:false/);assert.match(index,/driverSignature:false/);
-for(const token of ['PERÍODO POR RECEPCIÓN','Registro histórico','Contra entrega','Crédito a días','Bandeja de recepciones','Calendario financiero','Aprobaciones','supplier-confirmation','v41-reception-payments-enterprise'])assert.match(ui,new RegExp(token));
+for(const token of ['PERÍODO POR RECEPCIÓN','Registro histórico','Contra entrega','Crédito a días','Bandeja de recepciones','Calendario financiero','Aprobaciones','supplier-confirmation','initializeEnterpriseV41'])assert.match(ui,new RegExp(token));
 assert.doesNotMatch(ui,/Escanear código de barras|Firma del chofer/);
 assert.match(entry,/initializeEnterpriseV41/);assert.match(entry,/app-v41-enterprise\.js/);
 assert.match(combined,/index-v41\.js/);assert.match(combined,/2026\.08\.06\.42/);
