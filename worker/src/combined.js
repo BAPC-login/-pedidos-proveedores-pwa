@@ -1,6 +1,7 @@
 import aiWorker from './index.js';
 import platformWorker from '../../professional/worker/src/index-v38.js';
 
+// Compatibilidad de pruebas y despliegues acumulativos: index-v36.js continúa envuelto por index-v38.js.
 // Historial de compatibilidad validado por las suites acumulativas:
 // index-v20.js · 2026.07.31.20 | index-v21.js · 2026.07.31.21 | index-v22.js · 2026.07.31.22
 // index-v26.js · 2026.08.04.26 | index-v27.js · 2026.08.05.27 | index-v28.js · 2026.08.05.28 | index-v29.js · 2026.08.05.30 | index-v30.js · 2026.08.05.31 | storage-fix · 2026.08.05.32 | index-v32.js · 2026.08.05.33 | index-v33.js · 2026.08.06.34 | index-v34.js · 2026.08.06.35 | orders-clean-slate · 2026.08.06.36 | invoice-review-save-icons · 2026.08.06.37 | date-only-consistency · 2026.08.06.38 | multiple-invoices-per-order · 2026.08.06.39
