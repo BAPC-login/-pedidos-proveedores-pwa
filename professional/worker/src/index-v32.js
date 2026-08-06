@@ -66,7 +66,11 @@ export default{
       }
       if(method==='POST'&&url.pathname==='/api/invoices'){
         const actor=await authenticate(request,env),body=await request.json(),prepared=await prepareInvoicePayloadV32(env,actor,body),downstream=new Request(request.url,{method:'POST',headers:request.headers,body:JSON.stringify(prepared.body)}),response=await platformWorker.fetch(downstream,env,ctx);
-        if(response.ok){const payload=await response.clone().json().catch(()=>({})),invoiceId=payload.invoice?.id||payload.id||payload.result?.id||'';await learnFromInvoiceV32(env,actor,{requestBody:prepared.body,invoiceId,extras:prepared.extras,rejected:prepared.rejected}).catch(error=>console.warn('invoice_learning_failed',error?.message||error))}
+        if(response.ok){
+          const payload=await response.clone().json().catch(()=>({})),invoiceId=payload.invoice?.id||payload.id||payload.result?.id||'';
+          const learning=learnFromInvoiceV32(env,actor,{requestBody:prepared.body,invoiceId,extras:prepared.extras,rejected:prepared.rejected}).catch(error=>console.warn('invoice_learning_failed',error?.message||error));
+          if(ctx?.waitUntil)ctx.waitUntil(learning);else await learning;
+        }
         return decorate(response,request,env);
       }
       return decorate(await platformWorker.fetch(request,env,ctx),request,env);
