@@ -27,20 +27,20 @@ export async function getDashboardAnalyticsV40(env,actor,url){
     FROM invoices i JOIN suppliers s ON s.id=i.supplier_id
     WHERE i.org_id=? AND i.status!='void' AND date(i.invoice_date) BETWEEN date(?) AND date(?)
       AND (?='' OR i.supplier_id=?)
-      AND (?='' OR EXISTS(SELECT 1 FROM invoice_location_links ill WHERE ill.invoice_id=i.id AND ill.location_id=?))
+      AND (?='' OR EXISTS(SELECT 1 FROM invoice_order_links iol_location JOIN orders o_location ON o_location.id=iol_location.order_id WHERE iol_location.invoice_id=i.id AND o_location.location_id=?))
       AND (?='' OR EXISTS(SELECT 1 FROM invoice_order_links iol JOIN order_cost_centers occ ON occ.order_id=iol.order_id WHERE iol.invoice_id=i.id AND occ.cost_center_id=?))
       AND (?='' OR EXISTS(SELECT 1 FROM invoice_lines il JOIN products p ON p.id=il.product_id WHERE il.invoice_id=i.id AND p.category_id=?))
     ORDER BY i.invoice_date`;
   const categorySql=`SELECT COALESCE(c.name,'Sin categoría') AS name,COALESCE(SUM(il.gross_line_total),0) AS spend
     FROM invoice_lines il JOIN invoices i ON i.id=il.invoice_id LEFT JOIN products p ON p.id=il.product_id LEFT JOIN categories c ON c.id=p.category_id
     WHERE i.org_id=? AND i.status!='void' AND date(i.invoice_date) BETWEEN date(?) AND date(?) AND (?='' OR i.supplier_id=?)
-      AND (?='' OR EXISTS(SELECT 1 FROM invoice_location_links ill WHERE ill.invoice_id=i.id AND ill.location_id=?))
+      AND (?='' OR EXISTS(SELECT 1 FROM invoice_order_links iol_location JOIN orders o_location ON o_location.id=iol_location.order_id WHERE iol_location.invoice_id=i.id AND o_location.location_id=?))
       AND (?='' OR EXISTS(SELECT 1 FROM invoice_order_links iol JOIN order_cost_centers occ ON occ.order_id=iol.order_id WHERE iol.invoice_id=i.id AND occ.cost_center_id=?))
       AND (?='' OR p.category_id=?) GROUP BY COALESCE(c.name,'Sin categoría') ORDER BY spend DESC LIMIT 12`;
   const centerSql=`SELECT COALESCE(cc.name,'Sin centro') AS name,COALESCE(SUM(i.gross_total),0) AS spend,COUNT(DISTINCT i.id) AS documents
     FROM invoices i JOIN invoice_order_links iol ON iol.invoice_id=i.id JOIN order_cost_centers occ ON occ.order_id=iol.order_id JOIN cost_centers cc ON cc.id=occ.cost_center_id
     WHERE i.org_id=? AND i.status!='void' AND date(i.invoice_date) BETWEEN date(?) AND date(?) AND (?='' OR i.supplier_id=?)
-      AND (?='' OR EXISTS(SELECT 1 FROM invoice_location_links ill WHERE ill.invoice_id=i.id AND ill.location_id=?))
+      AND (?='' OR EXISTS(SELECT 1 FROM invoice_order_links iol_location JOIN orders o_location ON o_location.id=iol_location.order_id WHERE iol_location.invoice_id=i.id AND o_location.location_id=?))
       AND (?='' OR cc.id=?) AND (?='' OR EXISTS(SELECT 1 FROM invoice_lines il JOIN products p ON p.id=il.product_id WHERE il.invoice_id=i.id AND p.category_id=?))
     GROUP BY cc.id,cc.name ORDER BY spend DESC LIMIT 12`;
 
