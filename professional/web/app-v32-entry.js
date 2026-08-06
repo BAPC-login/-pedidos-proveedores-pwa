@@ -7,6 +7,7 @@ import {initializeEnhancementsV32} from './app-v32-enhancements.js';
 import {initializeDocumentsV33} from './app-v33-documents.js';
 import {initializePolishV34} from './app-v34-polish.js';
 import './app-multi-invoice-v38.js';
+import './app-v39-stability.js';
 import {initializeInvoiceReviewV36} from './app-v36-invoice-review.js';
 
 let initialized=false;
