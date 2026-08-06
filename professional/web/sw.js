@@ -1,4 +1,5 @@
 // Compatibilidad histórica: v17-readiness · v18-history-master-pdf · v19-workflow-r2 · v20-professional-sso · nuvasto-v21-brand-platform · nuvasto-v22-orders-pdf-motion · nuvasto-v23-auth-keyboard · nuvasto-v23-screen-state-hotfix · nuvasto-v26-r2-invoice-keyboard · v28-regression-suite · nuvasto-v29-invoice-checkout-r2 · nuvasto-v30-reliability-mobile · v31-invoice-storage · v32-professional-ux · v33-history-documents · v34-folio-invoice-visual · v35-orders-clean-slate · v36-invoice-review-save-icons · v36-date-only-consistency · v38-multiple-invoices-per-order
+// Cachés compatibles previas: nuvasto-v36-invoice-review-save-icons · nuvasto-v36-date-only-consistency
 // Caché activa: Nuvasto v38 · hasta cinco documentos independientes por pedido
 const VERSION='nuvasto-v38-multiple-invoices-per-order';
 const SHELL=[
