@@ -4,11 +4,12 @@ import {injectV32Styles} from './app-v32-base.js';
 import {initializeOrdersHistoryV32} from './app-v32-orders.js';
 import {initializeCatalogV32} from './app-v32-catalog.js';
 import {initializeEnhancementsV32} from './app-v32-enhancements.js';
+import {initializeDocumentsV33} from './app-v33-documents.js';
 
 let initialized=false;
 export function initializeProfessionalV32(){
-  if(initialized)return;initialized=true;injectV32Styles();initializeOrdersHistoryV32();initializeCatalogV32();initializeEnhancementsV32();
-  if(state.token&&['orders','history','catalog','suppliers'].includes(state.view))openRoute(state.view,state.subview||'',{replace:true}).catch(error=>console.warn('v32_initial_route_failed',error));
+  if(initialized)return;initialized=true;injectV32Styles();initializeOrdersHistoryV32();initializeCatalogV32();initializeEnhancementsV32();initializeDocumentsV33();
+  if(state.token&&['orders','history','documents','catalog','suppliers'].includes(state.view))openRoute(state.view,state.subview||'',{replace:true}).catch(error=>console.warn('v32_initial_route_failed',error));
 }
 
 setTimeout(initializeProfessionalV32,220);

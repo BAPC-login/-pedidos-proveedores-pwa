@@ -34,6 +34,26 @@ function matches(order,filters){
     &&(!filters.reception||(filters.reception==='pending'&&!order.lastReceivedAt)||(filters.reception==='received'&&Boolean(order.lastReceivedAt)));
 }
 
+function fallbackMeta(orders){
+  return{
+    suppliers:uniq(orders.map(item=>item.supplierId?{id:item.supplierId,name:item.supplierName}:null)),
+    locations:uniq(orders.map(item=>item.locationId?{id:item.locationId,name:item.locationName}:null)),
+    costCenters:uniq(orders.map(item=>item.costCenterId?{id:item.costCenterId,name:item.costCenterName}:null)),
+    brands:[...new Set(orders.flatMap(item=>item.productBrands||[]))].sort((a,b)=>a.localeCompare(b,'es')),
+    categories:uniq(orders.flatMap(item=>item.categories||[]))
+  };
+}
+
+async function loadOrdersPayload(){
+  try{return await api('/api/orders/advanced',{fresh:true,timeout:30000})}
+  catch(error){
+    if([401,403].includes(Number(error.status||0)))throw error;
+    console.warn('advanced_orders_fallback',error?.code||error?.message||error);
+    const legacy=await api('/api/orders',{fresh:true,timeout:30000}),orders=legacy.orders||[];
+    return{orders,meta:fallbackMeta(orders),fallback:true};
+  }
+}
+
 function card(order,cap){
   const info=stateInfo(order),editing=order.status==='draft',pendingInvoice=Number(order.invoiceCount||0)===0&&!['received','reconciled','closed','cancelled'].includes(order.status),pendingReception=!order.lastReceivedAt&&!['draft','cancelled','received','reconciled','closed'].includes(order.status);
   let action='open',label='Ver pedido';
@@ -54,9 +74,9 @@ export async function renderOrdersHistoryV32(mode='orders'){
   if($('#pageEyebrow'))$('#pageEyebrow').textContent=history?'TRAZABILIDAD':'COMPRAS';if($('#pageTitle'))$('#pageTitle').textContent=history?'Historial':'Pedidos';
   $('#mainContent').innerHTML=`<section class="v32-page">${skeletonCards(4)}</section>`;
   try{
-    const[payload,cap]=await Promise.all([api('/api/orders/advanced',{fresh:true,timeout:30000}),loadCapabilitiesV30()]),all=payload.orders||[],orders=all.filter(order=>history?order.status!=='draft':order.status!=='cancelled'),meta=payload.meta||{},defaults={query:'',from:'',to:'',supplier:'',location:'',center:'',status:'',brand:'',category:'',invoice:'',reception:''};
+    const[payload,cap]=await Promise.all([loadOrdersPayload(),loadCapabilitiesV30()]),all=payload.orders||[],orders=all.filter(order=>history?order.status!=='draft':order.status!=='cancelled'),meta=payload.meta||fallbackMeta(all),defaults={query:'',from:'',to:'',supplier:'',location:'',center:'',status:'',brand:'',category:'',invoice:'',reception:''};
     let filters=savedFilters(mode,defaults);
-    $('#mainContent').innerHTML=`<section class="v32-page"><header class="v32-head"><div><span class="eyebrow">${history?'TRAZABILIDAD':'COMPRAS'}</span><h2>${history?'Historial de pedidos':'Pedidos'}</h2><p>${history?'Consulta documentos, recepciones y estados desde una sola vista.':'Gestiona cada pedido con una acción principal clara y accesos directos.'}</p></div><div class="v32-head-actions">${!history&&cap.orders?.create?'<button class="btn primary" id="v32NewOrder">＋ Nuevo pedido</button>':''}</div></header><div class="v32-toolbar"><label class="v32-search"><span class="sr-only">Buscar pedidos</span><input id="v32OrderSearch" value="${esc(filters.query)}" placeholder="Buscar folio, proveedor, marca o categoría"></label><button class="v32-filter-trigger" id="v32OrderFilters" type="button">Filtros avanzados <span class="v32-filter-count ${filterCount(filters)?'':'hidden'}" id="v32OrderFilterCount">${filterCount(filters)}</span></button></div><div class="v32-grid" id="v32OrderGrid"></div></section>`;
+    $('#mainContent').innerHTML=`<section class="v32-page"><header class="v32-head"><div><span class="eyebrow">${history?'TRAZABILIDAD':'COMPRAS'}</span><h2>${history?'Historial de pedidos':'Pedidos'}</h2><p>${history?'Consulta documentos, recepciones y estados desde una sola vista.':'Gestiona cada pedido con una acción principal clara y accesos directos.'}</p></div><div class="v32-head-actions">${!history&&cap.orders?.create?'<button class="btn primary" id="v32NewOrder">＋ Nuevo pedido</button>':''}</div></header>${payload.fallback?'<div class="v33-inline-notice" role="status">Se cargó el historial mediante el servicio de respaldo. La información está disponible mientras se completa la actualización del servicio avanzado.</div>':''}<div class="v32-toolbar"><label class="v32-search"><span class="sr-only">Buscar pedidos</span><input id="v32OrderSearch" value="${esc(filters.query)}" placeholder="Buscar folio, proveedor, marca o categoría"></label><button class="v32-filter-trigger" id="v32OrderFilters" type="button">Filtros avanzados <span class="v32-filter-count ${filterCount(filters)?'':'hidden'}" id="v32OrderFilterCount">${filterCount(filters)}</span></button></div><div class="v32-grid" id="v32OrderGrid"></div></section>`;
     const bind=()=>{
       $$('[data-v32-order-open]').forEach(button=>button.onclick=()=>openOrderDetail(button.dataset.v32OrderOpen).catch(error=>toast(error.message,'error')));
       $$('[data-v32-order-share]').forEach(button=>button.onclick=()=>share(button,orders.find(item=>item.id===button.dataset.v32OrderShare)));
@@ -66,7 +86,10 @@ export async function renderOrdersHistoryV32(mode='orders'){
     $('#v32OrderSearch').oninput=render;$('#v32NewOrder')?.addEventListener('click',()=>openOrder());
     $('#v32OrderFilters').onclick=()=>openFilterDrawer({scope:mode,title:'Filtros avanzados',subtitle:'Combina período, proveedor, local, centro, marca, categoría y estados.',filters,fields:`<label class="field"><span>Desde</span><input type="date" name="from"></label><label class="field"><span>Hasta</span><input type="date" name="to"></label><label class="field"><span>Proveedor</span><select name="supplier">${optionList(meta.suppliers||[],filters.supplier)}</select></label><label class="field"><span>Local</span><select name="location">${optionList(meta.locations||[],filters.location)}</select></label><label class="field"><span>Centro de costo</span><select name="center">${optionList(meta.costCenters||[],filters.center)}</select></label><label class="field"><span>Estado</span><select name="status">${optionList(uniq(orders.map(item=>({id:item.status,name:statusLabel(item.status)}))),filters.status)}</select></label><label class="field"><span>Marca de producto</span><select name="brand">${optionList((meta.brands||[]).map(item=>({id:item,name:item})),filters.brand)}</select></label><label class="field"><span>Categoría</span><select name="category">${optionList(meta.categories||[],filters.category)}</select></label><label class="field"><span>Factura</span><select name="invoice"><option value="">Todas</option><option value="pending">Pendiente</option><option value="linked">Con factura</option></select></label><label class="field"><span>Recepción</span><select name="reception"><option value="">Todas</option><option value="pending">Pendiente</option><option value="received">Registrada</option></select></label>`,onApply:next=>{filters=next;render()}});
     render();
-  }catch(error){$('#mainContent').innerHTML=`<section class="v32-page"><div class="v32-empty" role="alert"><h3>No se pudo cargar ${history?'el historial':'los pedidos'}</h3><p>${esc(error.message)}</p><button class="btn primary" id="v32RetryOrders">Reintentar</button></div></section>`;$('#v32RetryOrders').onclick=()=>renderOrdersHistoryV32(mode)}
+  }catch(error){
+    const diagnostic=[error.code,error.status].filter(value=>value!==undefined&&value!==null&&value!=='').join(' · ');
+    $('#mainContent').innerHTML=`<section class="v32-page"><div class="v32-empty" role="alert"><h3>No se pudo cargar ${history?'el historial':'los pedidos'}</h3><p>${esc(error.message)}</p>${diagnostic?`<small class="v33-diagnostic">Referencia: ${esc(diagnostic)}</small>`:''}<button class="btn primary" id="v32RetryOrders">Reintentar</button></div></section>`;$('#v32RetryOrders').onclick=()=>renderOrdersHistoryV32(mode);
+  }
 }
 
 export function initializeOrdersHistoryV32(){registerRouteRenderer('orders',()=>renderOrdersHistoryV32('orders'));registerRouteRenderer('history',()=>renderOrdersHistoryV32('history'))}
