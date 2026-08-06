@@ -31,8 +31,8 @@ assert.match(index,/ensureOrdersCleanSlateV35/);
 assert.match(index,/ordersCleanSlateApplied/);
 assert.match(index,/ordersRemainingAfterReset/);
 assert.match(index,/\/api\/operations\/order-reset-status/);
-assert.match(combined,/2026\.08\.06\.36/);
+assert.match(combined,/2026\.08\.06\.37/);
 assert.match(pkg,/order-reset-v35\.js/);
 assert.match(pkg,/workflow-v35-order-reset\.test\.mjs/);
 
-console.log('workflow v35 one-time order clean slate preserving catalog and company data: OK');
+console.log('workflow v35 one-time order clean slate preserved under Nuvasto v36: OK');
