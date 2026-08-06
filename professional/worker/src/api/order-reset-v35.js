@@ -3,12 +3,21 @@ import {nowIso,uuid} from '../core.js';
 const RESET_KEY='orders-clean-slate-2026-08-05-v1';
 const DEFAULT_ORG_ID='e73d2d6e-dae8-46c6-87df-43ae05ca81fa';
 const rows=result=>result?.results||[];
+const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
 async function ensureResetState(db){
   await db.prepare(`CREATE TABLE IF NOT EXISTS data_seed_state(
     seed_key TEXT PRIMARY KEY,
     item_count INTEGER NOT NULL DEFAULT 0,
     completed_at TEXT NOT NULL
+  )`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS folio_operation_locks(
+    org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    lock_key TEXT NOT NULL,
+    token TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(org_id,lock_key)
   )`).run();
 }
 
@@ -19,6 +28,26 @@ async function targetOrganizations(env){
     ORDER BY created_at
   `).bind(DEFAULT_ORG_ID).all();
   return rows(result);
+}
+
+async function acquireResetLock(env,orgId){
+  const token=uuid();
+  for(let attempt=0;attempt<80;attempt++){
+    const current=new Date(),now=current.toISOString(),expiresAt=new Date(current.getTime()+45000).toISOString();
+    await env.DB.prepare(`INSERT OR IGNORE INTO folio_operation_locks(org_id,lock_key,token,expires_at,updated_at)
+      VALUES(?,'orders-clean-slate-v35',?,?,?)`).bind(orgId,token,expiresAt,now).run();
+    const result=await env.DB.prepare(`UPDATE folio_operation_locks SET token=?,expires_at=?,updated_at=?
+      WHERE org_id=? AND lock_key='orders-clean-slate-v35' AND(token=? OR expires_at<=?)`)
+      .bind(token,expiresAt,now,orgId,token,now).run();
+    if(Number(result?.meta?.changes||0)>0)return token;
+    await wait(Math.min(250,60+attempt*6));
+  }
+  throw new Error('No se pudo obtener el bloqueo para reiniciar los pedidos');
+}
+
+async function releaseResetLock(env,orgId,token){
+  await env.DB.prepare(`DELETE FROM folio_operation_locks
+    WHERE org_id=? AND lock_key='orders-clean-slate-v35' AND token=?`).bind(orgId,token).run().catch(()=>{});
 }
 
 async function orderFiles(env,orgId){
@@ -86,7 +115,7 @@ async function deleteOrderRows(env,orgId,fileRows){
     env.DB.prepare('DELETE FROM orders WHERE org_id=?').bind(orgId),
     env.DB.prepare("DELETE FROM usage_counters WHERE org_id=? AND metric='orders_created'").bind(orgId),
     env.DB.prepare('DELETE FROM idempotency_keys WHERE org_id=?').bind(orgId),
-    env.DB.prepare('DELETE FROM folio_operation_locks WHERE org_id=?').bind(orgId)
+    env.DB.prepare("DELETE FROM folio_operation_locks WHERE org_id=? AND lock_key='folios'").bind(orgId)
   ];
   for(const file of fileRows)statements.push(env.DB.prepare('DELETE FROM files WHERE id=? AND org_id=?').bind(file.id,orgId));
   statements.push(env.DB.prepare(`INSERT INTO audit_logs(
@@ -103,18 +132,23 @@ async function deleteOrderRows(env,orgId,fileRows){
 
 export async function ensureOrdersCleanSlateV35(env){
   await ensureResetState(env.DB);
-  const completed=await env.DB.prepare('SELECT item_count,completed_at FROM data_seed_state WHERE seed_key=?').bind(RESET_KEY).first();
+  let completed=await env.DB.prepare('SELECT item_count,completed_at FROM data_seed_state WHERE seed_key=?').bind(RESET_KEY).first();
   if(completed)return{applied:true,alreadyCompleted:true,ordersDeleted:Number(completed.item_count||0),completedAt:completed.completed_at,resetKey:RESET_KEY};
   const organizations=await targetOrganizations(env);
   if(!organizations.length)return{applied:false,alreadyCompleted:false,ordersDeleted:0,completedAt:null,resetKey:RESET_KEY,reason:'target_workspace_not_found'};
-  const results=[];
-  for(const organization of organizations){
-    const files=await orderFiles(env,organization.id);
-    results.push(await deleteOrderRows(env,organization.id,files));
-  }
-  const total=results.reduce((sum,item)=>sum+item.ordersDeleted,0),completedAt=nowIso();
-  await env.DB.prepare('INSERT INTO data_seed_state(seed_key,item_count,completed_at) VALUES(?,?,?)').bind(RESET_KEY,total,completedAt).run();
-  return{applied:true,alreadyCompleted:false,ordersDeleted:total,completedAt,resetKey:RESET_KEY,organizations:results};
+  const anchorOrgId=organizations[0].id,token=await acquireResetLock(env,anchorOrgId);
+  try{
+    completed=await env.DB.prepare('SELECT item_count,completed_at FROM data_seed_state WHERE seed_key=?').bind(RESET_KEY).first();
+    if(completed)return{applied:true,alreadyCompleted:true,ordersDeleted:Number(completed.item_count||0),completedAt:completed.completed_at,resetKey:RESET_KEY};
+    const results=[];
+    for(const organization of organizations){
+      const files=await orderFiles(env,organization.id);
+      results.push(await deleteOrderRows(env,organization.id,files));
+    }
+    const total=results.reduce((sum,item)=>sum+item.ordersDeleted,0),completedAt=nowIso();
+    await env.DB.prepare('INSERT INTO data_seed_state(seed_key,item_count,completed_at) VALUES(?,?,?)').bind(RESET_KEY,total,completedAt).run();
+    return{applied:true,alreadyCompleted:false,ordersDeleted:total,completedAt,resetKey:RESET_KEY,organizations:results};
+  }finally{await releaseResetLock(env,anchorOrgId,token)}
 }
 
 export async function ordersCleanSlateStatusV35(env){
