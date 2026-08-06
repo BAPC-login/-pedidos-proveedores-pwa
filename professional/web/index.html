@@ -69,17 +69,18 @@
         <span class="chevron" id="workspaceChevron">⌄</span>
       </button>
       <nav class="side-nav" aria-label="Navegación principal">
-        <button class="nav-item active" data-view="dashboard"><span class="nav-icon">⌂</span><span>Resumen</span></button>
+        <button class="nav-item active" data-view="dashboard"><span class="nav-icon">⌂</span><span>Inicio</span></button>
         <button class="nav-item" data-view="orders"><span class="nav-icon">▤</span><span>Pedidos</span><b class="nav-count" id="pendingCount">0</b></button>
+        <button class="nav-item" data-view="history"><span class="nav-icon">◷</span><span>Historial</span></button>
         <button class="nav-item" data-view="invoices"><span class="nav-icon">▧</span><span>Facturas</span></button>
-        <button class="nav-item" data-view="catalog"><span class="nav-icon">◫</span><span>Catálogo</span></button>
+        <button class="nav-item" data-view="catalog"><span class="nav-icon">◫</span><span>Productos</span></button>
         <button class="nav-item" data-view="suppliers"><span class="nav-icon">◇</span><span>Proveedores</span></button>
         <button class="nav-item admin-only" data-view="team"><span class="nav-icon">◎</span><span>Usuarios</span></button>
-        <button class="nav-item admin-only" data-view="audit"><span class="nav-icon">◷</span><span>Auditoría</span></button>
+        <button class="nav-item admin-only" data-view="audit"><span class="nav-icon">◴</span><span>Auditoría</span></button>
       </nav>
       <div class="sidebar-spacer"></div>
       <nav class="side-nav lower">
-        <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>Administración</span></button>
+        <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>Configuración</span></button>
         <button class="nav-item danger-text" id="logoutButton"><span class="nav-icon">↪</span><span>Cerrar sesión</span></button>
       </nav>
       <div class="user-mini">
@@ -90,12 +91,12 @@
 
     <header class="topbar">
       <button class="route-back hidden" id="routeBack" type="button" aria-label="Volver a la vista anterior">←</button>
-      <button class="mobile-workspace-button" id="mobileWorkspaceButton" type="button" aria-label="Cambiar empresa y abrir administración">
+      <button class="mobile-workspace-button" id="mobileWorkspaceButton" type="button" aria-label="Cambiar empresa y abrir configuración">
         <div class="brand-mark tiny"><img src="./nuvasto-mark.svg" alt=""></div>
         <span><strong>Nuvasto</strong><small id="mobileWorkspaceName">Madriguera</small></span>
         <b>⌄</b>
       </button>
-      <div class="page-heading"><span class="eyebrow" id="pageEyebrow">OPERACIÓN</span><h1 id="pageTitle">Resumen</h1></div>
+      <div class="page-heading"><span class="eyebrow" id="pageEyebrow">OPERACIÓN</span><h1 id="pageTitle">Inicio</h1></div>
       <label class="global-search"><span>⌕</span><input id="globalSearch" placeholder="Buscar o ir a una sección" autocomplete="off"><kbd>⌘ K</kbd></label>
       <div class="top-actions">
         <button class="sync-chip" id="syncChip"><i></i><span>Sincronizado</span></button>
@@ -108,11 +109,11 @@
     <main class="content" id="mainContent" tabindex="-1"></main>
 
     <nav class="bottom-nav" aria-label="Navegación móvil">
-      <button class="bottom-item active" data-view="dashboard"><span>⌂</span><small>Resumen</small></button>
+      <button class="bottom-item active" data-view="dashboard"><span>⌂</span><small>Inicio</small></button>
       <button class="bottom-item" data-view="orders"><span>▤</span><small>Pedidos</small></button>
       <button class="bottom-create" id="mobileCreate" type="button" aria-label="Nuevo pedido">＋</button>
-      <button class="bottom-item" data-view="catalog"><span>◫</span><small>Catálogo</small></button>
-      <button class="bottom-item" data-view="suppliers"><span>◇</span><small>Proveedores</small></button>
+      <button class="bottom-item" data-view="history"><span>◷</span><small>Historial</small></button>
+      <button class="bottom-item" data-view="settings"><span>☰</span><small>Más</small></button>
     </nav>
   </div>
 
