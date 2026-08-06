@@ -6,7 +6,7 @@ import {createOrderFileV4} from './order-core-v4.js';
 
 const rows=result=>result?.results||[];
 const locationAllowed=(actor,locationId)=>actor.locationScope?.includes?.('*')||actor.locationScope?.includes?.(locationId);
-const draftFolio=(batchId,index)=>`BORRADOR-${String(batchId||uuid()).replace(/[^A-Z0-9]/gi,'').slice(0,8).toUpperCase()}-${String(index+1).padStart(3,'0')}`;
+const draftFolio=(batchId,index)=>`BORRADOR-${String(batchId||uuid()).replace(/[^A-Z0-9]/gi,'').slice(0,32).toUpperCase()}-${String(index+1).padStart(3,'0')}`;
 
 export async function prepareDraftFoliosV40(env,orgId){
   const drafts=rows(await env.DB.prepare("SELECT id,batch_id,folio,created_at FROM orders WHERE org_id=? AND status='draft' AND folio NOT LIKE 'BORRADOR-%' ORDER BY created_at,id").bind(orgId).all());
@@ -36,7 +36,7 @@ async function nextFolios(env,orgId,location,count,date){
 
 export async function emitOrderBatchV40(request,env,actor,batchId,ctx){
   assertMinimumRole(actor.role,ROLES.PURCHASER);await prepareDraftFoliosV40(env,actor.orgId);
-  const result=await env.DB.prepare(`SELECT o.id,o.status,o.location_id,o.folio,o.created_at,l.code,l.name FROM orders o JOIN locations l ON l.id=o.location_id WHERE o.org_id=? AND o.batch_id=? ORDER BY o.created_at,o.id`).bind(actor.orgId,batchId).all(),orders=rows(result);
+  const result=await env.DB.prepare(`SELECT o.id,o.status,o.location_id,o.folio,o.created_at,l.code,l.name FROM orders o JOIN locations l ON l.id=o.location_id WHERE o.org_id=? AND o.batch_id=? ORDER BY o.created_at,o.folio,o.id`).bind(actor.orgId,batchId).all(),orders=rows(result);
   if(!orders.length)throw new HttpError(404,'Archivo de pedidos no encontrado','not_found');
   if(orders.some(order=>!locationAllowed(actor,order.location_id)))throw new HttpError(403,'No tienes acceso a todos los pedidos del archivo','forbidden');
   const editable=orders.filter(order=>order.status==='draft');
