@@ -33,8 +33,8 @@ for(const pattern of [/MAX_DOCUMENT_BYTES=20\*1024\*1024/,/input\.multiple=true/
 assert.match(router,/while\(pending\)/);assert.match(router,/superseded:true/);assert.match(router,/activePromise&&activeKey===routeKey/);assert.match(router,/aria-busy/);
 assert.match(analysisCore,/MAX_INVOICE_FILE_BYTES_V39=20\*1024\*1024/);assert.match(analysisCore,/El documento supera 20 MB/);assert.match(analysisCore,/storeFile/);assert.match(analysisCore,/flowVersion:39/);assert.match(analysis,/analyzeInvoiceCoreV39/);assert.match(analysis,/safeMultipartRequest/);assert.match(analysis,/maxFileBytes/);
 assert.match(indexV39,/2\.0\.0-alpha\.39/);assert.match(indexV39,/maxDocumentSizeMb:20/);assert.match(indexV39,/native-multiple-v39/);assert.match(indexV39,/serialized-v39/);
-assert.match(combined,/index-v39\.js/);assert.match(combined,/2026\.08\.06\.40/);assert.match(sw,/nuvasto-v39-multi-picker-cache-navigation/);assert.match(sw,/app-v39-stability\.js/);assert.match(sw,/clients\.matchAll/);assert.match(sw,/client\.navigate\(client\.url\)/);
+assert.match(combined,/index-v(?:39|40)\.js/);assert.match(combined,/2026\.08\.06\.(?:40|41)/);assert.match(sw,/nuvasto-v(?:39-multi-picker-cache-navigation|40-professional-operations)/);assert.match(sw,/app-v39-stability\.js/);assert.match(sw,/clients\.matchAll/);assert.match(sw,/client\.navigate\(client\.url\)/);
 assert.match(pkg,/2\.0\.0-alpha\.36/);assert.match(pkg,/workflow-v36\.test\.mjs/);assert.match(pkg,/index-v36\.js/);assert.match(pkg,/app-v36-invoice-review\.js/);
 for(const file of ['../web/app-multi-invoice-v38.js','../web/app-v39-stability.js','../web/app-router-v14.js','../worker/src/api/invoice-analysis-core-v39.js','../worker/src/api/invoice-analysis-v39.js','../worker/src/index-v39.js'])execFileSync(process.execPath,['--check',new URL(file,import.meta.url).pathname],{stdio:'inherit'});
 
-console.log('workflow v39 native multi-picker, 20 MB documents, forced cache cutover and stable navigation: OK');
+console.log('workflow v39 native multi-picker, 20 MB documents, forced cache cutover and stable navigation under v40: OK');
