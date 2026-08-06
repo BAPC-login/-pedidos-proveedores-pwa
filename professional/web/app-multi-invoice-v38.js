@@ -1,0 +1,192 @@
+import {$,$$,esc,state,api,toast,money,date,clearResponseCache} from './app-core.js';
+import {openModal,closeModal} from './app-modal.js';
+import {openRoute} from './app-router-v14.js';
+
+const VERSION='38';
+const MAX_DOCUMENTS=5;
+const preV36Fetch=window.fetch.bind(window);
+const DOCUMENT_TYPES=[['33','Factura electrónica'],['34','Factura exenta'],['39','Boleta electrónica'],['52','Guía de despacho electrónica'],['61','Nota de crédito electrónica'],['SC','Documento sin cargo'],['0','Otro documento']];
+const TRIGGERS=['#attachInvoice','#attachInvoiceBottom','#v18AttachInvoice','#v18AttachInvoiceBottom','#v30AttachInvoice','#v30AttachInvoiceBottom','#v30GoInvoice','[data-v16-invoice]','[data-v30-order-invoice]','[data-v38-order-documents]','[data-action="analyze-invoice"]'].join(',');
+let queue=null,opening=false,enhanceScheduled=false,previewUrls=[];
+
+const normalize=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+const activeOrder=order=>order&&(order.publicState||order.status)!=='editing'&&order.status!=='draft'&&!['received','reconciled','closed','cancelled'].includes(String(order.status||''));
+const canUpload=()=>['owner','admin','receiver','finance','purchaser'].includes(String(state.me?.user?.role||''));
+const fileSize=value=>value>=1024*1024?`${(value/1024/1024).toFixed(2)} MB`:`${Math.max(1,Math.round(value/1024))} KB`;
+const integer=value=>Number(String(value??'').replace(/[^0-9-]/g,''))||0;
+const kindLabel=kind=>kind==='free'?'Sin cargo':'Factura';
+
+function injectStyles(){
+  if($('#nuvastoMultiInvoiceV38Styles'))return;
+  const style=document.createElement('style');style.id='nuvastoMultiInvoiceV38Styles';style.textContent=`
+    .v38-upload-copy{display:grid;gap:5px}.v38-upload-copy strong{font-size:12px}.v38-upload-copy small{color:var(--muted);font-size:8px;line-height:1.45}
+    .v38-selected-list{display:grid;gap:9px;margin-top:10px}.v38-selected-empty{padding:18px;border:1px dashed var(--line);border-radius:14px;text-align:center;color:var(--muted);font-size:9px}
+    .v38-selected-file{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(155px,.55fr);gap:10px;align-items:center;padding:11px;border:1px solid var(--line);border-radius:14px;background:var(--soft);min-width:0}
+    .v38-file-number{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:color-mix(in srgb,var(--primary) 12%,var(--card));color:var(--primary);font-weight:950}.v38-file-copy{min-width:0}.v38-file-copy strong,.v38-file-copy small{display:block}.v38-file-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.v38-file-copy small{margin-top:4px;color:var(--muted);font-size:8px}.v38-selected-file select{width:100%}
+    .v38-batch-note{display:grid;gap:5px;padding:13px 14px;border:1px solid color-mix(in srgb,var(--primary) 25%,var(--line));border-radius:14px;background:color-mix(in srgb,var(--primary) 6%,var(--card))}.v38-batch-note strong{font-size:11px}.v38-batch-note p{margin:0;color:var(--muted);font-size:8px;line-height:1.5}
+    .v38-progress-card{display:grid;gap:13px;padding:18px;border:1px solid var(--line);border-radius:17px;background:var(--soft)}.v38-progress-head{display:flex;gap:12px;align-items:center}.v38-spinner{width:25px;height:25px;border:3px solid color-mix(in srgb,var(--primary) 20%,transparent);border-top-color:var(--primary);border-radius:50%;animation:v38Spin .8s linear infinite}.v38-progress-head strong,.v38-progress-head small{display:block}.v38-progress-head small{margin-top:4px;color:var(--muted);font-size:8px}.v38-progress-track{height:7px;overflow:hidden;border-radius:999px;background:var(--line)}.v38-progress-track span{display:block;height:100%;background:var(--primary);border-radius:inherit;transition:width .25s ease}
+    .v38-review-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;margin-bottom:12px;padding:12px 13px;border:1px solid var(--line);border-radius:14px;background:var(--soft)}.v38-review-index{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:var(--primary);color:#fff;font-weight:950}.v38-review-head strong,.v38-review-head small{display:block}.v38-review-head small{margin-top:4px;color:var(--muted);font-size:8px;overflow-wrap:anywhere}.v38-kind{padding:6px 9px;border-radius:999px;background:color-mix(in srgb,var(--primary) 12%,var(--card));color:var(--primary);font-size:7px;font-weight:950;text-transform:uppercase}.v38-kind.free{background:color-mix(in srgb,var(--success) 13%,var(--card));color:var(--success)}
+    .v38-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}.v38-summary article{padding:10px 11px;border:1px solid var(--line);border-radius:12px;background:var(--soft)}.v38-summary strong,.v38-summary small{display:block}.v38-summary strong{font-size:16px}.v38-summary small{margin-top:4px;color:var(--muted);font-size:7px;text-transform:uppercase;letter-spacing:.08em}
+    .v38-money-input{font-variant-numeric:tabular-nums}.v38-document-free{border-color:color-mix(in srgb,var(--success) 36%,var(--line))!important}.v38-document-free [name=isFree]{pointer-events:none}.v38-document-free .v38-money-input{opacity:.7;background:var(--soft)!important}
+    .v38-error-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+    @keyframes v38Spin{to{transform:rotate(360deg)}}
+    @media(max-width:620px){.v38-selected-file{grid-template-columns:auto minmax(0,1fr)}.v38-selected-file label{grid-column:1/-1}.v38-review-head{grid-template-columns:auto minmax(0,1fr)}.v38-kind{grid-column:1/-1;width:max-content}.v38-summary{grid-template-columns:1fr 1fr}.v38-summary article:last-child{grid-column:1/-1}}
+    @media(prefers-reduced-motion:reduce){.v38-spinner{animation:none}}
+  `;document.head.append(style);
+}
+
+async function loadSources(){
+  const [orders,products,suppliers,locations]=await Promise.all([
+    api('/api/orders',{fresh:true,timeout:20000}),api('/api/products',{fresh:true,timeout:20000}),api('/api/suppliers',{fresh:true,timeout:20000}),api('/api/locations',{fresh:true,timeout:20000})
+  ]);
+  state.cache.orders=orders.orders||[];state.cache.products=products.products||[];state.cache.suppliers=suppliers.suppliers||[];state.cache.locations=locations.locations||[];
+}
+
+async function orderPdf(orderId){
+  try{
+    let payload=await api(`/api/documents?entityType=order&entityId=${encodeURIComponent(orderId)}&kind=order_pdf`,{fresh:true,timeout:20000});
+    let document=(payload.documents||[]).sort((a,b)=>Number(b.revision||0)-Number(a.revision||0))[0];
+    if(!document?.key){await api(`/api/orders/${encodeURIComponent(orderId)}/pdf`,{method:'POST',json:{},timeout:30000});payload=await api(`/api/documents?entityType=order&entityId=${encodeURIComponent(orderId)}&kind=order_pdf`,{fresh:true,timeout:20000});document=(payload.documents||[]).sort((a,b)=>Number(b.revision||0)-Number(a.revision||0))[0]}
+    if(!document?.key)return null;
+    const response=await fetch(`/api/files/${encodeURIComponent(document.key)}`,{headers:{Authorization:`Bearer ${state.token}`},cache:'no-store'});if(!response.ok)return null;
+    const blob=await response.blob();return new File([blob],document.name||'pedido.pdf',{type:blob.type||'application/pdf'});
+  }catch(error){console.warn('v38_order_pdf_optional',error);return null}
+}
+
+function typeOptions(selected){return DOCUMENT_TYPES.map(([value,label])=>`<option value="${value}" ${String(selected||'33')===value?'selected':''}>${esc(label)}</option>`).join('')}
+function tokens(value){return new Set(String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim().split(' ').filter(token=>token.length>1&&!['DE','DEL','LA','EL','Y','CON','SIN','UNIDAD','CAJA','PACK','DISPLAY'].includes(token)))}
+function similarity(left,right){const a=tokens(left),b=tokens(right);if(!a.size||!b.size)return 0;let hits=0;for(const token of a)if(b.has(token)||[...b].some(other=>other.startsWith(token)||token.startsWith(other)))hits++;return hits/Math.max(a.size,b.size)}
+function lineSource(line,index){return line.sourceLine||line.descriptionOriginal||line.sourceDescription||line.description||`Línea ${index+1}`}
+function scoreLabel(value){const score=Number(value||0);return score>=.8?'Coincidencia alta':score>=.55?'Coincidencia media':'Revisión manual'}
+function conversion(line){if(line.conversionSummary)return line.conversionSummary;const qty=Number(line.packageQty??line.invoiceQuantity??0),pack=Number(line.packSize||1),units=Number(line.units||qty*pack),orderPack=Number(line.orderPackSize||1);return orderPack>1?`Documento: ${units} unidades = ${Number((units/orderPack).toFixed(3))} formatos de ${orderPack}`:`Documento: ${units} unidades`}
+function productOptions(order,selected=''){return order.items.map(item=>`<option value="${esc(item.productId)}" ${String(item.productId)===String(selected)?'selected':''}>${esc(item.description)} · ${esc(item.orderUnit)}</option>`).join('')}
+
+function reconcileLines(source,order,nature){
+  const products=order.items.map(item=>({id:item.productId,name:item.description,pack:Number(item.unitsPerOrderUnit||1)}));
+  const lines=(source.length?source:order.items.map(item=>({productId:item.productId,description:item.description,sourceDescription:item.description,packageQty:0,invoiceQuantity:0,packSize:Number(item.unitsPerOrderUnit||1),units:0,confidence:1,matchMethod:'manual_order_fallback'}))).map((line,index)=>{
+    let resolved={...line};
+    if(!resolved.productId||!products.some(product=>String(product.id)===String(resolved.productId))){const best=products.map(product=>({product,score:similarity(lineSource(resolved,index),product.name)})).sort((a,b)=>b.score-a.score)[0];if(best?.score>=.42)resolved={...resolved,productId:best.product.id,description:best.product.name,orderPackSize:best.product.pack,confidence:Math.max(Number(resolved.confidence||0),best.score),matchMethod:'nuvasto_local_catalog'}}
+    if(nature==='free')resolved={...resolved,isFree:true,grossLineTotal:0,netLineTotal:0,grossUnitPrice:0,freeReason:resolved.freeReason||'Documento sin cargo'};
+    return resolved;
+  });
+  return lines;
+}
+
+function moneyField(name,label,value,disabled=false){const amount=Math.max(0,integer(value));return `<label class="field"><span>${esc(label)}</span><input class="v38-money-input" type="text" inputmode="numeric" autocomplete="off" data-v38-money-display="${esc(name)}" value="${esc(money(amount))}" ${disabled?'disabled':''}><input type="hidden" name="${esc(name)}" value="${amount}"></label>`}
+function lineMoneyField(value,disabled=false){const amount=Math.max(0,integer(value));return `<label class="field"><span>Total de la línea</span><input class="v38-money-input" type="text" inputmode="numeric" autocomplete="off" data-v38-line-money value="${esc(money(amount))}" ${disabled?'disabled':''}><input type="hidden" name="grossLineTotal" value="${amount}"></label>`}
+
+function reviewBody(analysis,lines,order,item,index,total){
+  const invoice=analysis.invoice||{},totals=invoice.totals||{},free=item.kind==='free',today=new Date().toISOString().slice(0,10),matched=lines.filter(line=>line.productId).length,warnings=[...(analysis.warnings||[]),...(invoice.warnings||[])];
+  const type=free?'SC':(invoice.documentTypeCode||invoice.documentType||'33');
+  return `<section class="v38-review-head"><span class="v38-review-index">${index+1}</span><div><strong>${esc(item.file.name)}</strong><small>${fileSize(item.file.size)} · documento ${index+1} de ${total}</small></div><span class="v38-kind ${free?'free':''}">${kindLabel(item.kind)}</span></section>${free?'<section class="v38-batch-note"><strong>Documento completo sin cargo</strong><p>Todas sus líneas se guardarán con precio $0 y quedarán vinculadas de forma independiente al pedido.</p></section>':''}${analysis.degraded?'<section class="v30-inline-notice"><strong>Revisión manual asistida</strong><p>La lectura no fue concluyente. Se precargaron los productos del pedido para completar el documento sin perder el archivo.</p></section>':''}${warnings.length?`<section class="v30-inline-notice"><strong>Observaciones de lectura</strong><p>${warnings.map(esc).join(' · ')}</p></section>`:''}<section class="v38-summary"><article><strong>${lines.length}</strong><small>Líneas leídas</small></article><article><strong>${matched}/${lines.length}</strong><small>Productos vinculados</small></article><article><strong>${analysis.elapsedMs?`${Math.round(analysis.elapsedMs/1000)} s`:'—'}</strong><small>Procesamiento</small></article></section><div class="v30-field-grid"><label class="field"><span>Tipo de documento</span><select name="documentType">${typeOptions(type)}</select></label><label class="field"><span>Número de documento</span><input name="invoiceNumber" value="${esc(invoice.invoiceNumber||'')}" required></label><label class="field"><span>Fecha</span><input name="invoiceDate" type="date" value="${esc(invoice.invoiceDate||today)}" required></label>${moneyField('net','Neto',free?0:totals.net,free)}${moneyField('vat','IVA',free?0:(totals.vat||totals.tax),free)}${moneyField('additionalTax','Impuesto adicional',free?0:totals.additionalTax,free)}${moneyField('total','Total',free?0:totals.total,free)}</div><div class="v30-item-list" style="margin-top:12px">${lines.map((line,lineIndex)=>{const forced=free||line.isFree;return `<article class="v30-item-card ${free?'v38-document-free':''}" data-invoice-line="${lineIndex}"><header><div><span class="eyebrow">LÍNEA ${lineIndex+1}</span><h4>${esc(lineSource(line,lineIndex))}</h4></div><span class="v30-reconcile-status ${Number(line.confidence||0)>=.55?'ok':'review'}">${esc(scoreLabel(line.confidence))} · ${Math.round(Number(line.confidence||0)*100)}%</span></header><div class="v30-inline-notice"><strong>Conversión</strong><p>${esc(conversion(line))}</p></div><label class="field"><span>Producto del pedido</span><select name="productId"><option value="">Sin vincular</option>${productOptions(order,line.productId)}</select></label><div class="v30-field-grid"><label class="field"><span>Cantidad leída</span><input name="packageQty" type="number" min="0" step="0.001" value="${Number(line.packageQty??line.invoiceQuantity??0)}" inputmode="decimal"></label><label class="field"><span>Unidades por formato</span><input name="packSize" type="number" min="0.001" step="0.001" value="${Number(line.packSize||1)}" inputmode="decimal"></label><label class="field"><span>Total de unidades</span><output data-units>${Number(line.units||0)}</output></label>${lineMoneyField(forced?0:line.grossLineTotal,forced)}<label class="field"><span>Precio final por unidad</span><output data-price>${money(forced?0:line.grossUnitPrice||0)}</output></label><label class="check-card"><input name="isFree" type="checkbox" ${forced?'checked':''} ${free?'disabled':''}><span><strong>${free?'Sin cargo':'Bonificado'}</strong><small>Precio $0</small></span></label><label class="field full"><span>Observación</span><input name="freeReason" value="${esc(line.freeReason||line.notes||(free?'Documento sin cargo':''))}"></label></div></article>`}).join('')}</div>`;
+}
+
+function bindMoney(root=document){
+  root.querySelectorAll('[data-v38-money-display]').forEach(display=>{if(display.dataset.bound)return;display.dataset.bound='1';const hidden=display.nextElementSibling;display.addEventListener('focus',()=>{display.value=String(integer(hidden.value));requestAnimationFrame(()=>display.select())});display.addEventListener('input',()=>{hidden.value=String(Math.max(0,integer(display.value)))});display.addEventListener('blur',()=>display.value=money(hidden.value))});
+  root.querySelectorAll('[data-v38-line-money]').forEach(display=>{if(display.dataset.bound)return;display.dataset.bound='1';const hidden=display.nextElementSibling;display.addEventListener('focus',()=>{display.value=String(integer(hidden.value));requestAnimationFrame(()=>display.select())});display.addEventListener('input',()=>{hidden.value=String(Math.max(0,integer(display.value)));display.closest('[data-invoice-line]')?.dispatchEvent(new Event('v38:math'))});display.addEventListener('blur',()=>display.value=money(hidden.value))});
+}
+
+function bindLineMath(nature){
+  $$('[data-invoice-line]').forEach(row=>{
+    const calculate=()=>{const qty=Number(row.querySelector('[name=packageQty]').value||0),pack=Number(row.querySelector('[name=packSize]').value||1),checkbox=row.querySelector('[name=isFree]'),free=nature==='free'||checkbox.checked,totalDisplay=row.querySelector('[data-v38-line-money]'),totalHidden=row.querySelector('[name=grossLineTotal]');if(free){totalHidden.value='0';totalDisplay.value=money(0);totalDisplay.disabled=true}else totalDisplay.disabled=false;const units=qty*pack,total=free?0:Number(totalHidden.value||0);row.querySelector('[data-units]').textContent=String(Math.round(units*1000)/1000);row.querySelector('[data-price]').textContent=money(units?Math.round(total/units):0)};
+    row.querySelectorAll('[name=packageQty],[name=packSize],[name=isFree]').forEach(input=>input.addEventListener('input',calculate));row.addEventListener('v38:math',calculate);calculate();
+  });
+}
+
+async function createInvoice(payload){
+  const response=await preV36Fetch('/api/invoices',{method:'POST',cache:'no-store',headers:{Authorization:`Bearer ${state.token}`,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const result=await response.json().catch(()=>({ok:false,error:`HTTP ${response.status}`}));
+  if(!response.ok||result.ok===false)throw Object.assign(new Error(result.error||'No se pudo guardar el documento'),{status:response.status,code:result.code,details:result.details});
+  clearResponseCache();state.cache.dashboard=null;state.cache.orders=[];state.cache.invoices=[];return result.invoice||result.result||result;
+}
+
+async function openReview(analysis,item){
+  if(!queue?.active)return;
+  const invoice=analysis.invoice||{},source=Array.isArray(invoice.lines)?invoice.lines:Array.isArray(invoice.items)?invoice.items:[],lines=reconcileLines(source,queue.order,item.kind),position=queue.index,total=queue.items.length;
+  openModal({eyebrow:`DOCUMENTO ${position+1} DE ${total}`,title:`Revisar ${kindLabel(item.kind).toLowerCase()}`,subtitle:'Confirma este documento de manera independiente antes de continuar con el siguiente.',size:'large',closeOnSuccess:false,body:reviewBody(analysis,lines,queue.order,item,position,total),submitLabel:item.kind==='free'?'Guardar documento sin cargo':'Guardar factura y continuar',onSubmit:async form=>{
+    const rejected=new Set($$('[data-v32-reject-line]:checked').map(input=>Number(input.dataset.v32RejectLine))),rows=$$('[data-invoice-line]');
+    const reviewed=rows.map((row,index)=>{const original=lines[index],packageQty=Number(row.querySelector('[name=packageQty]').value||0),packSize=Number(row.querySelector('[name=packSize]').value||1),units=packageQty*packSize,isFree=item.kind==='free'||row.querySelector('[name=isFree]').checked,grossLineTotal=isFree?0:Number(row.querySelector('[name=grossLineTotal]').value||0),excluded=rejected.has(index);return{...original,productId:row.querySelector('[name=productId]').value,sourceDescription:lineSource(original,index),packageQty,invoiceQuantity:packageQty,packSize,units,totalUnits:units,grossLineTotal,grossUnitPrice:isFree?0:(units?Math.round(grossLineTotal/units):0),isFree,freeReason:isFree?(row.querySelector('[name=freeReason]').value||'Documento sin cargo'):'',policyAction:excluded?'reject':original.policyAction,rejectedByPolicy:excluded||original.rejectedByPolicy,policyReason:excluded?'Producto no solicitado':original.policyReason}});
+    if(!reviewed.some((line,index)=>!rejected.has(index)&&line.productId))throw new Error('Vincula al menos una línea no excluida con un producto del pedido.');
+    const free=item.kind==='free',payload={supplierId:queue.supplierId,locationId:queue.locationId,orderIds:[queue.orderId],invoiceNumber:form.get('invoiceNumber'),invoiceDate:form.get('invoiceDate'),currency:'CLP',documentType:free?'SC':form.get('documentType'),documentNature:item.kind,documentFileName:item.file.name,batchSessionId:queue.id,batchPosition:position+1,batchTotal:total,extraItemsDecision:$('#v32ExtraDecision')?.value||'review',totals:{net:free?0:Number(form.get('net')||0),vat:free?0:Number(form.get('vat')||0),additionalTax:free?0:Number(form.get('additionalTax')||0),total:free?0:Number(form.get('total')||0)},aiModel:analysis.model||'nuvasto',sourceFileId:analysis.sourceFile?.id||'',aiConfidence:reviewed.filter((line,index)=>!rejected.has(index)&&line.productId).length/Math.max(1,reviewed.filter((line,index)=>!rejected.has(index)).length),lines:reviewed};
+    const saved=await createInvoice(payload);queue.saved.push({id:saved.id||'',number:payload.invoiceNumber,kind:item.kind,fileName:item.file.name});
+    if(queue.index<queue.items.length-1){queue.index++;toast(`Documento ${position+1} de ${total} guardado. Continuando con el siguiente…`);await processCurrent();return saved}
+    await finishQueue();return saved;
+  }});
+  bindMoney($('#modalBody'));bindLineMath(item.kind);
+}
+
+function progressBody(item,index,total){const progress=Math.round((index/Math.max(1,total))*100);return `<section class="v38-progress-card"><div class="v38-progress-head"><span class="v38-spinner" aria-hidden="true"></span><div><strong>Leyendo ${kindLabel(item.kind).toLowerCase()} ${index+1} de ${total}</strong><small>${esc(item.file.name)} · el resto de los documentos permanece en la cola.</small></div></div><div class="v38-progress-track"><span style="width:${progress}%"></span></div><div class="v38-batch-note"><strong>Procesamiento independiente</strong><p>Cada archivo tendrá su propio número, fecha, montos, líneas, original en R2 y vínculo con el mismo pedido.</p></div></section>`}
+
+async function processCurrent(){
+  if(!queue?.active)return;const item=queue.items[queue.index],position=queue.index,total=queue.items.length;queue.processing=true;
+  openModal({eyebrow:`DOCUMENTO ${position+1} DE ${total}`,title:'Procesando documento',subtitle:`${queue.order.folio} · ${queue.order.supplierName}`,size:'large',hideSubmit:true,body:progressBody(item,position,total)});
+  try{
+    const products=queue.order.items.map(product=>({productId:product.productId,description:product.description,unit:product.orderUnit,orderedQty:product.quantityOrdered,unitsPerOrderUnit:product.unitsPerOrderUnit})),upload=new FormData();
+    upload.append('file',item.file,item.file.name);if(queue.pdf)upload.append('orderFile',queue.pdf,queue.pdf.name);upload.append('context',JSON.stringify({providerName:queue.order.supplierName,folio:queue.order.folio,products,aliases:queue.aliases.map(alias=>({productId:alias.productId,alias:alias.alias,confidence:alias.confidence,usageCount:alias.usageCount})),locationId:queue.locationId,fileName:item.file.name,documentNature:item.kind,batchPosition:position+1,batchTotal:total}));
+    const response=await api('/api/invoices/analyze',{method:'POST',body:upload,timeout:124000});queue.processing=false;if(!queue?.active)return;await openReview(response.analysis||{},item);
+  }catch(error){queue.processing=false;console.error('v38_document_analysis_failed',error);showQueueError(error,item)}
+}
+
+function showQueueError(error,item){
+  if(!queue?.active)return;const position=queue.index,total=queue.items.length,message=error?.code==='request_timeout'?'La lectura excedió el tiempo disponible. Puedes reintentar este archivo sin perder los demás.':(error?.message||'No se pudo procesar este documento.');
+  openModal({eyebrow:`DOCUMENTO ${position+1} DE ${total}`,title:'No se pudo leer el documento',subtitle:item.file.name,size:'large',hideSubmit:true,body:`<section class="v30-inline-notice error"><strong>Error de procesamiento</strong><p>${esc(message)}</p></section><div class="v38-error-actions"><button class="btn primary" type="button" id="v38RetryDocument">Reintentar</button><button class="btn" type="button" id="v38SkipDocument">Omitir este archivo</button></div>`});
+  $('#v38RetryDocument').onclick=()=>processCurrent();$('#v38SkipDocument').onclick=async()=>{queue.skipped.push({fileName:item.file.name,reason:message});if(queue.index<queue.items.length-1){queue.index++;await processCurrent()}else await finishQueue()};
+}
+
+async function finishQueue(){
+  if(!queue)return;const completed=queue.saved.length,skipped=queue.skipped.length,target=queue.returnToHistory||queue.orderId?'history':'invoices',summary=completed===1?'1 documento guardado y vinculado':`${completed} documentos guardados y vinculados`,hadSaved=completed>0;queue.active=false;window.NuvastoInvoiceQueue=null;queue=null;closeModal(hadSaved?'saved':'cancelled');if(hadSaved)toast(skipped?`${summary}; ${skipped} omitido${skipped===1?'':'s'}`:summary);else toast('No se guardó ningún documento','error');await openRoute(target,'',{replace:true});
+}
+
+function revokePreviews(){previewUrls.forEach(url=>URL.revokeObjectURL(url));previewUrls=[]}
+function renderSelection(input){
+  revokePreviews();const target=$('#v38SelectedDocuments'),files=[...(input?.files||[])];if(!target)return;
+  if(!files.length){target.innerHTML='<div class="v38-selected-empty">Selecciona entre 1 y 5 facturas o documentos sin cargo.</div>';return}
+  target.innerHTML=files.map((file,index)=>{if(String(file.type||'').startsWith('image/'))previewUrls.push(URL.createObjectURL(file));return `<article class="v38-selected-file"><span class="v38-file-number">${index+1}</span><div class="v38-file-copy"><strong>${esc(file.name)}</strong><small>${fileSize(file.size)} · ${esc(file.type||'archivo')}</small></div><label class="field"><span>Clasificación independiente</span><select data-v38-kind="${index}"><option value="invoice">Factura / documento con valor</option><option value="free">Sin cargo / bonificado</option></select></label></article>`}).join('');
+}
+
+function pendingContext(orders){const supplierIds=[...new Set(orders.map(order=>order.supplierId))],suppliers=state.cache.suppliers.filter(item=>supplierIds.includes(item.id));return `<label class="field"><span>Proveedor</span><select name="supplierId" id="v38Supplier">${suppliers.map(item=>`<option value="${esc(item.id)}">${esc(item.name)}</option>`).join('')}</select></label><label class="field"><span>Local</span><select name="locationId" id="v38Location"></select></label><label class="field full"><span>Pedido a vincular</span><select name="orderId" id="v38Order" required></select></label>`}
+
+async function openMultiDocuments(options={}){
+  if(opening)return;opening=true;
+  try{
+    await loadSources();let preset=null;if(options.orderId)preset=(await api(`/api/orders/${encodeURIComponent(options.orderId)}`,{fresh:true,timeout:20000})).order;
+    const available=state.cache.orders.filter(activeOrder);if(!preset&&!available.length)return toast('No hay pedidos emitidos disponibles para vincular documentos','error');
+    const context=preset?`<section class="v30-section full"><div><span class="eyebrow">PEDIDO VINCULADO</span><h3>${esc(preset.folio)} · ${esc(preset.supplierName)}</h3><p>${esc(preset.locationName)} · ${esc(preset.costCenterName||'Centro de costo')} · admite varias facturas y documentos sin cargo.</p></div></section><input type="hidden" name="supplierId" value="${esc(preset.supplierId)}"><input type="hidden" name="locationId" value="${esc(preset.locationId)}"><input type="hidden" name="orderId" value="${esc(preset.id)}">`:pendingContext(available);
+    openModal({eyebrow:'ETAPA 2 · DOCUMENTOS',title:'Adjuntar documentos al pedido',subtitle:'Selecciona hasta 5 archivos. Cada uno se leerá, revisará y guardará de forma independiente.',size:'large',closeOnSuccess:false,body:`<div class="v30-field-grid">${context}<label class="field full"><span>Facturas y documentos sin cargo</span><div class="v38-upload-copy"><strong>Seleccionar uno o varios documentos</strong><small>PDF o fotografías completas, nítidas y tomadas de frente.</small></div><input id="v38Files" name="files" type="file" accept="application/pdf,image/*" multiple required></label></div><div class="v38-selected-list" id="v38SelectedDocuments"><div class="v38-selected-empty">Selecciona entre 1 y 5 facturas o documentos sin cargo.</div></div><section class="v38-batch-note"><strong>Un pedido puede tener varias facturas</strong><p>Por ejemplo: bebidas, destilados, aguas y un documento sin cargo. Cada archivo conservará su número, fecha, total, líneas y original en R2.</p></section>`,submitLabel:'Procesar documentos',onSubmit:async form=>{
+      const input=$('#v38Files'),files=[...(input?.files||[])];if(!files.length)throw new Error('Selecciona al menos un documento.');if(files.length>MAX_DOCUMENTS)throw new Error(`Puedes procesar hasta ${MAX_DOCUMENTS} documentos por vez.`);
+      const orderId=String(form.get('orderId')||''),supplierId=String(form.get('supplierId')||''),locationId=String(form.get('locationId')||''),order=preset?.id===orderId?preset:(await api(`/api/orders/${encodeURIComponent(orderId)}`,{fresh:true,timeout:20000})).order;
+      if(!activeOrder(order))throw new Error('El pedido ya no admite nuevos documentos.');const kinds=files.map((file,index)=>({file,kind:$(`[data-v38-kind="${index}"]`)?.value==='free'?'free':'invoice'})),aliases=(await api(`/api/aliases?supplierId=${encodeURIComponent(supplierId)}`,{fresh:true,timeout:20000}).catch(()=>({aliases:[]}))).aliases||[],pdf=await orderPdf(orderId);
+      queue={id:crypto.randomUUID(),active:true,processing:false,index:0,items:kinds,saved:[],skipped:[],order,orderId,supplierId,locationId,aliases,pdf,returnToHistory:options.returnToHistory!==false};window.NuvastoInvoiceQueue={active:true,id:queue.id,total:kinds.length,orderId};revokePreviews();await processCurrent();
+    }});
+    const input=$('#v38Files');input?.addEventListener('change',()=>{if(input.files.length>MAX_DOCUMENTS){toast(`Selecciona un máximo de ${MAX_DOCUMENTS} documentos`,'error');input.value=''}renderSelection(input)});renderSelection(input);
+    if(!preset){const supplier=$('#v38Supplier'),location=$('#v38Location'),order=$('#v38Order');const syncOrders=()=>{const list=available.filter(item=>item.supplierId===supplier.value&&item.locationId===location.value);order.innerHTML=list.map(item=>`<option value="${esc(item.id)}">${esc(item.folio)} · ${esc(item.costCenterName||'Centro')} · ${Number(item.invoiceCount||0)} documento${Number(item.invoiceCount||0)===1?'':'s'} vinculado${Number(item.invoiceCount||0)===1?'':'s'}</option>`).join('');$('#modalSubmit').disabled=!list.length};const syncLocations=()=>{const list=available.filter(item=>item.supplierId===supplier.value),locations=[...new Map(list.map(item=>[item.locationId,item.locationName])).entries()];location.innerHTML=locations.map(([id,name])=>`<option value="${esc(id)}">${esc(name)}</option>`).join('');syncOrders()};supplier.onchange=syncLocations;location.onchange=syncOrders;syncLocations()}
+  }finally{opening=false}
+}
+
+async function resolveOrderId(trigger){
+  const direct=trigger?.dataset?.v38OrderDocuments||trigger?.dataset?.v30OrderInvoice||trigger?.dataset?.v16Invoice||trigger?.dataset?.orderId||'';if(direct)return direct;
+  const folio=[$('#modalEyebrow')?.textContent,$('#modalTitle')?.textContent].map(value=>String(value||'').trim()).find(value=>/^[A-Z0-9]+-\d{6}-\d{3}$/i.test(value))||'';
+  if(!state.cache.orders.length){const payload=await api('/api/orders',{fresh:true,timeout:20000});state.cache.orders=payload.orders||[]}
+  return state.cache.orders.find(order=>String(order.folio||'')===folio)?.id||'';
+}
+
+function interceptInvoiceEntry(){
+  window.addEventListener('click',async event=>{
+    const primary=event.target.closest?.('#primaryAction'),trigger=event.target.closest?.(TRIGGERS)||(primary&&state.view==='invoices'?primary:null);if(!trigger)return;
+    event.preventDefault();event.stopImmediatePropagation();const orderId=await resolveOrderId(trigger).catch(()=>''),button=trigger;button.disabled=true;
+    try{await openMultiDocuments(orderId?{orderId,returnToHistory:true}:{})}catch(error){toast(error.message||'No se pudo abrir el ingreso de documentos','error')}finally{if(button.isConnected)button.disabled=false}
+  },true);
+}
+
+function enhanceOrderActions(){
+  if(!canUpload())return;
+  $$('[data-v30-order-invoice]').forEach(button=>{const id=button.dataset.v30OrderInvoice,order=state.cache.orders.find(item=>item.id===id);button.dataset.v38OrderDocuments=id;button.textContent=Number(order?.invoiceCount||0)>0?'Agregar documentos':'Subir documentos'});
+  $$('.v30-order-card .v30-order-actions').forEach(actions=>{const reference=actions.querySelector('[data-v30-order-open]'),id=reference?.dataset.v30OrderOpen,order=state.cache.orders.find(item=>item.id===id);if(!id||!activeOrder(order)||actions.querySelector('[data-v38-order-documents]'))return;const button=document.createElement('button');button.className='btn primary';button.type='button';button.dataset.v38OrderDocuments=id;button.textContent=Number(order.invoiceCount||0)>0?'Agregar documentos':'Subir documentos';actions.prepend(button)});
+  const heading=[...$$('#modalBody h3')].find(node=>normalize(node.textContent)==='facturas vinculadas');if(!heading)return;const folio=String($('#modalEyebrow')?.textContent||'').trim(),order=state.cache.orders.find(item=>String(item.folio||'')===folio);if(!activeOrder(order))return;const section=heading.closest('.v30-section,.v18-detail-section');if(!section||section.querySelector('[data-v38-order-documents]'))return;const button=document.createElement('button');button.className='btn small primary';button.type='button';button.dataset.v38OrderDocuments=order.id;button.textContent=section.querySelector('.v30-item-card,.v18-detail-row')?'Agregar documentos':'Subir documentos';const head=heading.closest('.v30-section-head,header');if(head)head.append(button);else section.prepend(button);
+}
+
+function scheduleEnhance(){if(enhanceScheduled)return;enhanceScheduled=true;requestAnimationFrame(()=>{enhanceScheduled=false;enhanceOrderActions()})}
+
+export function initializeMultiInvoiceV38(){injectStyles();interceptInvoiceEntry();new MutationObserver(scheduleEnhance).observe(document.body||document.documentElement,{subtree:true,childList:true});document.addEventListener('pedidos:view-rendered',scheduleEnhance);$('#modal')?.addEventListener('close',()=>{revokePreviews();if(queue?.active){queue.active=false;window.NuvastoInvoiceQueue=null;queue=null}});scheduleEnhance();window.NuvastoMultiInvoice=Object.freeze({version:VERSION,open:openMultiDocuments,maxDocuments:MAX_DOCUMENTS})}
+
+initializeMultiInvoiceV38();
