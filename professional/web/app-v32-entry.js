@@ -9,10 +9,11 @@ import {initializePolishV34} from './app-v34-polish.js';
 import './app-multi-invoice-v38.js';
 import './app-v39-stability.js';
 import {initializeInvoiceReviewV36} from './app-v36-invoice-review.js';
+import {initializeOperationalUpgradeV40} from './app-v40-operations.js';
 
 let initialized=false;
 export function initializeProfessionalV32(){
-  if(initialized)return;initialized=true;injectV32Styles();initializeOrdersHistoryV32();initializeCatalogV32();initializeEnhancementsV32();initializeDocumentsV33();initializePolishV34();initializeInvoiceReviewV36();
+  if(initialized)return;initialized=true;injectV32Styles();initializeOrdersHistoryV32();initializeCatalogV32();initializeEnhancementsV32();initializeDocumentsV33();initializePolishV34();initializeInvoiceReviewV36();initializeOperationalUpgradeV40();
   if(state.token&&['orders','history','documents','catalog','suppliers'].includes(state.view))openRoute(state.view,state.subview||'',{replace:true}).catch(error=>console.warn('v32_initial_route_failed',error));
 }
 
