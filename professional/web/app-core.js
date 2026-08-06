@@ -2,7 +2,13 @@ const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const money = value => Number(value || 0).toLocaleString('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0});
-const date = value => value ? new Date(value).toLocaleDateString('es-CL') : '—';
+const date = value => {
+  const text=String(value??'').trim();
+  if(!text)return '—';
+  const calendar=text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const parsed=calendar?new Date(Number(calendar[1]),Number(calendar[2])-1,Number(calendar[3])):new Date(text);
+  return Number.isNaN(parsed.getTime())?'—':parsed.toLocaleDateString('es-CL');
+};
 const roleNames = {owner:'Propietario',admin:'Administrador',purchaser:'Compras',approver:'Aprobador',receiver:'Recepción',finance:'Finanzas',readonly:'Solo lectura'};
 const state = {
   token: localStorage.getItem('pp:token') || '',
