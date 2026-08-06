@@ -17,16 +17,23 @@ function injectStyles(){
     .v36-review-summary strong,.v36-review-summary small{display:block}.v36-review-summary strong{font-size:17px;line-height:1.05;overflow-wrap:anywhere}.v36-review-summary small{margin-top:5px;color:var(--muted);font-size:8px;text-transform:uppercase;letter-spacing:.08em}
     .v36-money-field{position:relative}.v36-money-field>input[type=hidden]+.v36-money-input{width:100%;font-variant-numeric:tabular-nums}.v36-money-input{text-align:left!important}.v36-money-input:disabled{opacity:.7;background:var(--soft)!important}
     .v36-saving-note{display:grid;gap:4px;margin:0 0 10px;padding:11px 13px;border:1px solid color-mix(in srgb,var(--success) 35%,var(--line));border-radius:13px;background:color-mix(in srgb,var(--success) 8%,var(--card))}.v36-saving-note strong{font-size:11px}.v36-saving-note small{color:var(--muted);font-size:8px;line-height:1.4}
+    #v26InvoiceSummary.v36-legacy-summary-sentinel{display:none!important}
     @media(max-width:520px){.v36-review-summary{grid-template-columns:1fr 1fr}.v36-review-summary article:last-child{grid-column:1/-1}}
   `;document.head.append(style);
 }
 
 function isInvoiceReview(){const title=normalize($('#modalTitle')?.textContent);return Boolean($('#modal')?.open&&title.includes('linea')&&title.includes('confirmar')&&$('[data-invoice-line]'))}
 function metricValue(label){const wanted=normalize(label);for(const small of $$('#modalBody small')){if(normalize(small.textContent)!==wanted)continue;const strong=small.closest('article,div')?.querySelector('strong');if(strong)return strong.textContent?.trim()||''}return''}
+function legacySummarySentinel(body){
+  let sentinel=body.querySelector('#v26InvoiceSummary');
+  if(!sentinel){sentinel=document.createElement('span');sentinel.id='v26InvoiceSummary';body.append(sentinel)}
+  if(!sentinel.classList.contains('v36-legacy-summary-sentinel')){sentinel.className='v36-legacy-summary-sentinel';sentinel.hidden=true;sentinel.replaceChildren()}
+}
 function removeLegacySummaries(body){
-  body.querySelectorAll('#v26InvoiceSummary,.v26-invoice-summary,.v30-metrics,.v19-invoice-summary').forEach(node=>node.remove());
+  legacySummarySentinel(body);
+  body.querySelectorAll('.v26-invoice-summary:not(#v26InvoiceSummary),.v30-metrics,.v19-invoice-summary').forEach(node=>node.remove());
   [...body.children].forEach(node=>{
-    if(node.id==='v32PolicySummary'||node.matches('.v30-inline-notice,.v30-item-list,.v30-field-grid,.v32-policy-summary,.v36-review-summary'))return;
+    if(node.id==='v26InvoiceSummary'||node.id==='v32PolicySummary'||node.matches('.v30-inline-notice,.v30-item-list,.v30-field-grid,.v32-policy-summary,.v36-review-summary'))return;
     const text=normalize(node.textContent),duplicate=(text.includes('numero de documento')&&text.includes('total documento'))||(text.includes('lineas leidas')&&text.includes('productos vinculados'));
     if(duplicate&&node.querySelectorAll('article,strong,small').length>=3)node.remove();
   });
@@ -34,7 +41,8 @@ function removeLegacySummaries(body){
 function canonicalSummary(body,processing){
   const rows=$$('[data-invoice-line]'),linked=rows.filter(row=>row.querySelector('[name=productId]')?.value).length;
   let section=body.querySelector('.v36-review-summary');if(!section){section=document.createElement('section');section.className='v36-review-summary';section.setAttribute('aria-label','Resumen del cotejo')}
-  section.innerHTML=`<article><strong>${rows.length}</strong><small>Líneas leídas</small></article><article><strong>${linked}/${rows.length}</strong><small>Productos vinculados</small></article><article><strong>${processing||'—'}</strong><small>Procesamiento</small></article>`;
+  const desired=`<article><strong>${rows.length}</strong><small>Líneas leídas</small></article><article><strong>${linked}/${rows.length}</strong><small>Productos vinculados</small></article><article><strong>${processing||'—'}</strong><small>Procesamiento</small></article>`;
+  if(section.innerHTML!==desired)section.innerHTML=desired;
   const policy=body.querySelector('#v32PolicySummary');if(policy){if(policy.nextElementSibling!==section)policy.insertAdjacentElement('afterend',section)}else if(body.firstElementChild!==section)body.prepend(section);
 }
 function enhanceMoneyInput(raw){
