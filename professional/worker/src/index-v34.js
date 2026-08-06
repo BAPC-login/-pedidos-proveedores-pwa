@@ -4,6 +4,7 @@ import {ROLES,assertMinimumRole,corsHeaders,errorResponse,ok,securityHeaders} fr
 import {ensureSchema} from './schema.js';
 import {analyzeInvoiceV34} from './api/invoice-analysis-v34.js';
 import {ensureFolioIntegrityV34,folioIntegrityStatusV34,withFolioWriteLockV34} from './api/folio-integrity-v34.js';
+import {ensureOrdersCleanSlateV35,ordersCleanSlateStatusV35} from './api/order-reset-v35.js';
 
 const VERSION='34';
 const RELEASE_VERSION='2.0.0-alpha.34';
@@ -15,6 +16,7 @@ function decorate(response,request,env){
   headers.set('X-Nuvasto-Version',VERSION);
   headers.set('X-Nuvasto-Invoice-Engine','multipart-safe-v34');
   headers.set('X-Nuvasto-Folio-Integrity','unique-v34');
+  headers.set('X-Nuvasto-Order-Reset','clean-slate-v35');
   headers.set('X-Nuvasto-Storage',env.FILES?'r2':'unavailable');
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
@@ -27,12 +29,20 @@ function needsFolioLock(method,pathname){
     ||/^\/api\/trash\/[^/]+\/restore$/.test(pathname);
 }
 
+async function prepareWorkspace(env){
+  await ensureSchema(env);
+  await ensureFolioIntegrityV34(env);
+  await ensureOrdersCleanSlateV35(env);
+}
+
 async function health(request,env,ctx){
+  await prepareWorkspace(env);
   const response=await platformWorker.fetch(request,env,ctx),payload=await response.clone().json().catch(()=>({}));
-  let folios={duplicates:null,uniqueIndex:false};
-  try{await ensureSchema(env);await ensureFolioIntegrityV34(env);folios=await folioIntegrityStatusV34(env)}catch(error){folios={duplicates:null,uniqueIndex:false,error:error?.code||error?.message||'folio_check_failed'}}
+  let folios={duplicates:null,uniqueIndex:false},reset={applied:false,ordersRemaining:null};
+  try{folios=await folioIntegrityStatusV34(env);reset=await ordersCleanSlateStatusV35(env)}catch(error){reset={applied:false,ordersRemaining:null,error:error?.code||error?.message||'order_reset_status_failed'}}
   return decorate(ok({...payload,version:RELEASE_VERSION,schemaVersion:34,invoiceFlowVersion:34,invoiceMultipartFixVersion:34,
     invoiceFallbackReview:true,folioIntegrityVersion:34,folioUniqueIndex:Boolean(folios.uniqueIndex),duplicateFolios:folios.duplicates,
+    ordersCleanSlateVersion:35,ordersCleanSlateApplied:Boolean(reset.applied),ordersRemainingAfterReset:reset.ordersRemaining,
     mobileVisualVersion:34,dashboardCustomizationVersion:34},request,env),request,env);
 }
 
@@ -41,10 +51,7 @@ export default{
     const url=new URL(request.url),method=request.method.toUpperCase();
     try{
       if(method==='GET'&&url.pathname==='/health')return health(request,env,ctx);
-      if(url.pathname.startsWith('/api/')){
-        await ensureSchema(env);
-        await ensureFolioIntegrityV34(env);
-      }
+      if(url.pathname.startsWith('/api/'))await prepareWorkspace(env);
       if(method==='POST'&&url.pathname==='/api/invoices/analyze'){
         const actor=await authenticate(request,env);
         return decorate(ok({analysis:await analyzeInvoiceV34(request,env,actor)},request,env),request,env);
@@ -53,6 +60,10 @@ export default{
         const actor=await authenticate(request,env);assertMinimumRole(actor.role,ROLES.ADMIN);
         if(method==='POST')await ensureFolioIntegrityV34(env,{force:true});
         return decorate(ok({integrity:await folioIntegrityStatusV34(env)},request,env),request,env);
+      }
+      if(method==='GET'&&url.pathname==='/api/operations/order-reset-status'){
+        const actor=await authenticate(request,env);assertMinimumRole(actor.role,ROLES.ADMIN);
+        return decorate(ok({reset:await ordersCleanSlateStatusV35(env)},request,env),request,env);
       }
       if(needsFolioLock(method,url.pathname)){
         const actor=await authenticate(request,env);

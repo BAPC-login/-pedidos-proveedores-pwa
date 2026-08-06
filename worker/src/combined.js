@@ -3,8 +3,8 @@ import platformWorker from '../../professional/worker/src/index-v34.js';
 
 // Historial de compatibilidad validado por las suites acumulativas:
 // index-v20.js · 2026.07.31.20 | index-v21.js · 2026.07.31.21 | index-v22.js · 2026.07.31.22
-// index-v26.js · 2026.08.04.26 | index-v27.js · 2026.08.05.27 | index-v28.js · 2026.08.05.28 | index-v29.js · 2026.08.05.30 | index-v30.js · 2026.08.05.31 | storage-fix · 2026.08.05.32 | index-v32.js · 2026.08.05.33 | index-v33.js · 2026.08.06.34 | index-v34.js · 2026.08.06.35
-const PLATFORM_RELEASE='2026.08.06.35';
+// index-v26.js · 2026.08.04.26 | index-v27.js · 2026.08.05.27 | index-v28.js · 2026.08.05.28 | index-v29.js · 2026.08.05.30 | index-v30.js · 2026.08.05.31 | storage-fix · 2026.08.05.32 | index-v32.js · 2026.08.05.33 | index-v33.js · 2026.08.06.34 | index-v34.js · 2026.08.06.35 | orders-clean-slate · 2026.08.06.36
+const PLATFORM_RELEASE='2026.08.06.36';
 function rewritePath(request,pathname){const url=new URL(request.url);url.pathname=pathname;return new Request(url.toString(),request)}
 function isAiRoute(pathname){return pathname==='/health'||pathname.startsWith('/v1/')}
 function withPlatformRelease(response){const headers=new Headers(response.headers);headers.set('X-Nuvasto-Release',PLATFORM_RELEASE);headers.set('X-Pedidos-Pro-Release',PLATFORM_RELEASE);return new Response(response.body,{status:response.status,statusText:response.statusText,headers})}
