@@ -57,7 +57,7 @@ jobs:
           wranglerVersion: '4'
           command: deploy --config wrangler.toml --keep-vars
 
-      - name: Verify deployed release, R2 and v42 capabilities
+      - name: Verify deployed release, R2, v42 documents and v43 experience
         id: verify
         shell: bash
         run: |
@@ -71,18 +71,19 @@ jobs:
             const h=JSON.parse(process.env.PLATFORM_HEALTH||'{}');
             const storage=h.ok===true&&h.r2Configured===true&&h.r2Required===true&&h.r2Ready===true&&h.storageBackend==='r2';
             const v42=h.reliableEmissionV42===true&&h.emissionPdfVerification===true&&h.masterProductOrdering===true;
-            process.stdout.write(storage&&v42?'true':'false');
+            const v43=h.experienceV43===true&&h.operationsBootstrapV43===true&&h.productLifecycleV43===true&&h.professionalDashboardV43===true&&h.processNavigationV43===true&&h.floatingOrderActionsV43===true&&h.settingsPolicyDedupV43===true;
+            process.stdout.write(storage&&v42&&v43?'true':'false');
           } catch { process.stdout.write('false'); }
           NODE
             )
             if [ "$release" = "$expected" ] && [ "$ready" = "true" ]; then
-              echo "Nuvasto $release desplegado con R2, emisión PDF verificada y orden maestro v42 operativos."
+              echo "Nuvasto $release desplegado con R2, emisión PDF v42 y experiencia v43 verificadas."
               exit 0
             fi
-            echo "Esperando despliegue ${attempt}/24 · release=${release:-none} · v42+r2=$ready"
+            echo "Esperando despliegue ${attempt}/24 · release=${release:-none} · v42+v43+r2=$ready"
             sleep 10
           done
-          echo "::error::Cloudflare no activó el release esperado con R2 y las capacidades v42."
+          echo "::error::Cloudflare no activó el release esperado con R2 y las capacidades v42/v43."
           exit 1
 
       - name: Publish production status on commit
@@ -93,7 +94,7 @@ jobs:
         run: |
           if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ]; then
             state=success
-            description='Nuvasto v42 publicado y verificado en Cloudflare'
+            description='Nuvasto v43 publicado y verificado en Cloudflare'
           else
             state=failure
             description='El despliegue de Nuvasto a producción no quedó verificado'
