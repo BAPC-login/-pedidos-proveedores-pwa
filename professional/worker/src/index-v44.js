@@ -3,6 +3,7 @@ import {authenticate} from './auth.js';
 import {ensureSchema} from './schema.js';
 import {ensureEnterpriseSchemaV41} from './api/schema-v41.js';
 import {ensureProcurementSuiteV44} from './api/schema-v44.js';
+import {updateMasterRecordV44} from './api/master-data-v44.js';
 import {corsHeaders,errorResponse,ok,routeMatch,securityHeaders,HttpError} from './core.js';
 import {
   assertPermissionV44,bulkMasterDataV44,enqueueJobV44,financePlanningV44,getEffectivePermissionV44,getMasterListAssistV44,globalSearchV44,
@@ -18,17 +19,19 @@ async function prepare(env){await ensureSchema(env);await ensureEnterpriseSchema
 async function auth(request,env){await prepare(env);return authenticate(request,env)}
 async function payload(response){return response.clone().json().catch(()=>({}))}
 function masterStatus(path){const match=path.match(/^\/api\/master-data-v44\/([^/]+)\/([^/]+)\/status$/);return match?{entity:decodeURIComponent(match[1]),id:decodeURIComponent(match[2])}:null}
+function masterRecord(path){const match=path.match(/^\/api\/master-data-v44\/([^/]+)\/([^/]+)$/);return match?{entity:decodeURIComponent(match[1]),id:decodeURIComponent(match[2])}:null}
 function permissionUser(path){const match=path.match(/^\/api\/permissions-v44\/([^/]+)$/);return match?decodeURIComponent(match[1]):''}
 function favorite(path){const match=path.match(/^\/api\/master-list-favorites-v44\/([^/]+)$/);return match?decodeURIComponent(match[1]):''}
 function jobAction(path){const match=path.match(/^\/api\/jobs-v44\/([^/]+)\/(retry|run)$/);return match?{id:decodeURIComponent(match[1]),action:match[2]}:null}
 function isCatalogMutation(path,method){if(!['POST','PATCH','PUT','DELETE'].includes(method))return false;return /^\/api\/(products|categories|suppliers|cost-centers|locations)(\/|$)/.test(path)||path.startsWith('/api/catalog/import')}
 async function delegateTracked(request,env,ctx,actor,{jobType,entityType='',entityId=''}){try{const response=await platformWorker.fetch(request,env,ctx);if(response.ok){const body=await payload(response);ctx?.waitUntil?.(recordCompletedJobV44(env,actor,{jobType,entityType,entityId,result:{status:response.status,ok:true,keys:Object.keys(body||{}).slice(0,12)}}).catch(()=>{}))}else ctx?.waitUntil?.(recordFailedJobV44(env,actor,{jobType,entityType,entityId,error:new Error(`HTTP ${response.status}`)}).catch(()=>{}));return response}catch(error){ctx?.waitUntil?.(recordFailedJobV44(env,actor,{jobType,entityType,entityId,error}).catch(()=>{}));throw error}}
 
-export default{async fetch(request,env,ctx){const url=new URL(request.url),method=request.method.toUpperCase(),path=url.pathname,statusMatch=masterStatus(path),userId=permissionUser(path),favoriteId=favorite(path),job=jobAction(path),batchEmit=routeMatch(path,'/api/order-batches/:id/emit'),orderReception=routeMatch(path,'/api/orders/:id/receptions'),approval=routeMatch(path,'/api/approvals/:id/resolve');try{
-  if(method==='GET'&&path==='/health'){await prepare(env);const response=await platformWorker.fetch(request,env,ctx),base=await payload(response);return decorate(ok({...base,version:RELEASE_VERSION,procurementOsV44:true,canonicalMasterDataV44:true,masterListAssistV44:true,procurementIntelligenceV44:true,financePlanningV44:true,receptionEvidenceV44:true,granularPermissionsV44:true,jobQueueV44:true,observabilityV44:true,globalSearchV44:true,productionE2EContractV44:true},request,env),request,env)}
+export default{async fetch(request,env,ctx){const url=new URL(request.url),method=request.method.toUpperCase(),path=url.pathname,statusMatch=masterStatus(path),recordMatch=masterRecord(path),userId=permissionUser(path),favoriteId=favorite(path),job=jobAction(path),batchEmit=routeMatch(path,'/api/order-batches/:id/emit'),orderReception=routeMatch(path,'/api/orders/:id/receptions'),approval=routeMatch(path,'/api/approvals/:id/resolve');try{
+  if(method==='GET'&&path==='/health'){await prepare(env);const response=await platformWorker.fetch(request,env,ctx),base=await payload(response);return decorate(ok({...base,version:RELEASE_VERSION,procurementOsV44:true,canonicalMasterDataV44:true,masterDataEditingV44:true,masterListAssistV44:true,procurementIntelligenceV44:true,financePlanningV44:true,receptionEvidenceV44:true,granularPermissionsV44:true,jobQueueV44:true,observabilityV44:true,globalSearchV44:true,productionE2EContractV44:true},request,env),request,env)}
   if(method==='GET'&&path==='/api/procurement-os-v44/summary'){const actor=await auth(request,env);return decorate(ok({summary:await procurementOsSummaryV44(env,actor)},request,env),request,env)}
   if(method==='GET'&&path==='/api/master-data-v44'){const actor=await auth(request,env);return decorate(ok(await listMasterDataV44(env,actor,url),request,env),request,env)}
   if(statusMatch&&method==='PATCH'){const actor=await auth(request,env);await assertPermissionV44(env,actor,'catalog');return decorate(ok({item:await setMasterDataStatusV44(request,env,actor,statusMatch.entity,statusMatch.id)},request,env),request,env)}
+  if(recordMatch&&method==='PATCH'){const actor=await auth(request,env);await assertPermissionV44(env,actor,'catalog');return decorate(ok({item:await updateMasterRecordV44(request,env,actor,recordMatch.entity,recordMatch.id)},request,env),request,env)}
   if(method==='POST'&&path==='/api/master-data-v44/bulk'){const actor=await auth(request,env);await assertPermissionV44(env,actor,'catalog');return decorate(ok(await bulkMasterDataV44(request,env,actor),request,env),request,env)}
   if(method==='POST'&&path==='/api/master-data-v44/merge'){const actor=await auth(request,env);await assertPermissionV44(env,actor,'catalog');return decorate(ok({merge:await mergeMasterDataV44(request,env,actor)},request,env),request,env)}
   if(method==='GET'&&path==='/api/master-list-assist-v44'){const actor=await auth(request,env);return decorate(ok({assist:await getMasterListAssistV44(env,actor,url)},request,env),request,env)}
