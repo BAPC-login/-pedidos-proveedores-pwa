@@ -1,4 +1,6 @@
 let initializationPromise=null;
+const rows=result=>result?.results||[];
+async function ensureColumn(db,table,column,definition){const result=await db.prepare(`PRAGMA table_info(${table})`).all();if(rows(result).some(item=>item.name===column))return false;await db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`).run();return true}
 const ddl=[
 `CREATE TABLE IF NOT EXISTS procurement_user_permissions(org_id TEXT NOT NULL,user_id TEXT NOT NULL,location_scope TEXT NOT NULL DEFAULT '["*"]',cost_center_scope TEXT NOT NULL DEFAULT '["*"]',max_order_amount INTEGER NOT NULL DEFAULT 0,can_create_orders INTEGER NOT NULL DEFAULT 0,can_emit_orders INTEGER NOT NULL DEFAULT 0,can_receive INTEGER NOT NULL DEFAULT 0,can_manage_catalog INTEGER NOT NULL DEFAULT 0,can_view_finance INTEGER NOT NULL DEFAULT 0,can_approve INTEGER NOT NULL DEFAULT 0,updated_by TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(org_id,user_id))`,
 `CREATE TABLE IF NOT EXISTS product_favorites(org_id TEXT NOT NULL,user_id TEXT NOT NULL,cost_center_id TEXT NOT NULL,product_id TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(org_id,user_id,cost_center_id,product_id))`,
@@ -16,6 +18,6 @@ const ddl=[
 export async function ensureProcurementSuiteV44(env){
   if(!env.DB)throw new Error('D1 binding DB is not available');
   if(initializationPromise)return initializationPromise;
-  initializationPromise=(async()=>{for(const statement of ddl)await env.DB.prepare(statement).run();return{ready:true,tables:6}})().catch(error=>{initializationPromise=null;throw error});
+  initializationPromise=(async()=>{const added={categoryCostCenter:await ensureColumn(env.DB,'categories','cost_center_id','TEXT')};for(const statement of ddl)await env.DB.prepare(statement).run();await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_v44_categories_center ON categories(org_id,cost_center_id,active,sort_order)').run();return{ready:true,tables:6,added}})().catch(error=>{initializationPromise=null;throw error});
   return initializationPromise;
 }
