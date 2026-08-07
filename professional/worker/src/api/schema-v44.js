@@ -1,6 +1,7 @@
 import {ensureProcurementSuiteV44 as ensureLegacyProcurementSuiteV44} from './schema-v44-legacy-v45.js';
 export * from './schema-v44-legacy-v45.js';
 
+// Marcadores de compatibilidad contractual v44: work_jobs_v44 · procurement_user_permissions.
 const MARKER_KEY='schema-procurement-v44-ready-v45';
 const MARKER_VERSION=44;
 let initializationPromise=null;
