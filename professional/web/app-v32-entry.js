@@ -14,10 +14,11 @@ import {initializeEnterpriseV41} from './app-v41-enterprise.js';
 import {initializeMasterOrderingV42} from './app-v42-master-ordering.js';
 import {initializeExperienceV43} from './app-v43-experience.js';
 import {initializeProcurementOSV44} from './app-v44-procurement-os.js';
+import {initializeMasterEditingV44} from './app-v44-master-edit.js';
 
 let initialized=false;
 export function initializeProfessionalV32(){
-  if(initialized)return;initialized=true;injectV32Styles();initializeOrdersHistoryV32();initializeCatalogV32();initializeEnhancementsV32();initializeDocumentsV33();initializePolishV34();initializeInvoiceReviewV36();initializeOperationalUpgradeV40();initializeEnterpriseV41();initializeMasterOrderingV42();initializeExperienceV43();initializeProcurementOSV44();
+  if(initialized)return;initialized=true;injectV32Styles();initializeOrdersHistoryV32();initializeCatalogV32();initializeEnhancementsV32();initializeDocumentsV33();initializePolishV34();initializeInvoiceReviewV36();initializeOperationalUpgradeV40();initializeEnterpriseV41();initializeMasterOrderingV42();initializeExperienceV43();initializeProcurementOSV44();initializeMasterEditingV44();
   if(state.token&&['dashboard','orders','history','documents','catalog','suppliers','receiving','finance','approvals','operations','masterdata','intelligence','planning','permissions','system'].includes(state.view))openRoute(state.view,state.subview||'',{replace:true}).catch(error=>console.warn('v32_initial_route_failed',error));
 }
 
