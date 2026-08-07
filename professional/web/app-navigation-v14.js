@@ -6,7 +6,7 @@ import {renderReceiving,renderHistory} from './app-experience-operations.js';
 import {initialRoute,initializeRouter,openRoute,registerRouteRenderer} from './app-router-v14.js';
 
 const standard=['dashboard','orders','invoices','catalog','suppliers','team','audit','settings'];
-const deferred=['operations','receiving','history','enterprise','professional','documents','finance','approvals'];
+const deferred=['operations','receiving','history','enterprise','professional','documents','finance','approvals','masterdata','intelligence','planning','permissions','system'];
 let initialized=false;
 function register(){registerRouteRenderer('dashboard',()=>renderDashboardV14());registerRouteRenderer('enterprise',()=>renderEnterpriseV15());standard.filter(view=>view!=='dashboard').forEach(view=>registerRouteRenderer(view,()=>navigate(view)));registerRouteRenderer('operations',route=>renderOperationsAdmin(route.subview||'home',{fromRoute:true}));registerRouteRenderer('receiving',()=>renderReceiving());registerRouteRenderer('history',()=>renderHistory())}
 function intercept(event){const target=event.target.closest?.('[data-view],[data-view-link],[data-experience-view],[data-operations-tab]');if(!target)return;const view=target.dataset.view||target.dataset.viewLink||target.dataset.experienceView,tab=target.dataset.operationsTab||'';if(!view&&!tab)return;event.preventDefault();event.stopImmediatePropagation();if(tab)return openRoute('operations',tab).catch(console.error);openRoute(view,view==='operations'?'home':'').catch(console.error)}
