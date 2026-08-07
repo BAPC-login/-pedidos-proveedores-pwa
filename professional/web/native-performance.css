@@ -11,4 +11,17 @@ button,a,input,select,textarea,[role="button"]{touch-action:manipulation}
 @keyframes nuvasto-native-shimmer{to{transform:translate3d(70%,0,0)}}
 .toast{transform:translate3d(0,0,0);will-change:transform,opacity}
 .bottom-nav,.topbar{transform:translateZ(0)}
-@media(prefers-reduced-motion:reduce){.v44-skeleton::after{animation:none!important}.content{scroll-behavior:auto}}
+.native-share-preparing{position:relative;opacity:.66!important;cursor:wait!important}
+.native-share-preparing::after{content:"";width:13px;height:13px;flex:0 0 13px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:nuvasto-share-spin .7s linear infinite}
+@keyframes nuvasto-share-spin{to{transform:rotate(360deg)}}
+@media(max-width:600px){
+  .topbar{grid-template-columns:40px 44px minmax(0,1fr) auto!important;grid-template-areas:'back heading . actions' 'search search search search'!important;column-gap:8px!important;row-gap:8px!important;padding-left:max(14px,env(safe-area-inset-left))!important;padding-right:max(14px,env(safe-area-inset-right))!important}
+  .route-back{grid-area:back!important}
+  .mobile-workspace-button{grid-area:heading!important;width:44px!important;min-width:44px!important;max-width:44px!important;height:44px!important;padding:0!important;overflow:visible!important;display:grid!important;place-items:center!important;position:relative!important;z-index:3!important}
+  .mobile-workspace-button>span,.mobile-workspace-button>b{display:none!important}
+  .mobile-workspace-button .brand-mark.tiny{width:36px!important;height:36px!important;min-width:36px!important;border-radius:11px!important;margin:0!important}
+  .top-actions{grid-area:actions!important;justify-self:end!important;position:relative!important;z-index:2!important;gap:6px!important;min-width:max-content!important}
+  .top-actions .v41-bell,.top-actions .icon-button,.top-actions .mobile-user-button{flex:0 0 auto!important}
+  .global-search{grid-area:search!important;min-width:0!important}
+}
+@media(prefers-reduced-motion:reduce){.v44-skeleton::after,.native-share-preparing::after{animation:none!important}.content{scroll-behavior:auto}}
