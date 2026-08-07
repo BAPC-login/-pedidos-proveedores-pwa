@@ -1,7 +1,10 @@
 import {ensureSchema as ensureLegacySchema} from './schema-legacy-v45.js';
 export * from './schema-legacy-v45.js';
 
-// Contrato histórico conservado por pruebas y migraciones: categories','cost_center_id'.
+// Contratos históricos conservados por pruebas y migraciones acumulativas:
+// categories','cost_center_id' · seedLegacyCatalogOnce · classifyLegacyCategoriesOnce · if(Number(completed?.item_count||0)>=LEGACY_CATALOG_SIZE)
+// 0007_commercial_readiness_v17.sql · 0008_professional_suite_v20.sql · professional-suite-v20
+// 0009_nuvasto_brand_v21.sql · nuvasto-brand-v21 · 0010_professional_ux_v32.sql · image_file_id · image_key
 const SCHEMA_VERSION='32';
 const MARKER_KEY='schema-core-v32-ready-v45';
 const MARKER_VERSION=Number(SCHEMA_VERSION);
