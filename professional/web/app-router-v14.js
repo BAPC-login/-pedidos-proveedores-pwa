@@ -1,4 +1,4 @@
-import {$,state} from './app-core.js';
+import {$,state,beginViewRequestScope} from './app-core.js';
 const renderers=new Map();
 let current={view:'dashboard',subview:'',depth:0};
 let scrollTimer=0,running=false,activeKey='',activePromise=null,pending=null;
@@ -12,6 +12,7 @@ export function routeState(){return {...current}}
 
 async function performRoute(view,subview,options){
   const renderer=renderers.get(view);if(!renderer)throw new Error(`Vista no registrada: ${view}`);
+  beginViewRequestScope();
   if(!options.fromHistory)saveScroll();
   const oldDepth=Number(history.state?.depth||0),same=current.view===view&&current.subview===subview;
   const route={pp:true,view,subview,depth:options.fromHistory?Number(options.depth||0):(options.replace?oldDepth:same?oldDepth:oldDepth+1),scrollY:Number(options.scrollY??sessionStorage.getItem(`pp:scroll:${key({view,subview})}`)??0)};
@@ -28,7 +29,7 @@ async function pump(){
       const request=pending;pending=null;activeKey=request.key;
       activePromise=performRoute(request.view,request.subview,request.options);
       try{const result=await activePromise;request.waiters.forEach(waiter=>waiter.resolve(result))}
-      catch(error){request.waiters.forEach(waiter=>waiter.reject(error))}
+      catch(error){if(error?.code==='request_superseded'||error?.silent)request.waiters.forEach(waiter=>waiter.resolve({superseded:true}));else request.waiters.forEach(waiter=>waiter.reject(error))}
       finally{activePromise=null;activeKey=''}
     }
   }finally{running=false}
@@ -37,6 +38,7 @@ async function pump(){
 export function openRoute(view,subview='',options={}){
   const routeKey=key({view,subview});
   if(activePromise&&activeKey===routeKey&&!pending)return activePromise;
+  if(activePromise&&activeKey!==routeKey)beginViewRequestScope();
   return new Promise((resolve,reject)=>{
     if(pending&&pending.key===routeKey){pending.waiters.push({resolve,reject});return}
     if(pending){pending.waiters.forEach(waiter=>waiter.resolve({superseded:true}));pending=null}
