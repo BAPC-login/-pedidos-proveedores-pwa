@@ -1,5 +1,6 @@
 import {$,esc,state,api,toast} from './app-core.js';
 import {openModal} from './app-modal.js';
+import {uploadFileDirectV45} from './app-upload-v45.js';
 
 let initialized=false;
 let currentObjectUrl='';
@@ -43,10 +44,9 @@ async function protectedUrl(key){
 async function upload(file){
   if(!file||!file.size)throw new Error('Selecciona un logo');
   if(file.size>10*1024*1024)throw new Error('El logo supera 10 MB');
-  const converted=await imageToJpeg(file);const form=new FormData();form.append('file',converted.blob,`${String(file.name||'logo').replace(/\.[^.]+$/,'')}.jpg`);
-  const response=await fetch('/api/files?purpose=brand-logo',{method:'POST',headers:{Authorization:`Bearer ${state.token}`},body:form});const payload=await response.json().catch(()=>({}));
-  if(!response.ok||payload.ok===false)throw new Error(payload.error||'No se pudo cargar el logo');
-  return {...payload.file,width:converted.width,height:converted.height};
+  const converted=await imageToJpeg(file),fileName=`${String(file.name||'logo').replace(/\.[^.]+$/,'')}.jpg`;
+  const uploaded=await uploadFileDirectV45(converted.blob,{purpose:'brand-logo',fileName});
+  return {...uploaded,width:converted.width,height:converted.height};
 }
 
 export async function openCompanyLogoUploader(){
