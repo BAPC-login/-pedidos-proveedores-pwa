@@ -1,8 +1,9 @@
 import {ensureSchema as ensureLegacySchema} from './schema-legacy-v45.js';
 export * from './schema-legacy-v45.js';
 
+const SCHEMA_VERSION='32';
 const MARKER_KEY='schema-core-v32-ready-v45';
-const MARKER_VERSION=32;
+const MARKER_VERSION=Number(SCHEMA_VERSION);
 let initializationPromise=null;
 
 async function markerReady(db){
@@ -15,7 +16,7 @@ export async function ensureSchema(env){
   if(!env.DB)throw new Error('D1 binding DB is not available');
   if(initializationPromise)return initializationPromise;
   initializationPromise=(async()=>{
-    if(await markerReady(env.DB))return{initialized:true,seeded:false,version:String(MARKER_VERSION),statements:0,fastPath:true};
+    if(await markerReady(env.DB))return{initialized:true,seeded:false,version:SCHEMA_VERSION,statements:0,fastPath:true};
     const result=await ensureLegacySchema(env);await persistMarker(env.DB);return{...result,fastPath:false};
   })().catch(error=>{initializationPromise=null;throw error});
   return initializationPromise;
