@@ -3,12 +3,13 @@ import v43 from './index-v43.js';
 import v42 from './index-v42.js';
 import v41 from './index-v41.js';
 import v40 from './index-v40.js';
-import {authenticate} from './auth.js';
-import {corsHeaders,errorResponse,ok,securityHeaders} from './core.js';
+import {authenticate,writeAudit} from './auth.js';
+import {HttpError,corsHeaders,errorResponse,monthKey,nowIso,ok,planFor,sanitizeFileName,securityHeaders,uuid} from './core.js';
 
 const VERSION='45';
 const RELEASE_VERSION='2.0.0-alpha.45';
 const RELEASE='2026.08.07.46';
+const MAX_DIRECT_UPLOAD_BYTES=20*1024*1024;
 
 function decorate(response,request,env,startedAt,layer='core'){
   const headers=new Headers(response.headers),origin=request.headers.get('Origin')||'';
@@ -30,6 +31,25 @@ async function operationsBootstrap(request,env,ctx){
   const settled=await Promise.allSettled(definitions.map(([,target])=>internal(request,env,ctx,target))),cache={},warnings=[];
   settled.forEach((result,index)=>{const[cacheKey,target]=definitions[index];if(result.status==='fulfilled')cache[cacheKey]=result.value;else warnings.push({target,message:String(result.reason?.message||result.reason||'Error de carga')})});
   return{cache,warnings,coreReady:Boolean(cache['/api/categories']&&cache['/api/cost-centers']&&cache['/api/products']),generatedAt:new Date().toISOString(),strategy:'single-roundtrip-no-schema-hotpath-v45'};
+}
+async function usageValue(env,orgId,metric){const row=await env.DB.prepare('SELECT quantity FROM usage_counters WHERE org_id = ? AND month_key = ? AND metric = ?').bind(orgId,monthKey(),metric).first();return Number(row?.quantity||0)}
+async function incrementUsage(env,orgId,metric,amount){await env.DB.prepare(`INSERT INTO usage_counters (org_id,month_key,metric,quantity,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(org_id,month_key,metric) DO UPDATE SET quantity=quantity+excluded.quantity,updated_at=excluded.updated_at`).bind(orgId,monthKey(),metric,Number(amount||0),nowIso()).run()}
+async function directR2Upload(request,env,actor,url){
+  if(!env.FILES)throw new HttpError(503,'R2 no está disponible para esta carga','storage_unavailable');
+  if(!request.body)throw new HttpError(400,'Adjunta un archivo','missing_file');
+  const declared=Number(request.headers.get('X-File-Size')||request.headers.get('Content-Length')||0);
+  if(!Number.isFinite(declared)||declared<=0)throw new HttpError(411,'No se pudo determinar el tamaño del archivo','file_size_required');
+  if(declared>MAX_DIRECT_UPLOAD_BYTES)throw new HttpError(413,'El archivo supera 20 MB','file_too_large');
+  const limits=planFor(actor.organization.plan),used=await usageValue(env,actor.orgId,'file_bytes');
+  if(used+declared>Number(limits.fileBytes||0))throw new HttpError(402,'Límite de almacenamiento alcanzado','plan_limit');
+  const purpose=sanitizeFileName(url.searchParams.get('purpose')||'general').slice(0,80),fileName=sanitizeFileName(url.searchParams.get('name')||request.headers.get('X-File-Name')||'archivo'),contentType=String(request.headers.get('Content-Type')||'application/octet-stream').slice(0,150),fileId=uuid(),createdAt=nowIso(),key=`r2/${actor.orgId}/${purpose}/${createdAt.slice(0,10)}/${fileId}-${fileName}`;
+  await env.FILES.put(key,request.body,{httpMetadata:{contentType},customMetadata:{orgId:actor.orgId,uploadedBy:actor.userId,purpose,streamed:'true'}});
+  try{
+    await env.DB.prepare(`INSERT INTO files (id,org_id,storage_key,file_name,content_type,size_bytes,sha256,purpose,uploaded_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)`).bind(fileId,actor.orgId,key,fileName,contentType,declared,'',purpose,actor.userId,createdAt).run();
+    await incrementUsage(env,actor.orgId,'file_bytes',declared);
+    await writeAudit(env,actor,request,'file.upload_stream','file',fileId,{purpose,size:declared,contentType});
+  }catch(error){await env.FILES.delete(key).catch(()=>{});throw error}
+  return{id:fileId,key,name:fileName,size:declared,contentType,sha256:'',purpose,backend:'r2',streamed:true,createdAt};
 }
 function isCatalogMutation(path,method){return ['POST','PATCH','PUT','DELETE'].includes(method)&&(/^\/api\/(products|categories|suppliers|cost-centers|locations)(\/|$)/.test(path)||path.startsWith('/api/catalog/import'))}
 function isV44(path,method){
@@ -60,13 +80,14 @@ export default{async fetch(request,env,ctx){
   const startedAt=Date.now(),url=new URL(request.url),method=request.method.toUpperCase(),path=url.pathname;
   try{
     if(method==='GET'&&path==='/api/operations-bootstrap-v45')return decorate(ok(await operationsBootstrap(request,env,ctx),request,env),request,env,startedAt,'bootstrap-v45');
+    if(method==='POST'&&path==='/api/files/direct-v45'){const actor=await authenticate(request,env);return decorate(ok({file:await directR2Upload(request,env,actor,url)},request,env),request,env,startedAt,'r2-stream-v45')}
     let worker=v40,layer='core-v40';
     if(isV44(path,method)){worker=v44;layer='v44-guarded'}
     else if(isV42(path,method)){worker=v42;layer='v42-explicit'}
     else if(isV43(path,method)){worker=v43;layer='v43-explicit'}
     else if(isV41(path,method)){worker=v41;layer='v41-explicit'}
     const response=await worker.fetch(request,env,ctx);
-    if(path==='/health'&&response.ok){const body=await response.clone().json().catch(()=>null);if(body)return decorate(ok({...body,version:RELEASE_VERSION,nativePerformanceV45:true,schemaOffCriticalPathV45:true,requestCoalescingV45:true,operationsBootstrapV45:true},request,env),request,env,startedAt,layer)}
+    if(path==='/health'&&response.ok){const body=await response.clone().json().catch(()=>null);if(body)return decorate(ok({...body,version:RELEASE_VERSION,nativePerformanceV45:true,schemaOffCriticalPathV45:true,requestCoalescingV45:true,operationsBootstrapV45:true,directR2StreamingV45:true},request,env),request,env,startedAt,layer)}
     return decorate(response,request,env,startedAt,layer);
   }catch(error){return decorate(errorResponse(error,request,env),request,env,startedAt,'v45-error')}
 }};
