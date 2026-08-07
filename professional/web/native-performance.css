@@ -1,0 +1,14 @@
+html{overscroll-behavior-y:none;-webkit-text-size-adjust:100%;text-rendering:optimizeLegibility}
+body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent}
+button,a,input,select,textarea,[role="button"]{touch-action:manipulation}
+.content,.v44-search-overlay,.modal-body,.side-nav{scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
+#mainContent{contain:layout style;min-height:60dvh}
+.route-loading #mainContent{pointer-events:none}
+.route-loading .page-heading{opacity:.82;transform:translateY(0)}
+.v44-row,.order-file-row,.order-card,.history-card,.invoice-card,.product-card,.supplier-card,[data-order-id]{content-visibility:auto;contain-intrinsic-size:72px}
+.v44-skeleton{position:relative!important;overflow:hidden!important;background:var(--soft)!important;animation:none!important;contain:paint!important}
+.v44-skeleton::after{content:"";position:absolute;inset:-20% -45%;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--card) 72%,transparent),transparent);transform:translate3d(-70%,0,0);animation:nuvasto-native-shimmer 1.15s linear infinite;will-change:transform}
+@keyframes nuvasto-native-shimmer{to{transform:translate3d(70%,0,0)}}
+.toast{transform:translate3d(0,0,0);will-change:transform,opacity}
+.bottom-nav,.topbar{transform:translateZ(0)}
+@media(prefers-reduced-motion:reduce){.v44-skeleton::after{animation:none!important}.content{scroll-behavior:auto}}
