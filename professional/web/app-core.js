@@ -22,10 +22,12 @@ const state = {
 
 const responseCache=new Map();
 const pendingRequests=new Map();
-const GET_TTL=30000;
-const DEFAULT_REQUEST_TIMEOUT=15000;
+const GET_TTL=45000;
+const DEFAULT_REQUEST_TIMEOUT=20000;
+const STALE_FALLBACK_MAX_AGE=15*60*1000;
 let sessionValidationPromise=null;
 
+function cacheKeyFor(path){return `${state.token.slice(-12)}:${path}`}
 function requestTimeoutError(){return Object.assign(new Error('La solicitud tardó demasiado. Revisa tu conexión e intenta nuevamente.'),{code:'request_timeout',status:0})}
 async function sessionStillValid(){
   if(!state.token)return false;
@@ -36,9 +38,11 @@ async function sessionStillValid(){
   return sessionValidationPromise;
 }
 function clearResponseCache(){responseCache.clear();pendingRequests.clear()}
+function seedResponseCache(path,value){const cacheKey=cacheKeyFor(path);responseCache.set(cacheKey,{time:Date.now(),value});pendingRequests.delete(cacheKey);return value}
+function staleResponse(cacheKey){const cached=responseCache.get(cacheKey);if(!cached)return null;return Date.now()-cached.time<=STALE_FALLBACK_MAX_AGE?cached.value:null}
 const api = async (path, options={}) => {
   const method=String(options.method||'GET').toUpperCase();
-  const cacheKey=`${state.token.slice(-12)}:${path}`;
+  const cacheKey=cacheKeyFor(path),stale=method==='GET'?staleResponse(cacheKey):null;
   if(method==='GET'&&!options.fresh){
     const cached=responseCache.get(cacheKey);
     if(cached&&Date.now()-cached.time<Number(options.ttl||GET_TTL))return cached.value;
@@ -54,7 +58,7 @@ const api = async (path, options={}) => {
     const timeout=Math.max(1000,Number(options.timeout||DEFAULT_REQUEST_TIMEOUT));
     const timer=setTimeout(()=>controller.abort(),timeout);
     const requestOptions={...options,method,headers,cache:'no-store',signal:controller.signal};
-    delete requestOptions.json;delete requestOptions.fresh;delete requestOptions.ttl;delete requestOptions.timeout;
+    delete requestOptions.json;delete requestOptions.fresh;delete requestOptions.ttl;delete requestOptions.timeout;delete requestOptions.noStaleFallback;
     if (options.json !== undefined) {headers.set('Content-Type','application/json');requestOptions.body=JSON.stringify(options.json)}
     try{
       const response = await fetch(path,requestOptions);
@@ -64,11 +68,13 @@ const api = async (path, options={}) => {
         if(invalid)logoutLocal();
       }
       if (!response.ok || payload.ok === false) throw Object.assign(new Error(payload.error || 'No se pudo completar la operación'),{code:payload.code,status:response.status,details:payload.details});
-      if(method==='GET')responseCache.set(cacheKey,{time:Date.now(),value:payload});else clearResponseCache();
+      if(method==='GET')seedResponseCache(path,payload);else clearResponseCache();
       return payload;
     }catch(error){
-      if(error?.name==='AbortError')throw requestTimeoutError();
-      throw error;
+      const normalized=error?.name==='AbortError'?requestTimeoutError():error;
+      const recoverable=method==='GET'&&!options.noStaleFallback&&stale&&(!normalized?.status||Number(normalized.status)>=500);
+      if(recoverable){console.warn('api_stale_fallback',path,normalized?.code||normalized?.message||normalized);return stale}
+      throw normalized;
     }finally{clearTimeout(timer)}
   })();
   if(method==='GET')pendingRequests.set(cacheKey,request);
@@ -103,4 +109,4 @@ function hideStartup(){$('#startupScreen')?.classList.add('hidden')}
 function showAuth(){hideStartup();$('#authScreen')?.classList.remove('hidden');$('#appShell')?.classList.add('hidden')}
 function showApp(){hideStartup();$('#authScreen')?.classList.add('hidden');$('#appShell')?.classList.remove('hidden');const {user,organization,plan}=state.me;$('#workspaceName').textContent=organization.name;$('#workspacePlan').textContent=user.isPlatformOwner?'Owner de plataforma':`Plan ${plan.name==='free'?'gratuito':plan.name}`;$('#workspaceAvatar').textContent=initials(organization.name);$('#workspaceCard').disabled=false;$('#workspaceCard').classList.add('selectable');$('#workspaceChevron').classList.remove('hidden');$('#userName').textContent=user.displayName;$('#userRole').textContent=roleNames[user.role]||user.role;$('#userAvatar').textContent=initials(user.displayName);$('#mobileWorkspaceName')&&($('#mobileWorkspaceName').textContent=organization.name);$('#mobileUserAvatar')&&($('#mobileUserAvatar').textContent=initials(user.displayName));$$('.admin-only').forEach(node=>node.classList.toggle('hidden',!isAdmin()))}
 function logoutLocal(){state.token='';state.me=null;clearResponseCache();localStorage.removeItem('pp:token');showAuth()}
-export {$,$$,esc,money,date,roleNames,state,api,toast,initials,isAdmin,canBuy,setBusy,setTheme,queueMutation,readMutations,syncMutations,updateSyncChip,showAuth,showApp,logoutLocal,sessionStillValid,clearResponseCache};
+export {$,$$,esc,money,date,roleNames,state,api,toast,initials,isAdmin,canBuy,setBusy,setTheme,queueMutation,readMutations,syncMutations,updateSyncChip,showAuth,showApp,logoutLocal,sessionStillValid,clearResponseCache,seedResponseCache};
