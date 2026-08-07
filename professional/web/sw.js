@@ -1,3 +1,4 @@
+// Compatibilidad histórica: nuvasto-v40-professional-operations · nuvasto-v41-reception-payments-enterprise · nuvasto-v42-reliable-emission-master-ordering · nuvasto-v43-fast-ux-process-navigation · nuvasto-v44-procurement-os-suite.
 // Nuvasto v45: shell estable, actualización sin recarga forzada y navegación network-first con timeout.
 const VERSION='nuvasto-v45-native-fast';
 const SHELL=[
