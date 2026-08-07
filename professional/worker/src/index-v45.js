@@ -8,7 +8,7 @@ import {HttpError,corsHeaders,errorResponse,monthKey,nowIso,ok,planFor,sanitizeF
 
 const VERSION='45';
 const RELEASE_VERSION='2.0.0-alpha.45';
-const RELEASE='2026.08.07.46';
+const RELEASE='2026.08.07.47';
 const MAX_DIRECT_UPLOAD_BYTES=20*1024*1024;
 
 function decorate(response,request,env,startedAt,layer='core'){
@@ -64,7 +64,7 @@ function isV44(path,method){
   return false;
 }
 function isV42(path,method){return path==='/api/master-list-ordering-v42'||(method==='POST'&&/^\/api\/order-batches\/[^/]+\/regenerate-documents$/.test(path))}
-function isV43(path,method){return (method==='GET'&&path==='/api/operations-bootstrap-v43')||(method==='PATCH'&&/^\/api\/products\/[^/]+\/status$/.test(path))}
+function isV43(path,method){return (method==='PATCH'&&/^\/api\/products\/[^/]+\/status$/.test(path))}
 function isV41(path,method){
   if(path==='/api/dashboard/analytics-v41'||path==='/api/receptions/work-queue'||path==='/api/finance/payments'||path==='/api/approvals'||path==='/api/approval-policies'||path==='/api/order-templates'||path==='/api/notifications-v41'||path==='/api/report-views'||path==='/api/presence'||path==='/api/global-search'||path==='/api/supplier-scorecards'||path==='/api/orders/close-reconciled'||path==='/api/platform/usage-v41')return true;
   if(/^\/api\/suppliers\/[^/]+\/payment-terms$/.test(path))return true;
@@ -79,7 +79,7 @@ function isV41(path,method){
 export default{async fetch(request,env,ctx){
   const startedAt=Date.now(),url=new URL(request.url),method=request.method.toUpperCase(),path=url.pathname;
   try{
-    if(method==='GET'&&path==='/api/operations-bootstrap-v45')return decorate(ok(await operationsBootstrap(request,env,ctx),request,env),request,env,startedAt,'bootstrap-v45');
+    if(method==='GET'&&(path==='/api/operations-bootstrap-v45'||path==='/api/operations-bootstrap-v43'))return decorate(ok(await operationsBootstrap(request,env,ctx),request,env),request,env,startedAt,'bootstrap-v45');
     if(method==='POST'&&path==='/api/files/direct-v45'){const actor=await authenticate(request,env);return decorate(ok({file:await directR2Upload(request,env,actor,url)},request,env),request,env,startedAt,'r2-stream-v45')}
     let worker=v40,layer='core-v40';
     if(isV44(path,method)){worker=v44;layer='v44-guarded'}
@@ -87,7 +87,7 @@ export default{async fetch(request,env,ctx){
     else if(isV43(path,method)){worker=v43;layer='v43-explicit'}
     else if(isV41(path,method)){worker=v41;layer='v41-explicit'}
     const response=await worker.fetch(request,env,ctx);
-    if(path==='/health'&&response.ok){const body=await response.clone().json().catch(()=>null);if(body)return decorate(ok({...body,version:RELEASE_VERSION,nativePerformanceV45:true,schemaOffCriticalPathV45:true,requestCoalescingV45:true,operationsBootstrapV45:true,directR2StreamingV45:true},request,env),request,env,startedAt,layer)}
+    if(path==='/health'&&response.ok){const body=await response.clone().json().catch(()=>null);if(body)return decorate(ok({...body,version:RELEASE_VERSION,nativePerformanceV45:true,schemaOffCriticalPathV45:true,requestCoalescingV45:true,operationsBootstrapV45:true,directR2StreamingV45:true,directNativeShareV45:true,legacyBootstrapAliasV45:true,clientReleaseHandshakeV45:true},request,env),request,env,startedAt,layer)}
     return decorate(response,request,env,startedAt,layer);
   }catch(error){return decorate(errorResponse(error,request,env),request,env,startedAt,'v45-error')}
 }};
