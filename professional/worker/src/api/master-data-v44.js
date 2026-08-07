@@ -4,6 +4,15 @@ import {ensureProcurementSuiteV44} from './schema-v44.js';
 
 async function record(env,actor,table,id){const value=await env.DB.prepare(`SELECT * FROM ${table} WHERE id=? AND org_id=?`).bind(id,actor.orgId).first();if(!value)throw new HttpError(404,'Registro no encontrado','not_found');return value}
 function duplicate(error){return /UNIQUE/i.test(String(error?.message||error))}
+export async function getMasterRecordV44(env,actor,entity,id){
+  await ensureProcurementSuiteV44(env);
+  if(entity==='products'){const r=await record(env,actor,'products',id);return{id:r.id,name:r.name,brand:r.brand,variant:r.variant,barcode:r.barcode,baseUnit:r.base_unit,contentValue:Number(r.content_value||0),contentUnit:r.content_unit,categoryId:r.category_id||'',active:Boolean(r.active)}}
+  if(entity==='categories'){const r=await record(env,actor,'categories',id);return{id:r.id,name:r.name,costCenterId:r.cost_center_id||'',sortOrder:Number(r.sort_order||0),active:Boolean(r.active)}}
+  if(entity==='suppliers'){const r=await record(env,actor,'suppliers',id);return{id:r.id,name:r.name,rut:r.rut,email:r.email,phone:r.phone,contactName:r.contact_name,leadDays:Number(r.lead_days||0),cutoffTime:r.cutoff_time,paymentTerms:r.payment_terms,active:Boolean(r.active)}}
+  if(entity==='cost-centers'){const r=await record(env,actor,'cost_centers',id);return{id:r.id,name:r.name,code:r.code,locationId:r.location_id,active:Boolean(r.active)}}
+  if(entity==='locations'){const r=await record(env,actor,'locations',id);return{id:r.id,name:r.name,code:r.code,timezone:r.timezone,active:Boolean(r.active)}}
+  throw new HttpError(400,'Tipo de maestro inválido','invalid_master_entity')
+}
 export async function updateMasterRecordV44(request,env,actor,entity,id){
   await ensureProcurementSuiteV44(env);const body=await readJson(request),stamp=nowIso();
   if(entity==='products'){
