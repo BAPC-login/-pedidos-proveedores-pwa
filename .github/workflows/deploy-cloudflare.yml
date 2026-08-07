@@ -54,7 +54,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: f1adc1e73490ce30fe3c1588d2ca57fb
           workingDirectory: professional
-          wranglerVersion: '4'
+          wranglerVersion: '4.114.0'
           command: deploy --config wrangler.toml --keep-vars
 
       - name: Verify deployed release, storage and native-fast v45
