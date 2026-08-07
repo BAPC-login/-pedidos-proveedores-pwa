@@ -1,6 +1,7 @@
 import {ensureEnterpriseSchemaV41 as ensureLegacyEnterpriseSchemaV41} from './schema-v41-legacy-v45.js';
 export * from './schema-v41-legacy-v45.js';
 
+// Marcadores de compatibilidad contractual v41: payment_term_anchor · approval_policies · invoice_line_splits · saved_report_views · operation_change_journal.
 const MARKER_KEY='schema-enterprise-v41-ready-v45';
 const MARKER_VERSION=41;
 let initializationPromise=null;
