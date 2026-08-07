@@ -11,10 +11,11 @@ import './app-v39-stability.js';
 import {initializeInvoiceReviewV36} from './app-v36-invoice-review.js';
 import {initializeOperationalUpgradeV40} from './app-v40-operations.js';
 import {initializeEnterpriseV41} from './app-v41-enterprise.js';
+import {initializeMasterOrderingV42} from './app-v42-master-ordering.js';
 
 let initialized=false;
 export function initializeProfessionalV32(){
-  if(initialized)return;initialized=true;injectV32Styles();initializeOrdersHistoryV32();initializeCatalogV32();initializeEnhancementsV32();initializeDocumentsV33();initializePolishV34();initializeInvoiceReviewV36();initializeOperationalUpgradeV40();initializeEnterpriseV41();
+  if(initialized)return;initialized=true;injectV32Styles();initializeOrdersHistoryV32();initializeCatalogV32();initializeEnhancementsV32();initializeDocumentsV33();initializePolishV34();initializeInvoiceReviewV36();initializeOperationalUpgradeV40();initializeEnterpriseV41();initializeMasterOrderingV42();
   if(state.token&&['dashboard','orders','history','documents','catalog','suppliers','receiving','finance','approvals'].includes(state.view))openRoute(state.view,state.subview||'',{replace:true}).catch(error=>console.warn('v32_initial_route_failed',error));
 }
 
