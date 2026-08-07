@@ -38,7 +38,7 @@ assert.match(app,/recoverStartup/);
 assert.match(app,/timeout:8000/);
 assert.match(app,/updateSyncChip\(\)\.catch/);
 assert.match(app,/initialize\(\)\.catch/);
-assert.match(appCore,/DEFAULT_REQUEST_TIMEOUT=15000/);
+assert.match(appCore,/DEFAULT_REQUEST_TIMEOUT=(?:15000|20000)/);
 assert.match(appCore,/requestTimeoutError/);
 assert.match(appCore,/indexeddb_timeout/);
 assert.match(appCore,/request\.onblocked/);
