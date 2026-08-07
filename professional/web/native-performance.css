@@ -2,7 +2,7 @@ html{overscroll-behavior-y:none;-webkit-text-size-adjust:100%;text-rendering:opt
 body{overscroll-behavior-y:none;-webkit-tap-highlight-color:transparent}
 button,a,input,select,textarea,[role="button"]{touch-action:manipulation}
 .content,.v44-search-overlay,.modal-body,.side-nav{scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
-#mainContent{contain:layout style;min-height:60dvh}
+#mainContent{contain:style;min-height:60dvh}
 .route-loading #mainContent{pointer-events:none}
 .route-loading .page-heading{opacity:.82;transform:translateY(0)}
 .v44-row,.order-file-row,.order-card,.history-card,.invoice-card,.product-card,.supplier-card,[data-order-id]{content-visibility:auto;contain-intrinsic-size:72px}
