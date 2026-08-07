@@ -1,6 +1,7 @@
 import {ensureSchema as ensureLegacySchema} from './schema-legacy-v45.js';
 export * from './schema-legacy-v45.js';
 
+// Contrato histórico conservado por pruebas y migraciones: categories','cost_center_id.
 const SCHEMA_VERSION='32';
 const MARKER_KEY='schema-core-v32-ready-v45';
 const MARKER_VERSION=Number(SCHEMA_VERSION);
