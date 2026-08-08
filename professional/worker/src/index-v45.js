@@ -8,7 +8,7 @@ import {HttpError,corsHeaders,errorResponse,monthKey,nowIso,ok,planFor,sanitizeF
 
 const VERSION='45';
 const RELEASE_VERSION='2.0.0-alpha.45';
-const RELEASE='2026.08.07.47';
+const RELEASE='2026.08.08.48';
 const MAX_DIRECT_UPLOAD_BYTES=20*1024*1024;
 
 function decorate(response,request,env,startedAt,layer='core'){
