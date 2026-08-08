@@ -17,6 +17,14 @@ Nuvasto es una plataforma PWA para gestionar pedidos, proveedores, centros de co
 - Almacenamiento de facturas, logos e imágenes en Cloudflare R2 cuando el binding `FILES` está activo.
 - Conectores asistidos para portales de proveedores y preparación futura de APIs oficiales.
 
+## Rendimiento y estabilidad
+
+- Una sola restauración de sesión y una sola ruta inicial por apertura.
+- Lecturas GET concurrentes agrupadas; los maestros usan caché SWR y respaldo temporal ante `429` o fallas transitorias.
+- Notificaciones desacopladas de las mutaciones del DOM, con actualización acotada y sin polling duplicado.
+- PWA cache-first para recursos estáticos: los módulos se descargan una vez por release y no se revalidan en cada navegación.
+- Handshake liviano en `/platform/release`; `/platform/health` queda reservado para diagnóstico integral de D1, R2 y capacidades.
+
 ## Despliegue
 
 El nombre técnico actual del Worker se conserva para no romper la URL, los secretos y la base D1 existentes. La marca visible, la PWA y los documentos se publican como **Nuvasto**.

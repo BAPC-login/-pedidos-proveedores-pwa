@@ -29,6 +29,15 @@ Cloudflare tenía un único proyecto conectado al directorio `worker/`. Para con
 - PWA responsive, modo claro/oscuro, caché y cola offline.
 - Límites de plan aplicados desde el backend.
 
+## Contrato de rendimiento
+
+- El frontend no puede iniciar rutas ni consultas de negocio antes de validar la sesión.
+- Los observadores del DOM solo mejoran nodos; nunca deben ejecutar polling ni consultas de red.
+- Las lecturas simultáneas de la misma URL se agrupan incluso cuando solicitan datos frescos.
+- Las notificaciones persistentes se consultan como máximo una vez cada dos minutos al navegar y cada cinco minutos mientras la app está visible.
+- El service worker precarga solo el shell crítico y almacena el resto bajo demanda, sin revalidar todos los módulos en cada apertura.
+- La versión del cliente se compara mediante `/platform/release`, sin ejecutar el diagnóstico completo de D1/R2 durante el arranque.
+
 ## Cuenta inicial
 
 El primer propietario se crea automáticamente al inicializar D1:

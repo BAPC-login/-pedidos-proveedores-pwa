@@ -27,7 +27,7 @@ import {initializeNuvastoUXV22} from './app-ux-v22.js';
 import {initializeNuvastoV23} from './app-nuvasto-v23.js';
 import {initializeProfessionalHotfixV24} from './app-professional-hotfix-v24.js';
 
-const CLIENT_RELEASE='2026.08.08.48';
+const CLIENT_RELEASE='2026.08.08.49';
 document.documentElement.dataset.clientRelease=CLIENT_RELEASE;
 
 // r48: evita tormentas de requests en navegación móvil. El core ya deduplica por vista;
@@ -102,7 +102,7 @@ let releaseCheckPromise=null;
 async function verifyClientRelease(){
   if(releaseCheckPromise)return releaseCheckPromise;
   releaseCheckPromise=(async()=>{try{
-    const response=await nativeFetch(`/platform/health?client=${encodeURIComponent(CLIENT_RELEASE)}&ts=${Date.now()}`,{cache:'no-store'});if(!response.ok)return;
+    const response=await nativeFetch(`/platform/release?client=${encodeURIComponent(CLIENT_RELEASE)}&ts=${Date.now()}`,{cache:'no-store'});if(!response.ok)return;
     const serverRelease=response.headers.get('X-Nuvasto-Release')||response.headers.get('X-Pedidos-Pro-Release')||'';if(!serverRelease||serverRelease===CLIENT_RELEASE){sessionStorage.removeItem('nuvasto:release-reload');return}
     const already=sessionStorage.getItem('nuvasto:release-reload');if(already===serverRelease)return;sessionStorage.setItem('nuvasto:release-reload',serverRelease);
     const registration=await navigator.serviceWorker?.getRegistration?.();await registration?.update?.().catch(()=>{});setTimeout(()=>location.reload(),180);
@@ -115,7 +115,7 @@ $('#openBootstrap').onclick=openBootstrap;$('#logoutButton').onclick=async()=>{t
 function openCommand(){$('#commandMenu').classList.remove('hidden');$('#commandInput').value='';renderCommands();setTimeout(()=>$('#commandInput').focus(),0)}
 function renderCommands(){const query=$('#commandInput').value.toLowerCase(),commands=[['dashboard','Ir a Resumen'],['receiving','Abrir pedidos por emitir'],['invoices','Ir a Documentos'],['history','Abrir historial'],['operations','Abrir Operaciones'],...(isAdmin()?[['professional','Control profesional Nuvasto'],['enterprise','Centro profesional y SaaS'],['team','Administrar usuarios'],['audit','Ver auditoría']]:[]),['settings','Abrir configuración']].filter(([,label])=>label.toLowerCase().includes(query));$('#commandResults').innerHTML=commands.map(([view,label])=>`<button class="command-result" data-command="${view}"><span>${label}</span><span>↵</span></button>`).join('');$$('[data-command]').forEach(node=>node.onclick=()=>{$('#commandMenu').classList.add('hidden');openRoute(node.dataset.command,node.dataset.command==='operations'?'home':'').catch(error=>{if(!error?.silent)toast(error.message,'error')})})}
 $('#commandInput').addEventListener('input',renderCommands);$('#commandMenu').addEventListener('click',event=>{if(event.target===$('#commandMenu'))$('#commandMenu').classList.add('hidden')});document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();openCommand()}if(event.key==='Escape')$('#commandMenu').classList.add('hidden')});window.addEventListener('online',()=>{state.online=true;updateSyncChip().catch(()=>{});syncMutations().catch(error=>console.warn('sync_recovery_failed',error));toast('Conexión recuperada')});window.addEventListener('offline',()=>{state.online=false;updateSyncChip().catch(()=>{});toast('Modo offline','error')});
-if('serviceWorker'in navigator){navigator.serviceWorker.register('./sw.js').then(registration=>registration.update().catch(()=>{})).catch(console.warn);navigator.serviceWorker.addEventListener('controllerchange',()=>console.info('service_worker_updated'));navigator.serviceWorker.addEventListener('message',event=>{if(event.data?.type==='NUVASTO_SW_UPDATED'){console.info('nuvasto_assets_updated',event.data.version);verifyClientRelease()}})}
+if('serviceWorker'in navigator){navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).catch(console.warn);navigator.serviceWorker.addEventListener('controllerchange',()=>console.info('service_worker_updated'));navigator.serviceWorker.addEventListener('message',event=>{if(event.data?.type==='NUVASTO_SW_UPDATED'){console.info('nuvasto_assets_updated',event.data.version);verifyClientRelease()}})}
 async function initialize(){
   updateSyncChip().catch(error=>console.warn('sync_chip_startup_failed',error));
   $('#openBootstrap').classList.add('hidden');

@@ -57,7 +57,7 @@ jobs:
           wranglerVersion: '4.114.0'
           command: deploy --config wrangler.toml --keep-vars
 
-      - name: Verify deployed release, storage and native-fast v45
+      - name: Verify deployed release, storage and stable runtime r49
         id: verify
         shell: bash
         run: |
@@ -74,18 +74,19 @@ jobs:
             const v43=h.experienceV43===true&&h.operationsBootstrapV43===true&&h.productLifecycleV43===true&&h.professionalDashboardV43===true&&h.processNavigationV43===true&&h.floatingOrderActionsV43===true&&h.settingsPolicyDedupV43===true;
             const v44=h.procurementOsV44===true&&h.canonicalMasterDataV44===true&&h.masterListAssistV44===true&&h.procurementIntelligenceV44===true&&h.financePlanningV44===true&&h.receptionEvidenceV44===true&&h.granularPermissionsV44===true&&h.jobQueueV44===true&&h.observabilityV44===true&&h.globalSearchV44===true&&h.productionE2EContractV44===true;
             const v45=h.nativePerformanceV45===true&&h.schemaOffCriticalPathV45===true&&h.requestCoalescingV45===true&&h.operationsBootstrapV45===true&&h.directR2StreamingV45===true;
-            process.stdout.write(storage&&v42&&v43&&v44&&v45?'true':'false');
+            const r49=h.notificationLoopGuardV49===true&&h.cacheFirstPwaV49===true&&h.lightweightReleaseHandshakeV49===true&&h.singleStartupRouteV49===true;
+            process.stdout.write(storage&&v42&&v43&&v44&&v45&&r49?'true':'false');
           } catch { process.stdout.write('false'); }
           NODE
             )
             if [ "$release" = "$expected" ] && [ "$ready" = "true" ]; then
-              echo "Nuvasto $release desplegado con R2, v42/v43/v44 y rendimiento nativo v45 verificados."
+              echo "Nuvasto $release desplegado con R2, v42/v43/v44/v45 y runtime estable r49 verificados."
               exit 0
             fi
-            echo "Esperando despliegue ${attempt}/24 · release=${release:-none} · v42+v43+v44+v45+r2=$ready"
+            echo "Esperando despliegue ${attempt}/24 · release=${release:-none} · v42+v43+v44+v45+r49+r2=$ready"
             sleep 10
           done
-          echo "::error::Cloudflare no activó el release esperado con las capacidades v42/v43/v44/v45 y R2."
+          echo "::error::Cloudflare no activó el release esperado con las capacidades v42/v43/v44/v45/r49 y R2."
           exit 1
 
       - name: Synthetic procurement journey on dedicated E2E tenant
@@ -106,10 +107,10 @@ jobs:
         run: |
           if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.synthetic.outcome }}" != "failure" ]; then
             state=success
-            description='Nuvasto v45 native-fast publicado y verificado en Cloudflare'
+            description='Nuvasto r49 estable publicado y verificado en Cloudflare'
           else
             state=failure
-            description='El despliegue de Nuvasto v45 no quedó verificado'
+            description='El despliegue de Nuvasto r49 no quedó verificado'
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state="$state" \

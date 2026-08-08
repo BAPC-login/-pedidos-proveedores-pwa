@@ -22,21 +22,22 @@ const state = {
 
 const responseCache=new Map();
 const pendingRequests=new Map();
-const GET_TTL=45000;
-const SWR_REFRESH_AFTER=12000;
+const GET_TTL=2*60*1000;
+const SWR_REFRESH_AFTER=2*60*1000;
 const DEFAULT_REQUEST_TIMEOUT=15000;
-const STALE_FALLBACK_MAX_AGE=15*60*1000;
+const STALE_FALLBACK_MAX_AGE=30*60*1000;
 const MAX_PARALLEL_GETS=4;
 const SWR_PATHS=[
-  /^\/api\/(categories|cost-centers|suppliers|products|locations)(?:\?|$)/,
+  /^\/api\/(categories|cost-centers|suppliers|products|locations|supplier-assets)(?:\?|$)/,
   /^\/api\/dashboard\/layout(?:\?|$)/,
   /^\/api\/settings(?:\?|$)/,
   /^\/api\/master-list-ordering-v42(?:\?|$)/,
-  /^\/api\/operations-bootstrap-v45(?:\?|$)/
+  /^\/api\/operations-bootstrap-v4[35](?:\?|$)/
 ];
 let sessionValidationPromise=null;
 let routeRequestController=new AbortController();
 let activeGetCount=0;
+let apiBackoffUntil=0;
 const getQueue=[];
 let dataWorker=null,workerSequence=0;
 const workerJobs=new Map();
@@ -110,6 +111,10 @@ async function networkRequest(path,options,method,cacheKey,stale,{background=fal
     const execute=async()=>{
       const response = await fetch(path,requestOptions);
       const payload = await parseResponsePayload(response);
+      if(response.status===429){
+        const retryAfter=Math.max(10,Number(response.headers.get('Retry-After')||60));
+        apiBackoffUntil=Date.now()+Math.min(retryAfter,300)*1000;
+      }
       if (response.status === 401 && state.token) {
         const invalid=String(path)==='/api/me'||String(payload.code||'').includes('session_')||!(await sessionStillValid());
         if(invalid)logoutLocal();
@@ -124,7 +129,7 @@ async function networkRequest(path,options,method,cacheKey,stale,{background=fal
   }catch(error){
     const aborted=error?.name==='AbortError';
     const normalized=aborted?(viewAborted&&!timeoutHit?requestSupersededError():requestTimeoutError()):error;
-    const recoverable=method==='GET'&&!options.noStaleFallback&&stale&&!viewAborted&&(!normalized?.status||Number(normalized.status)>=500);
+    const recoverable=method==='GET'&&!options.noStaleFallback&&stale&&!viewAborted&&(!normalized?.status||Number(normalized.status)===429||Number(normalized.status)>=500);
     metric({path,method,duration:Math.round(performance.now()-started),status:normalized?.code||'error',background});
     if(recoverable){console.warn('api_stale_fallback',path,normalized?.code||normalized?.message||normalized);return stale}
     throw normalized;
@@ -140,10 +145,11 @@ function revalidateInBackground(path,options,method,cacheKey,stale){
 const api = async (path, options={}) => {
   const method=String(options.method||'GET').toUpperCase();
   const cacheKey=cacheKeyFor(path),cached=method==='GET'?responseCache.get(cacheKey):null,stale=method==='GET'?staleResponse(cacheKey):null,age=cached?Date.now()-cached.time:Infinity;
+  if(method==='GET'&&pendingRequests.has(cacheKey))return pendingRequests.get(cacheKey);
+  if(method==='GET'&&!options.noStaleFallback&&stale&&Date.now()<apiBackoffUntil)return stale;
   if(method==='GET'&&!options.fresh){
     if(cached&&isSWRPath(path)&&age<STALE_FALLBACK_MAX_AGE){if(age>SWR_REFRESH_AFTER)revalidateInBackground(path,options,method,cacheKey,stale);return cached.value}
     if(cached&&age<Number(options.ttl||GET_TTL))return cached.value;
-    if(pendingRequests.has(cacheKey))return pendingRequests.get(cacheKey);
   }
   const request=networkRequest(path,options,method,cacheKey,stale);
   if(method==='GET')pendingRequests.set(cacheKey,request);
