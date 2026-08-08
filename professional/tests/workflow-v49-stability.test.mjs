@@ -23,7 +23,7 @@ assert.match(core,/pendingRequests\.has\(cacheKey\)\)return pendingRequests\.get
 assert.match(core,/apiBackoffUntil/);
 assert.match(core,/Number\(normalized\.status\)===429/);
 
-assert.match(app,/CLIENT_RELEASE='2026\.08\.08\.49'/);
+assert.match(app,/CLIENT_RELEASE='2026\.08\.08\.50'/);
 assert.match(app,/\/platform\/release\?client=/);
 assert.match(app,/register\('\.\/sw\.js',\{updateViaCache:'none'\}\)/);
 assert.doesNotMatch(app,/register\('\.\/sw\.js'\)\.then\(registration=>registration\.update/);
@@ -43,21 +43,21 @@ assert.match(v41,/notificationTimer=setInterval\(.*5\*60\*1000/);
 assert.doesNotMatch(v41,/function onRendered\(\)\{[^}]*notifications\(\)/);
 assert.match(v41,/new MutationObserver\(records=>\{if\(records\.some\(record=>record\.addedNodes\.length\)\)scheduleDomEnhance\(\)\}\)/);
 
-assert.match(sw,/nuvasto-v49-stable-runtime/);
+assert.match(sw,/nuvasto-v50-safari-navigation/);
 assert.match(sw,/const PRECACHE=/);
 assert.match(sw,/const OPTIONAL_ASSETS=/);
 assert.match(sw,/if\(cached\)return cached/);
 assert.doesNotMatch(sw,/cache\.addAll\(SHELL\)/);
 
 for(const config of [wrangler,rootWrangler])assert.match(config,/\/platform\/release/);
-assert.match(index,/VERSION='49'/);
-assert.match(index,/RELEASE_VERSION='2\.0\.0-alpha\.49'/);
+assert.match(index,/VERSION='50'/);
+assert.match(index,/RELEASE_VERSION='2\.0\.0-alpha\.50'/);
 for(const capability of ['notificationLoopGuardV49','cacheFirstPwaV49','lightweightReleaseHandshakeV49','singleStartupRouteV49'])assert.match(index,new RegExp(`${capability}:true`));
 assert.match(combined,/stable-runtime · 2026\.08\.08\.49/);
-assert.match(combined,/PLATFORM_RELEASE='2026\.08\.08\.49'/);
+assert.match(combined,/PLATFORM_RELEASE='2026\.08\.08\.50'/);
 assert.match(combined,/url\.pathname==='\/platform\/release'/);
 assert.match(deploy,/notificationLoopGuardV49/);
-assert.match(pkg,/"version": "2\.0\.0-alpha\.49"/);
+assert.match(pkg,/"version": "2\.0\.0-alpha\.50"/);
 assert.match(pkg,/workflow-v49-stability\.test\.mjs/);
 
 for(const file of ['../web/app-core.js','../web/app.js','../web/app-v32-entry.js','../web/app-v40-operations.js','../web/app-v41-enterprise.js','../web/sw.js','../worker/src/index-v45.js','../../worker/src/combined.js'])execFileSync(process.execPath,['--check',new URL(file,import.meta.url).pathname],{stdio:'inherit'});

@@ -27,7 +27,7 @@ import {initializeNuvastoUXV22} from './app-ux-v22.js';
 import {initializeNuvastoV23} from './app-nuvasto-v23.js';
 import {initializeProfessionalHotfixV24} from './app-professional-hotfix-v24.js';
 
-const CLIENT_RELEASE='2026.08.08.49';
+const CLIENT_RELEASE='2026.08.08.50';
 document.documentElement.dataset.clientRelease=CLIENT_RELEASE;
 
 // r48: evita tormentas de requests en navegación móvil. El core ya deduplica por vista;

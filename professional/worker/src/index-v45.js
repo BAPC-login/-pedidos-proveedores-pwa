@@ -6,9 +6,9 @@ import v40 from './index-v40.js';
 import {authenticate,writeAudit} from './auth.js';
 import {HttpError,corsHeaders,errorResponse,monthKey,nowIso,ok,planFor,sanitizeFileName,securityHeaders,uuid} from './core.js';
 
-const VERSION='49';
-const RELEASE_VERSION='2.0.0-alpha.49';
-const RELEASE='2026.08.08.49';
+const VERSION='50';
+const RELEASE_VERSION='2.0.0-alpha.50';
+const RELEASE='2026.08.08.50';
 const MAX_DIRECT_UPLOAD_BYTES=20*1024*1024;
 
 function decorate(response,request,env,startedAt,layer='core'){
@@ -87,7 +87,7 @@ export default{async fetch(request,env,ctx){
     else if(isV43(path,method)){worker=v43;layer='v43-explicit'}
     else if(isV41(path,method)){worker=v41;layer='v41-explicit'}
     const response=await worker.fetch(request,env,ctx);
-    if(path==='/health'&&response.ok){const body=await response.clone().json().catch(()=>null);if(body)return decorate(ok({...body,version:RELEASE_VERSION,nativePerformanceV45:true,schemaOffCriticalPathV45:true,requestCoalescingV45:true,operationsBootstrapV45:true,directR2StreamingV45:true,directNativeShareV45:true,legacyBootstrapAliasV45:true,clientReleaseHandshakeV45:true,notificationLoopGuardV49:true,cacheFirstPwaV49:true,lightweightReleaseHandshakeV49:true,singleStartupRouteV49:true},request,env),request,env,startedAt,layer)}
+    if(path==='/health'&&response.ok){const body=await response.clone().json().catch(()=>null);if(body)return decorate(ok({...body,version:RELEASE_VERSION,nativePerformanceV45:true,schemaOffCriticalPathV45:true,requestCoalescingV45:true,operationsBootstrapV45:true,directR2StreamingV45:true,directNativeShareV45:true,legacyBootstrapAliasV45:true,clientReleaseHandshakeV45:true,notificationLoopGuardV49:true,cacheFirstPwaV49:true,lightweightReleaseHandshakeV49:true,singleStartupRouteV49:true,redirectSafeNavigationV50:true},request,env),request,env,startedAt,layer)}
     return decorate(response,request,env,startedAt,layer);
   }catch(error){return decorate(errorResponse(error,request,env),request,env,startedAt,'v45-error')}
 }};

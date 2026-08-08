@@ -23,6 +23,7 @@ Nuvasto es una plataforma PWA para gestionar pedidos, proveedores, centros de co
 - Lecturas GET concurrentes agrupadas; los maestros usan caché SWR y respaldo temporal ante `429` o fallas transitorias.
 - Notificaciones desacopladas de las mutaciones del DOM, con actualización acotada y sin polling duplicado.
 - PWA cache-first para recursos estáticos: los módulos se descargan una vez por release y no se revalidan en cada navegación.
+- Navegaciones HTML network-first y normalizadas: nunca se entrega a Safari una respuesta cacheada con historial de redirección.
 - Handshake liviano en `/platform/release`; `/platform/health` queda reservado para diagnóstico integral de D1, R2 y capacidades.
 
 ## Despliegue
