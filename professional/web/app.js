@@ -1,4 +1,4 @@
-import {$,$$,state,api,toast,setBusy,setTheme,syncMutations,updateSyncChip,showAuth,showApp,logoutLocal,isAdmin} from './app-core.js';
+import {$,$$,state,api,toast,setBusy,setTheme,syncMutations,updateSyncChip,showAuth,showApp,logoutLocal,isAdmin,seedResponseCache} from './app-core.js';
 import './app-invoice-entry-v29.js';
 import {initializeCheckoutInvoiceV29} from './app-checkout-invoice-v29.js';
 import {initializeScreenStateHotfix} from './app-screen-state-hotfix.js';
@@ -27,8 +27,41 @@ import {initializeNuvastoUXV22} from './app-ux-v22.js';
 import {initializeNuvastoV23} from './app-nuvasto-v23.js';
 import {initializeProfessionalHotfixV24} from './app-professional-hotfix-v24.js';
 
-const CLIENT_RELEASE='2026.08.07.47';
+const CLIENT_RELEASE='2026.08.08.48';
 document.documentElement.dataset.clientRelease=CLIENT_RELEASE;
+
+// r48: evita tormentas de requests en navegación móvil. El core ya deduplica por vista;
+// esta capa deduplica también entre módulos heredados y conserva maestros brevemente.
+const nativeFetch=window.fetch.bind(window);
+const guardedInflight=new Map();
+const guardedCache=new Map();
+const GUARDED_TTL=2*60*1000;
+const GUARDED_STALE=30*60*1000;
+let workerBackoffUntil=0;
+function guardedPath(input){try{return new URL(typeof input==='string'?input:input?.url,location.href).pathname}catch{return ''}}
+function guardedMethod(input,init){return String(init?.method||input?.method||'GET').toUpperCase()}
+function guardedKey(input,init){const url=new URL(typeof input==='string'?input:input?.url,location.href);const headers=new Headers(init?.headers||input?.headers||{});return `${url.pathname}${url.search}|${headers.get('Authorization')||''}`}
+function guardable(path){return /^\/api\/(categories|cost-centers|suppliers|products|locations|supplier-assets|operations-bootstrap-v45|operations-bootstrap-v43|master-list-ordering-v42)(?:\/|\?|$)/.test(path)}
+function cloneEntry(entry){return new Response(entry.body,{status:entry.status,statusText:entry.statusText,headers:new Headers(entry.headers)})}
+async function snapshotResponse(response){const body=await response.clone().arrayBuffer();return{body,status:response.status,statusText:response.statusText,headers:[...response.headers.entries()],time:Date.now()}}
+function invalidateGuarded(){guardedCache.clear();guardedInflight.clear()}
+window.fetch=async(input,init={})=>{
+  const path=guardedPath(input),method=guardedMethod(input,init);
+  if(path.startsWith('/api/')&&method!=='GET'){invalidateGuarded();return nativeFetch(input,init)}
+  if(method!=='GET'||!guardable(path))return nativeFetch(input,init);
+  const key=guardedKey(input,init),cached=guardedCache.get(key),age=cached?Date.now()-cached.time:Infinity;
+  if(cached&&age<GUARDED_TTL)return cloneEntry(cached);
+  if(Date.now()<workerBackoffUntil&&cached&&age<GUARDED_STALE)return cloneEntry(cached);
+  if(guardedInflight.has(key))return (await guardedInflight.get(key)).clone();
+  const task=nativeFetch(input,init).then(async response=>{
+    if(response.status===429){workerBackoffUntil=Date.now()+60000;if(cached&&age<GUARDED_STALE)return cloneEntry(cached)}
+    if(response.ok){const entry=await snapshotResponse(response);guardedCache.set(key,entry)}
+    return response;
+  }).catch(error=>{if(cached&&age<GUARDED_STALE)return cloneEntry(cached);throw error}).finally(()=>guardedInflight.delete(key));
+  guardedInflight.set(key,task);
+  return (await task).clone();
+};
+
 if(!document.querySelector('link[data-native-performance]')){const link=document.createElement('link');link.rel='stylesheet';link.href='./native-performance.css';link.dataset.nativePerformance='45';document.head.append(link)}
 
 initializeScreenStateHotfix();initializeNuvastoV21();initializeNuvastoV23();initializeBrandingFeatures();initializeProcurementSettings();initializeProcurementEntry();initializeOrderCoreV15();initializeCompanyLogoUploader();initializeFileActions();initializeSettingsPanelsV13();initializeExperience();initializeTelemetryV13();initializeNavigationV14();initializeCommercialV16();initializeImportPreviewV17();initializeMasterV18();initializeNuvastoUXV22();initializeHistoryV18();initializePdfV18();initializeWorkflowV19();initializeSsoV20();initializeProfessionalV20();initializeHistorySemanticV20();initializeProfessionalHotfixV24();initializeCheckoutInvoiceV29();
@@ -49,6 +82,7 @@ startupWatchdog=setTimeout(()=>recoverStartup('La restauración tardó demasiado
 const onIdle=callback=>typeof requestIdleCallback==='function'?requestIdleCallback(callback,{timeout:900}):setTimeout(callback,120);
 function applyOperationsBootstrap(payload){
   const cache=payload?.cache||{};
+  for(const [path,value] of Object.entries(cache)){if(path.startsWith('/api/')&&value)seedResponseCache(path,value)}
   state.cache.categories=cache['/api/categories']?.categories||state.cache.categories||[];
   state.cache.costCenters=cache['/api/cost-centers']?.costCenters||state.cache.costCenters||[];
   state.cache.suppliers=cache['/api/suppliers']?.suppliers||state.cache.suppliers||[];
@@ -60,21 +94,24 @@ function preloadOperations(){
   if(!state.token||preloadScheduled)return;preloadScheduled=true;
   onIdle(()=>{
     const prime=window.NuvastoExperienceV43?.primeOperations;
-    const task=prime?prime():api('/api/operations-bootstrap-v45',{persist:true,ttl:60000,timeout:8000});
+    const task=prime?prime():api('/api/operations-bootstrap-v45',{persist:true,ttl:120000,timeout:8000});
     Promise.resolve(task).then(payload=>applyOperationsBootstrap(payload)).catch(error=>{if(!error?.silent)console.warn('operations_bootstrap_failed',error)});
   });
 }
+let releaseCheckPromise=null;
 async function verifyClientRelease(){
-  try{
-    const response=await fetch(`/platform/health?client=${encodeURIComponent(CLIENT_RELEASE)}&ts=${Date.now()}`,{cache:'no-store'});if(!response.ok)return;
+  if(releaseCheckPromise)return releaseCheckPromise;
+  releaseCheckPromise=(async()=>{try{
+    const response=await nativeFetch(`/platform/health?client=${encodeURIComponent(CLIENT_RELEASE)}&ts=${Date.now()}`,{cache:'no-store'});if(!response.ok)return;
     const serverRelease=response.headers.get('X-Nuvasto-Release')||response.headers.get('X-Pedidos-Pro-Release')||'';if(!serverRelease||serverRelease===CLIENT_RELEASE){sessionStorage.removeItem('nuvasto:release-reload');return}
     const already=sessionStorage.getItem('nuvasto:release-reload');if(already===serverRelease)return;sessionStorage.setItem('nuvasto:release-reload',serverRelease);
     const registration=await navigator.serviceWorker?.getRegistration?.();await registration?.update?.().catch(()=>{});setTimeout(()=>location.reload(),180);
-  }catch(error){console.warn('release_check_failed',error)}
+  }catch(error){console.warn('release_check_failed',error)}finally{setTimeout(()=>{releaseCheckPromise=null},30000)}})();
+  return releaseCheckPromise;
 }
 
 $('#loginForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;setBusy(button,true,'Ingresando…');try{const email=$('#loginEmail').value.trim();const response=await api('/api/auth/login',{method:'POST',timeout:15000,json:{email,password:$('#loginPassword').value}});state.token=response.token;localStorage.setItem('pp:token',state.token);localStorage.setItem('nuvasto:last-email',email);state.me=await api('/api/me',{fresh:true,persist:true,timeout:8000});try{await refreshBranding(true)}catch(error){console.warn('branding_load_failed',error)}showApp();finishStartup();verifyClientRelease();await openRoute('dashboard','',{replace:true});preloadOperations();toast('Sesión iniciada')}catch(error){if(!error?.silent)toast(error.message,'error')}finally{setBusy(button,false)}});
-$('#openBootstrap').onclick=openBootstrap;$('#logoutButton').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST',json:{}})}catch{}preloadScheduled=false;logoutLocal()};$('#primaryAction').onclick=()=>handleAction(state.view==='invoices'?'analyze-invoice':state.view==='catalog'?'new-product':state.view==='suppliers'?'new-supplier':state.view==='team'?'new-user':'new-order');$('#mobileCreate').onclick=()=>openOrder();$('#themeButton').onclick=()=>{const current=document.documentElement.dataset.theme;setTheme(current==='system'?'light':current==='light'?'dark':'system')};$('#syncChip').onclick=syncMutations;$('#workspaceCard').addEventListener('click',openWorkspaceSwitcher);$('#mobileWorkspaceButton').addEventListener('click',openWorkspaceSwitcher);$('#mobileUserButton').addEventListener('click',openWorkspaceSwitcher);$('#globalSearch').addEventListener('focus',()=>openCommand());$('#globalSearch').addEventListener('keydown',event=>{if(event.key==='Enter')openCommand()});
+$('#openBootstrap').onclick=openBootstrap;$('#logoutButton').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST',json:{}})}catch{}preloadScheduled=false;invalidateGuarded();logoutLocal()};$('#primaryAction').onclick=()=>handleAction(state.view==='invoices'?'analyze-invoice':state.view==='catalog'?'new-product':state.view==='suppliers'?'new-supplier':state.view==='team'?'new-user':'new-order');$('#mobileCreate').onclick=()=>openOrder();$('#themeButton').onclick=()=>{const current=document.documentElement.dataset.theme;setTheme(current==='system'?'light':current==='light'?'dark':'system')};$('#syncChip').onclick=syncMutations;$('#workspaceCard').addEventListener('click',openWorkspaceSwitcher);$('#mobileWorkspaceButton').addEventListener('click',openWorkspaceSwitcher);$('#mobileUserButton').addEventListener('click',openWorkspaceSwitcher);$('#globalSearch').addEventListener('focus',()=>openCommand());$('#globalSearch').addEventListener('keydown',event=>{if(event.key==='Enter')openCommand()});
 function openCommand(){$('#commandMenu').classList.remove('hidden');$('#commandInput').value='';renderCommands();setTimeout(()=>$('#commandInput').focus(),0)}
 function renderCommands(){const query=$('#commandInput').value.toLowerCase(),commands=[['dashboard','Ir a Resumen'],['receiving','Abrir pedidos por emitir'],['invoices','Ir a Documentos'],['history','Abrir historial'],['operations','Abrir Operaciones'],...(isAdmin()?[['professional','Control profesional Nuvasto'],['enterprise','Centro profesional y SaaS'],['team','Administrar usuarios'],['audit','Ver auditoría']]:[]),['settings','Abrir configuración']].filter(([,label])=>label.toLowerCase().includes(query));$('#commandResults').innerHTML=commands.map(([view,label])=>`<button class="command-result" data-command="${view}"><span>${label}</span><span>↵</span></button>`).join('');$$('[data-command]').forEach(node=>node.onclick=()=>{$('#commandMenu').classList.add('hidden');openRoute(node.dataset.command,node.dataset.command==='operations'?'home':'').catch(error=>{if(!error?.silent)toast(error.message,'error')})})}
 $('#commandInput').addEventListener('input',renderCommands);$('#commandMenu').addEventListener('click',event=>{if(event.target===$('#commandMenu'))$('#commandMenu').classList.add('hidden')});document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();openCommand()}if(event.key==='Escape')$('#commandMenu').classList.add('hidden')});window.addEventListener('online',()=>{state.online=true;updateSyncChip().catch(()=>{});syncMutations().catch(error=>console.warn('sync_recovery_failed',error));toast('Conexión recuperada')});window.addEventListener('offline',()=>{state.online=false;updateSyncChip().catch(()=>{});toast('Modo offline','error')});
