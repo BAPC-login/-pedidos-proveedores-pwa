@@ -2,14 +2,15 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {readFile} from 'node:fs/promises';
 
-const [files,app,index,css,sw,combined,pkg]=await Promise.all([
+const [files,app,index,css,sw,combined,pkg,r51]=await Promise.all([
   readFile(new URL('../web/app-file-actions.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app.js',import.meta.url),'utf8'),
   readFile(new URL('../worker/src/index-v45.js',import.meta.url),'utf8'),
   readFile(new URL('../web/native-performance.css',import.meta.url),'utf8'),
   readFile(new URL('../web/sw.js',import.meta.url),'utf8'),
   readFile(new URL('../../worker/src/combined.js',import.meta.url),'utf8'),
-  readFile(new URL('../package.json',import.meta.url),'utf8')
+  readFile(new URL('../package.json',import.meta.url),'utf8'),
+  readFile(new URL('../web/app-r51-ux.js',import.meta.url),'utf8')
 ]);
 
 assert.doesNotMatch(files,/openShareReady|Compartir ahora|ARCHIVO LISTO/);
@@ -24,9 +25,18 @@ assert.match(app,/NuvastoExperienceV43\?\.primeOperations/);
 assert.match(app,/guardedInflight/);
 assert.match(app,/GUARDED_TTL=2\*60\*1000/);
 assert.match(app,/seedResponseCache/);
+assert.match(app,/initializeMasterOrderingV42\(\)/);
+assert.match(app,/initializeR51UX\(\)/);
+assert.match(app,/orders\(\?:\\\/\[\^\/\]\+\)\?/);
 assert.doesNotMatch(app,/api\('\/api\/orders',\{persist:true,ttl:20000/);
 assert.doesNotMatch(app,/api\('\/api\/invoices',\{persist:true,ttl:30000/);
 assert.doesNotMatch(app,/api\('\/api\/notifications',\{persist:true,ttl:20000/);
+
+assert.match(r51,/r51BulkShare/);
+assert.match(r51,/r51CenterFilter/);
+assert.match(r51,/hydrateEditOrder/);
+assert.match(r51,/keyboardSafety/);
+assert.match(r51,/Por emitir/);
 
 assert.match(index,/path==='\/api\/operations-bootstrap-v45'\|\|path==='\/api\/operations-bootstrap-v43'/);
 assert.match(index,/RELEASE='2026\.08\.08\.50'/);
@@ -35,11 +45,12 @@ for(const token of ['directNativeShareV45:true','legacyBootstrapAliasV45:true','
 assert.match(css,/\.native-share-preparing/);
 assert.match(css,/\.mobile-workspace-button>span,.mobile-workspace-button>b\{display:none!important\}/);
 assert.match(css,/grid-template-areas:'back heading \. actions' 'search search search search'/);
-assert.match(sw,/nuvasto-v50-safari-navigation/);
+assert.match(sw,/nuvasto-v51-workflow-completion/);
+assert.match(sw,/app-r51-ux\.js/);
 assert.match(combined,/direct-share-runtime · 2026\.08\.07\.47/);
 assert.match(combined,/request-coalescing-hotfix · 2026\.08\.08\.48/);
 assert.match(combined,/PLATFORM_RELEASE='2026\.08\.08\.50'/);
 assert.match(pkg,/workflow-v45-hotfix\.test\.mjs/);
 
-for(const file of ['../web/app-file-actions.js','../web/app.js','../worker/src/index-v45.js'])execFileSync(process.execPath,['--check',new URL(file,import.meta.url).pathname],{stdio:'inherit'});
-console.log('workflow r48 hotfix direct share, request coalescing, single bootstrap and stale-client handshake: OK');
+for(const file of ['../web/app-file-actions.js','../web/app.js','../web/app-r51-ux.js','../web/app-experience-keyboard.js','../worker/src/index-v45.js'])execFileSync(process.execPath,['--check',new URL(file,import.meta.url).pathname],{stdio:'inherit'});
+console.log('workflow r51 mobile completion, request coalescing, ordering and stale-client handshake: OK');
