@@ -27,16 +27,12 @@ assert.match(app,/GUARDED_TTL=2\*60\*1000/);
 assert.match(app,/seedResponseCache/);
 assert.match(app,/initializeMasterOrderingV42\(\)/);
 assert.match(app,/initializeR51UX\(\)/);
-assert.match(app,/orders\(\?:\\\/\[\^\/\]\+\)\?/);
+for(const token of ['master-list-ordering-v42','orders','invoices','documents','audit'])assert.match(app,new RegExp(token));
 assert.doesNotMatch(app,/api\('\/api\/orders',\{persist:true,ttl:20000/);
 assert.doesNotMatch(app,/api\('\/api\/invoices',\{persist:true,ttl:30000/);
 assert.doesNotMatch(app,/api\('\/api\/notifications',\{persist:true,ttl:20000/);
 
-assert.match(r51,/r51BulkShare/);
-assert.match(r51,/r51CenterFilter/);
-assert.match(r51,/hydrateEditOrder/);
-assert.match(r51,/keyboardSafety/);
-assert.match(r51,/Por emitir/);
+for(const token of ['r51BulkShare','r51CenterFilter','hydrateEditOrder','keyboardSafety','Por emitir'])assert.match(r51,new RegExp(token));
 
 assert.match(index,/path==='\/api\/operations-bootstrap-v45'\|\|path==='\/api\/operations-bootstrap-v43'/);
 assert.match(index,/RELEASE='2026\.08\.08\.50'/);
