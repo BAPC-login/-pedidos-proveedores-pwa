@@ -32,6 +32,19 @@ async function operationsBootstrap(request,env,ctx){
   settled.forEach((result,index)=>{const[cacheKey,target]=definitions[index];if(result.status==='fulfilled')cache[cacheKey]=result.value;else warnings.push({target,message:String(result.reason?.message||result.reason||'Error de carga')})});
   return{cache,warnings,coreReady:Boolean(cache['/api/categories']&&cache['/api/cost-centers']&&cache['/api/products']),generatedAt:new Date().toISOString(),strategy:'single-roundtrip-no-schema-hotpath-v45'};
 }
+async function screenBootstrap(request,env,ctx,screen){
+  await authenticate(request,env);
+  const definitions=screen==='history'?
+    [['/api/orders','/api/orders'],['/api/invoices','/api/invoices'],['/api/audit','/api/audit']]:
+    screen==='receiving'?
+      [['/api/orders','/api/orders']]:
+      screen==='master'?
+        [['/api/categories','/api/categories'],['/api/cost-centers','/api/cost-centers'],['/api/suppliers','/api/suppliers?active=all'],['/api/products','/api/products'],['/api/locations','/api/locations'],['/api/supplier-assets','/api/supplier-assets']]:[];
+  if(!definitions.length)throw new HttpError(400,'Pantalla de precarga no válida','invalid_screen_bootstrap');
+  const settled=await Promise.allSettled(definitions.map(([,target])=>internal(request,env,ctx,target))),cache={},warnings=[];
+  settled.forEach((result,index)=>{const[cacheKey,target]=definitions[index];if(result.status==='fulfilled')cache[cacheKey]=result.value;else warnings.push({target,message:String(result.reason?.message||result.reason||'Error de carga')})});
+  return{screen,cache,warnings,generatedAt:new Date().toISOString(),strategy:'screen-bootstrap-r52'};
+}
 async function usageValue(env,orgId,metric){const row=await env.DB.prepare('SELECT quantity FROM usage_counters WHERE org_id = ? AND month_key = ? AND metric = ?').bind(orgId,monthKey(),metric).first();return Number(row?.quantity||0)}
 async function incrementUsage(env,orgId,metric,amount){await env.DB.prepare(`INSERT INTO usage_counters (org_id,month_key,metric,quantity,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(org_id,month_key,metric) DO UPDATE SET quantity=quantity+excluded.quantity,updated_at=excluded.updated_at`).bind(orgId,monthKey(),metric,Number(amount||0),nowIso()).run()}
 async function directR2Upload(request,env,actor,url){
@@ -80,6 +93,7 @@ export default{async fetch(request,env,ctx){
   const startedAt=Date.now(),url=new URL(request.url),method=request.method.toUpperCase(),path=url.pathname;
   try{
     if(method==='GET'&&(path==='/api/operations-bootstrap-v45'||path==='/api/operations-bootstrap-v43'))return decorate(ok(await operationsBootstrap(request,env,ctx),request,env),request,env,startedAt,'bootstrap-v45');
+    if(method==='GET'&&path==='/api/screen-bootstrap-v52')return decorate(ok(await screenBootstrap(request,env,ctx,url.searchParams.get('screen')||''),request,env),request,env,startedAt,'screen-bootstrap-r52');
     if(method==='POST'&&path==='/api/files/direct-v45'){const actor=await authenticate(request,env);return decorate(ok({file:await directR2Upload(request,env,actor,url)},request,env),request,env,startedAt,'r2-stream-v45')}
     let worker=v40,layer='core-v40';
     if(isV44(path,method)){worker=v44;layer='v44-guarded'}
@@ -87,7 +101,7 @@ export default{async fetch(request,env,ctx){
     else if(isV43(path,method)){worker=v43;layer='v43-explicit'}
     else if(isV41(path,method)){worker=v41;layer='v41-explicit'}
     const response=await worker.fetch(request,env,ctx);
-    if(path==='/health'&&response.ok){const body=await response.clone().json().catch(()=>null);if(body)return decorate(ok({...body,version:RELEASE_VERSION,nativePerformanceV45:true,schemaOffCriticalPathV45:true,requestCoalescingV45:true,operationsBootstrapV45:true,directR2StreamingV45:true,directNativeShareV45:true,legacyBootstrapAliasV45:true,clientReleaseHandshakeV45:true,notificationLoopGuardV49:true,cacheFirstPwaV49:true,lightweightReleaseHandshakeV49:true,singleStartupRouteV49:true,redirectSafeNavigationV50:true},request,env),request,env,startedAt,layer)}
+    if(path==='/health'&&response.ok){const body=await response.clone().json().catch(()=>null);if(body)return decorate(ok({...body,version:RELEASE_VERSION,nativePerformanceV45:true,schemaOffCriticalPathV45:true,requestCoalescingV45:true,operationsBootstrapV45:true,directR2StreamingV45:true,directNativeShareV45:true,legacyBootstrapAliasV45:true,clientReleaseHandshakeV45:true,notificationLoopGuardV49:true,cacheFirstPwaV49:true,lightweightReleaseHandshakeV49:true,singleStartupRouteV49:true,redirectSafeNavigationV50:true,screenBootstrapR52:true,performanceIndexesR52:true},request,env),request,env,startedAt,layer)}
     return decorate(response,request,env,startedAt,layer);
   }catch(error){return decorate(errorResponse(error,request,env),request,env,startedAt,'v45-error')}
 }};
