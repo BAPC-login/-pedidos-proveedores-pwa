@@ -26,12 +26,12 @@ import {initializeNuvastoV21} from './app-nuvasto-v21.js';
 import {initializeNuvastoUXV22} from './app-ux-v22.js';
 import {initializeNuvastoV23} from './app-nuvasto-v23.js';
 import {initializeProfessionalHotfixV24} from './app-professional-hotfix-v24.js';
+import {initializeMasterOrderingV42} from './app-v42-master-ordering.js';
+import {initializeR51UX} from './app-r51-ux.js';
 
 const CLIENT_RELEASE='2026.08.08.50';
 document.documentElement.dataset.clientRelease=CLIENT_RELEASE;
 
-// r48: evita tormentas de requests en navegación móvil. El core ya deduplica por vista;
-// esta capa deduplica también entre módulos heredados y conserva maestros brevemente.
 const nativeFetch=window.fetch.bind(window);
 const guardedInflight=new Map();
 const guardedCache=new Map();
@@ -41,7 +41,7 @@ let workerBackoffUntil=0;
 function guardedPath(input){try{return new URL(typeof input==='string'?input:input?.url,location.href).pathname}catch{return ''}}
 function guardedMethod(input,init){return String(init?.method||input?.method||'GET').toUpperCase()}
 function guardedKey(input,init){const url=new URL(typeof input==='string'?input:input?.url,location.href);const headers=new Headers(init?.headers||input?.headers||{});return `${url.pathname}${url.search}|${headers.get('Authorization')||''}`}
-function guardable(path){return /^\/api\/(categories|cost-centers|suppliers|products|locations|supplier-assets|operations-bootstrap-v45|operations-bootstrap-v43|master-list-ordering-v42)(?:\/|\?|$)/.test(path)}
+function guardable(path){return /^\/api\/(categories|cost-centers|suppliers|products|locations|supplier-assets|operations-bootstrap-v45|operations-bootstrap-v43|master-list-ordering-v42|orders(?:\/[^/]+)?|invoices|notifications(?:-v41)?|audit|documents|dashboard\/layout)(?:\/|\?|$)/.test(path)}
 function cloneEntry(entry){return new Response(entry.body,{status:entry.status,statusText:entry.statusText,headers:new Headers(entry.headers)})}
 async function snapshotResponse(response){const body=await response.clone().arrayBuffer();return{body,status:response.status,statusText:response.statusText,headers:[...response.headers.entries()],time:Date.now()}}
 function invalidateGuarded(){guardedCache.clear();guardedInflight.clear()}
@@ -64,7 +64,7 @@ window.fetch=async(input,init={})=>{
 
 if(!document.querySelector('link[data-native-performance]')){const link=document.createElement('link');link.rel='stylesheet';link.href='./native-performance.css';link.dataset.nativePerformance='45';document.head.append(link)}
 
-initializeScreenStateHotfix();initializeNuvastoV21();initializeNuvastoV23();initializeBrandingFeatures();initializeProcurementSettings();initializeProcurementEntry();initializeOrderCoreV15();initializeCompanyLogoUploader();initializeFileActions();initializeSettingsPanelsV13();initializeExperience();initializeTelemetryV13();initializeNavigationV14();initializeCommercialV16();initializeImportPreviewV17();initializeMasterV18();initializeNuvastoUXV22();initializeHistoryV18();initializePdfV18();initializeWorkflowV19();initializeSsoV20();initializeProfessionalV20();initializeHistorySemanticV20();initializeProfessionalHotfixV24();initializeCheckoutInvoiceV29();
+initializeScreenStateHotfix();initializeNuvastoV21();initializeNuvastoV23();initializeBrandingFeatures();initializeProcurementSettings();initializeProcurementEntry();initializeOrderCoreV15();initializeCompanyLogoUploader();initializeFileActions();initializeSettingsPanelsV13();initializeExperience();initializeTelemetryV13();initializeNavigationV14();initializeCommercialV16();initializeImportPreviewV17();initializeMasterV18();initializeMasterOrderingV42();initializeR51UX();initializeNuvastoUXV22();initializeHistoryV18();initializePdfV18();initializeWorkflowV19();initializeSsoV20();initializeProfessionalV20();initializeHistorySemanticV20();initializeProfessionalHotfixV24();initializeCheckoutInvoiceV29();
 
 let startupFinished=false;
 let startupWatchdog=null;
