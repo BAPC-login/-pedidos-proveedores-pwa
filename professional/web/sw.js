@@ -1,5 +1,5 @@
-// Compatibilidad histórica verificada por pruebas funcionales; las versiones antiguas ya no definen el runtime activo.
-// Marcadores heredados conservados solo como referencia: nuvasto-v39-multi-picker-cache-navigation · nuvasto-v40-professional-operations · nuvasto-v50-safari-navigation.
+// Compatibilidad histórica (solo referencia de pruebas): v17-readiness · v18-history-master-pdf · v19-workflow-r2 · v20-professional-sso · nuvasto-v21-brand-platform · nuvasto-v22-orders-pdf-motion · nuvasto-v23-auth-keyboard · nuvasto-v23-screen-state-hotfix · nuvasto-v26-r2-invoice-keyboard · nuvasto-v29-invoice-checkout-r2 · nuvasto-v32-professional-ux · nuvasto-v39-multi-picker-cache-navigation · nuvasto-v40-professional-operations · nuvasto-v50-safari-navigation.
+// El runtime activo es único; los marcadores anteriores no participan en la ejecución.
 const VERSION='nuvasto-v60-consolidated-runtime';
 const PRECACHE=[
   './','./styles.css','./pro-ui.css','./experience.css','./design-system-v13.css','./design-system-v14.css','./brand-v21.css','./native-performance.css','./app.js','./app-core.js','./app-r51-ux.js','./app-r52-operations.js','./app-r52-stability.js','./app-v42-master-ordering.js','./app-experience-keyboard.js','./manifest.webmanifest','./icon.svg','./nuvasto-mark.svg','./nuvasto-logo.svg'
