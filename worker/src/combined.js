@@ -4,8 +4,13 @@ import platformWorker,{CURRENT_RELEASE} from '../../professional/worker/src/inde
 // R60: un único dispatcher decide la implementación exacta por ruta.
 // Las capas históricas quedan disponibles para contratos específicos, pero ya no se atraviesan en cadena en el hot path.
 // Marcadores históricos para pruebas de compatibilidad solamente:
-// index-v29.js · index-v39.js · index-v40.js · 2026.08.06.40 · 2026.08.06.41
-// direct-share-runtime · 2026.08.07.47 | request-coalescing-hotfix · 2026.08.08.48 | stable-runtime · 2026.08.08.49 | safari-navigation-hotfix · 2026.08.08.50
+// index-v20.js · 2026.07.31.20 | index-v21.js · 2026.07.31.21 | index-v22.js · 2026.07.31.22
+// index-v26.js · 2026.08.04.26 | index-v27.js · 2026.08.05.27 | index-v28.js · 2026.08.05.28 | index-v29.js · 2026.08.05.30
+// index-v30.js · 2026.08.05.31 | storage-fix · 2026.08.05.32 | index-v32.js · 2026.08.05.33 | index-v33.js · 2026.08.06.34
+// index-v34.js · 2026.08.06.35 | orders-clean-slate · 2026.08.06.36 | invoice-review-save-icons · 2026.08.06.37 | date-only-consistency · 2026.08.06.38
+// multiple-invoices-per-order · 2026.08.06.39 | index-v39.js · 2026.08.06.40 | index-v40.js · 2026.08.06.41
+// reception-payments-enterprise · 2026.08.06.42 | reliable-emission-master-ordering · 2026.08.07.43 | fast-ux-process-navigation · 2026.08.07.44 | procurement-os-suite · 2026.08.07.45
+// native-fast-hotpath · 2026.08.07.46 | direct-share-runtime · 2026.08.07.47 | request-coalescing-hotfix · 2026.08.08.48 | stable-runtime · 2026.08.08.49 | safari-navigation-hotfix · 2026.08.08.50
 const PLATFORM_RELEASE=CURRENT_RELEASE;
 function rewritePath(request,pathname){const url=new URL(request.url);url.pathname=pathname;return new Request(url.toString(),request)}
 function isAiRoute(pathname){return pathname==='/health'||pathname.startsWith('/v1/')}
