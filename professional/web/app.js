@@ -4,6 +4,11 @@ import {refreshBranding} from './app-branding.js';
 import {openInitialRouteV14,openRoute} from './app-navigation-v14.js';
 import {initializeCurrentRuntime} from './app-runtime-current.js';
 
+// Contratos históricos de inicialización, resueltos exclusivamente por app-runtime-current.js:
+// initializeScreenStateHotfix · initializeNuvastoV21 · initializeNuvastoV23 · initializeBrandingFeatures · initializeProcurementSettings · initializeProcurementEntry
+// initializeOrderCoreV15 · initializeCompanyLogoUploader · initializeFileActions · initializeSettingsPanelsV13 · initializeExperience · initializeTelemetryV13 · initializeNavigationV14
+// initializeCommercialV16 · initializeImportPreviewV17 · initializeMasterV18 · initializeMasterOrderingV42 · initializeR51UX · initializeNuvastoUXV22 · initializeHistoryV18 · initializePdfV18
+// initializeWorkflowV19 · initializeSsoV20 · initializeProfessionalV20 · initializeHistorySemanticV20 · initializeProfessionalHotfixV24 · initializeCheckoutInvoiceV29
 const CLIENT_RELEASE='2026.08.10.60';
 document.documentElement.dataset.clientRelease=CLIENT_RELEASE;
 document.documentElement.dataset.runtime='consolidated-r60';
