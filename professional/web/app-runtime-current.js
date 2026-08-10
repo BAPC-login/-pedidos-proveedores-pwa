@@ -28,9 +28,16 @@ import {initializeMasterOrderingV42} from './app-v42-master-ordering.js';
 import {initializeR51UX} from './app-r51-ux.js';
 
 let initialized=false;
+function loadCurrentEnhancers(){
+  // app-core es el único coordinador de red. R52 conserva su UI, pero su antiguo fetch shield queda desactivado.
+  window.__nuvastoR52FetchShield=true;
+  Promise.all([
+    import('./app-r52-operations.js'),
+    import('./app-r52-stability.js')
+  ]).catch(error=>console.warn('current_enhancers_load_failed',error));
+}
 export function initializeCurrentRuntime(){
   if(initialized)return;initialized=true;
-  // Orden único y explícito. Los módulos históricos no deben autoinicializarse desde otros entrypoints.
   const initializers=[
     initializeScreenStateHotfix,initializeNuvastoV21,initializeNuvastoV23,initializeBrandingFeatures,
     initializeProcurementSettings,initializeProcurementEntry,initializeOrderCoreV15,initializeCompanyLogoUploader,
@@ -40,5 +47,6 @@ export function initializeCurrentRuntime(){
     initializeProfessionalV20,initializeHistorySemanticV20,initializeProfessionalHotfixV24,initializeCheckoutInvoiceV29
   ];
   for(const initialize of initializers)initialize();
+  loadCurrentEnhancers();
   document.documentElement.dataset.frontendRuntime='current-r60';
 }
