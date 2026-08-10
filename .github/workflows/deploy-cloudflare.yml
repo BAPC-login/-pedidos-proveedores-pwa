@@ -57,37 +57,36 @@ jobs:
           wranglerVersion: '4.114.0'
           command: deploy --config wrangler.toml --keep-vars
 
-      - name: Verify deployed release, storage and Safari-safe runtime r50
+      - name: Verify deployed consolidated runtime
         id: verify
         shell: bash
         run: |
-          expected=$(node -e "const s=require('fs').readFileSync('worker/src/combined.js','utf8');const m=s.match(/PLATFORM_RELEASE='([^']+)'/);if(!m)process.exit(1);process.stdout.write(m[1])")
+          expected=$(node --input-type=module -e "import('./professional/worker/src/index-current.js').then(m=>process.stdout.write(m.CURRENT_RELEASE))")
           url='https://pedidos-pro-ai.botreservasmultilocal.workers.dev/platform/health'
           for attempt in $(seq 1 24); do
             body=$(curl --fail --silent --show-error --max-time 20 --dump-header /tmp/headers "$url" 2>/dev/null || true)
             release=$(grep -Ei '^x-nuvasto-release:|^x-pedidos-pro-release:' /tmp/headers 2>/dev/null | head -1 | tr -d '\r' | awk '{print $2}' || true)
+            runtime=$(grep -Ei '^x-nuvasto-runtime:' /tmp/headers 2>/dev/null | head -1 | tr -d '\r' | awk '{print $2}' || true)
             ready=$(PLATFORM_HEALTH="$body" node <<'NODE'
           try {
             const h=JSON.parse(process.env.PLATFORM_HEALTH||'{}');
             const storage=h.ok===true&&h.r2Configured===true&&h.r2Required===true&&h.r2Ready===true&&h.storageBackend==='r2';
-            const v42=h.reliableEmissionV42===true&&h.emissionPdfVerification===true&&h.masterProductOrdering===true;
-            const v43=h.experienceV43===true&&h.operationsBootstrapV43===true&&h.productLifecycleV43===true&&h.professionalDashboardV43===true&&h.processNavigationV43===true&&h.floatingOrderActionsV43===true&&h.settingsPolicyDedupV43===true;
-            const v44=h.procurementOsV44===true&&h.canonicalMasterDataV44===true&&h.masterListAssistV44===true&&h.procurementIntelligenceV44===true&&h.financePlanningV44===true&&h.receptionEvidenceV44===true&&h.granularPermissionsV44===true&&h.jobQueueV44===true&&h.observabilityV44===true&&h.globalSearchV44===true&&h.productionE2EContractV44===true;
-            const v45=h.nativePerformanceV45===true&&h.schemaOffCriticalPathV45===true&&h.requestCoalescingV45===true&&h.operationsBootstrapV45===true&&h.directR2StreamingV45===true;
-            const r49=h.notificationLoopGuardV49===true&&h.cacheFirstPwaV49===true&&h.lightweightReleaseHandshakeV49===true&&h.singleStartupRouteV49===true;
-            const r50=h.redirectSafeNavigationV50===true;
-            process.stdout.write(storage&&v42&&v43&&v44&&v45&&r49&&r50?'true':'false');
+            const purchasing=h.reliableEmissionV42===true&&h.emissionPdfVerification===true&&h.masterProductOrdering===true;
+            const experience=h.operationsBootstrapV43===true&&h.productLifecycleV43===true&&h.processNavigationV43===true;
+            const procurement=h.procurementOsV44===true&&h.canonicalMasterDataV44===true&&h.granularPermissionsV44===true&&h.observabilityV44===true;
+            const performance=h.requestCoalescingV45===true&&h.operationsBootstrapV45===true&&h.cacheFirstPwaV49===true&&h.redirectSafeNavigationV50===true&&h.screenBootstrapR52===true&&h.performanceIndexesR52===true;
+            process.stdout.write(storage&&purchasing&&experience&&procurement&&performance?'true':'false');
           } catch { process.stdout.write('false'); }
           NODE
             )
-            if [ "$release" = "$expected" ] && [ "$ready" = "true" ]; then
-              echo "Nuvasto $release desplegado con R2, runtime r49 y navegación Safari r50 verificados."
+            if [ "$release" = "$expected" ] && [ "$runtime" = "consolidated-r60" ] && [ "$ready" = "true" ]; then
+              echo "Nuvasto $release desplegado y verificado con runtime consolidado r60."
               exit 0
             fi
-            echo "Esperando despliegue ${attempt}/24 · release=${release:-none} · v42+v43+v44+v45+r49+r50+r2=$ready"
+            echo "Esperando despliegue ${attempt}/24 · release=${release:-none} · runtime=${runtime:-none} · contratos=$ready"
             sleep 10
           done
-          echo "::error::Cloudflare no activó el release esperado con las capacidades v42/v43/v44/v45/r49/r50 y R2."
+          echo "::error::Cloudflare no activó el release esperado con runtime consolidado y contratos funcionales."
           exit 1
 
       - name: Synthetic procurement journey on dedicated E2E tenant
@@ -108,10 +107,10 @@ jobs:
         run: |
           if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.synthetic.outcome }}" != "failure" ]; then
             state=success
-            description='Nuvasto r50 Safari-safe publicado y verificado en Cloudflare'
+            description='Nuvasto r60 consolidado publicado y verificado en Cloudflare'
           else
             state=failure
-            description='El despliegue de Nuvasto r50 no quedó verificado'
+            description='El despliegue consolidado de Nuvasto no quedó verificado'
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state="$state" \
