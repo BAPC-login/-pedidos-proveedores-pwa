@@ -23,11 +23,9 @@ function decorate(response,request,env,startedAt,layer){
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
 
-function isCatalogMutation(path,method){
-  return ['POST','PATCH','PUT','DELETE'].includes(method)&&(/^\/api\/(products|categories|suppliers|cost-centers|locations)(\/|$)/.test(path)||path.startsWith('/api/catalog/import'));
-}
+function isCatalogMutation(path,method){return ['POST','PATCH','PUT','DELETE'].includes(method)&&(/^\/api\/(products|categories|suppliers|cost-centers|locations)(\/|$)/.test(path)||path.startsWith('/api/catalog/import'))}
 function isV44(path,method){
-  if(path==='/health'||path.startsWith('/api/procurement-os-v44')||path.startsWith('/api/master-data-v44')||path.startsWith('/api/master-list-assist-v44')||path.startsWith('/api/master-list-favorites-v44')||path.startsWith('/api/procurement-intelligence-v44')||path.startsWith('/api/finance-planning-v44')||path.startsWith('/api/permissions-v44')||path.startsWith('/api/my-permissions-v44')||path.startsWith('/api/reception-evidence-v44')||path.startsWith('/api/jobs-v44')||path.startsWith('/api/system-health-v44')||path.startsWith('/api/global-search-v44'))return true;
+  if(path.startsWith('/api/procurement-os-v44')||path.startsWith('/api/master-data-v44')||path.startsWith('/api/master-list-assist-v44')||path.startsWith('/api/master-list-favorites-v44')||path.startsWith('/api/procurement-intelligence-v44')||path.startsWith('/api/finance-planning-v44')||path.startsWith('/api/permissions-v44')||path.startsWith('/api/my-permissions-v44')||path.startsWith('/api/reception-evidence-v44')||path.startsWith('/api/jobs-v44')||path.startsWith('/api/system-health-v44')||path.startsWith('/api/global-search-v44'))return true;
   if(isCatalogMutation(path,method))return true;
   if(method==='POST'&&path==='/api/order-batches/v2')return true;
   if(method==='POST'&&/^\/api\/order-batches\/[^/]+\/emit$/.test(path))return true;
@@ -48,21 +46,17 @@ function isV41(path,method){
   return false;
 }
 function choose(path,method){
-  // r52/r45 endpoints remain implemented in their current module, but ordinary hot reads bypass all newer wrappers.
+  // Health conserva el contrato acumulado, pero no forma parte del hot path de navegación.
+  if(path==='/health')return[v45,'compat-health'];
   if(path==='/api/operations-bootstrap-v45'||path==='/api/operations-bootstrap-v43'||path==='/api/screen-bootstrap-v52'||path==='/api/files/direct-v45')return[v45,'current-special'];
   if(isV44(path,method))return[v44,'v44-feature'];
   if(path==='/api/master-list-ordering-v42'||(method==='POST'&&/^\/api\/order-batches\/[^/]+\/regenerate-documents$/.test(path)))return[v42,'v42-feature'];
   if(method==='PATCH'&&/^\/api\/products\/[^/]+\/status$/.test(path))return[v43,'v43-feature'];
   if(isV41(path,method))return[v41,'v41-feature'];
-  if(path==='/api/dashboard/analytics-v40'||method==='POST'&&path==='/api/order-batches/v2'||method==='POST'&&/^\/api\/order-batches\/[^/]+\/emit$/.test(path))return[v40,'v40-feature'];
+  if(path==='/api/dashboard/analytics-v40'||(method==='POST'&&path==='/api/order-batches/v2')||(method==='POST'&&/^\/api\/order-batches\/[^/]+\/emit$/.test(path)))return[v40,'v40-feature'];
   if(method==='GET'&&(path==='/api/orders'||path==='/api/orders/advanced'))return[v40,'orders-hotpath'];
-  // Core reads and ordinary order/document detail now go straight to the canonical legacy core instead of traversing v40-v45.
+  // Lecturas y detalles ordinarios van directamente al core canónico, sin atravesar v40-v45.
   return[base,'core-hotpath'];
 }
 
-export default{async fetch(request,env,ctx){
-  const startedAt=Date.now(),url=new URL(request.url),method=request.method.toUpperCase(),path=url.pathname;
-  const[worker,layer]=choose(path,method);
-  const response=await worker.fetch(request,env,ctx);
-  return decorate(response,request,env,startedAt,layer);
-}};
+export default{async fetch(request,env,ctx){const startedAt=Date.now(),url=new URL(request.url),method=request.method.toUpperCase(),path=url.pathname;const[worker,layer]=choose(path,method);const response=await worker.fetch(request,env,ctx);return decorate(response,request,env,startedAt,layer)}};
