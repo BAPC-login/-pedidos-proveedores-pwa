@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {readFile} from 'node:fs/promises';
 
-const [current,combined,app,core,sw]=await Promise.all([
+const [current,combined,app,runtime,core,sw,indexHtml]=await Promise.all([
   readFile(new URL('../worker/src/index-current.js',import.meta.url),'utf8'),
   readFile(new URL('../../worker/src/combined.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app.js',import.meta.url),'utf8'),
+  readFile(new URL('../web/app-runtime-current.js',import.meta.url),'utf8'),
   readFile(new URL('../web/app-core.js',import.meta.url),'utf8'),
-  readFile(new URL('../web/sw.js',import.meta.url),'utf8')
+  readFile(new URL('../web/sw.js',import.meta.url),'utf8'),
+  readFile(new URL('../web/index.html',import.meta.url),'utf8')
 ]);
 
 assert.match(current,/CURRENT_RELEASE='2026\.08\.10\.60'/);
@@ -17,12 +19,19 @@ assert.match(current,/return\[v40,'orders-hotpath'\]/);
 assert.match(combined,/index-current\.js/);
 assert.doesNotMatch(combined,/platformWorker from '\.\.\/\.\.\/professional\/worker\/src\/index-v45\.js'/);
 assert.match(app,/CLIENT_RELEASE='2026\.08\.10\.60'/);
+assert.match(app,/initializeCurrentRuntime\(\)/);
 assert.doesNotMatch(app,/window\.fetch=async/);
 assert.doesNotMatch(app,/guardedInflight/);
+assert.match(runtime,/__nuvastoR52FetchShield=true/);
+assert.match(runtime,/loadCurrentEnhancers/);
 assert.match(core,/HOT_OPERATIONAL/);
 assert.match(core,/options\.cancelOnNavigate===true/);
 assert.match(core,/pendingRequests\.has\(cacheKey\)/);
 assert.match(sw,/nuvasto-v60-consolidated-runtime/);
+assert.match(sw,/app-runtime-current\.js/);
+assert.equal((indexHtml.match(/<script\s+type="module"/g)||[]).length,1,'index.html debe tener un único entrypoint JS');
+assert.match(indexHtml,/src="\.\/app\.js"/);
+assert.doesNotMatch(indexHtml,/src="\.\/app-r52-/);
 
-for(const file of ['../worker/src/index-current.js','../../worker/src/combined.js','../web/app.js','../web/app-core.js','../web/sw.js'])execFileSync(process.execPath,['--check',new URL(file,import.meta.url).pathname],{stdio:'inherit'});
-console.log('workflow r60 consolidated dispatcher, single request coordinator and PWA cutover: OK');
+for(const file of ['../worker/src/index-current.js','../../worker/src/combined.js','../web/app.js','../web/app-runtime-current.js','../web/app-core.js','../web/sw.js'])execFileSync(process.execPath,['--check',new URL(file,import.meta.url).pathname],{stdio:'inherit'});
+console.log('workflow r60 consolidated dispatcher, one frontend entrypoint and one request coordinator: OK');
