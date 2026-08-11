@@ -1,6 +1,7 @@
 name: Deploy Nuvasto to Cloudflare
 
 # Único pipeline de producción. Valida, despliega y verifica main.
+# El repositorio consolidado no mantiene pipelines paralelos ni legacy en main.
 on:
   push:
     branches: [main]
