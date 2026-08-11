@@ -1,5 +1,6 @@
 name: Deploy Nuvasto to Cloudflare
 
+# Único pipeline de producción. Valida, despliega y verifica main.
 on:
   push:
     branches: [main]
@@ -103,10 +104,10 @@ jobs:
         run: |
           if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.synthetic.outcome }}" != "failure" ]; then
             state=success
-            description='Nuvasto R56 publicado y verificado en Cloudflare'
+            description='Nuvasto publicado y verificado en Cloudflare'
           else
             state=failure
-            description='El despliegue de Nuvasto R56 no quedó verificado'
+            description='El despliegue de Nuvasto no quedó verificado'
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state="$state" \
