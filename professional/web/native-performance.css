@@ -16,6 +16,10 @@ button,a,input,select,textarea,[role="button"]{touch-action:manipulation}
 .native-share-preparing{position:relative;opacity:.66!important;cursor:wait!important}
 .native-share-preparing::after{content:"";width:13px;height:13px;flex:0 0 13px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:nuvasto-share-spin .7s linear infinite}
 @keyframes nuvasto-share-spin{to{transform:rotate(360deg)}}
+.r55-native-action-wrap{position:relative!important;display:inline-grid!important;align-self:stretch!important}
+.r55-native-action-wrap>button{width:100%!important;height:100%!important;pointer-events:none!important}
+.r55-native-action-select{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;opacity:.001!important;z-index:80!important;border:0!important;background:transparent!important;color:transparent!important;-webkit-appearance:menulist!important;appearance:auto!important}
+[data-core-quantity],[data-edit-quantity]{pointer-events:auto!important;touch-action:manipulation!important;-webkit-user-select:text!important;user-select:text!important}
 @media(max-width:600px){
   .topbar{grid-template-columns:40px 44px minmax(0,1fr) auto!important;grid-template-areas:'back heading . actions' 'search search search search'!important;column-gap:8px!important;row-gap:8px!important;padding-left:max(14px,env(safe-area-inset-left))!important;padding-right:max(14px,env(safe-area-inset-right))!important}
   .route-back{grid-area:back!important}
