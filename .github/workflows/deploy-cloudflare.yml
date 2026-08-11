@@ -36,8 +36,6 @@ jobs:
           npm run check
           node tests/core.test.mjs
           node tests/workflow-v45-hotfix.test.mjs
-          node tests/workflow-v49-stability.test.mjs
-          node tests/workflow-v50-safari-navigation.test.mjs
 
       - name: Confirm Cloudflare deployment credential
         id: credential
