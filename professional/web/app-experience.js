@@ -1,7 +1,6 @@
 import {$,state} from './app-core.js';
 import {setExperienceActive} from './app-experience-operations.js';
 import {enhanceSettings} from './app-experience-settings.js';
-import {initializeQuantityKeyboard} from './app-experience-keyboard.js';
 let initialized=false;
 function loadStyles(){
   if(!document.querySelector('link[data-experience-css]')){const link=document.createElement('link');link.rel='stylesheet';link.href='./experience.css';link.dataset.experienceCss='1';document.head.append(link)}
@@ -16,7 +15,7 @@ function injectNavigation(){
     const invoices=side.querySelector('[data-view="invoices"]');if(invoices){invoices.querySelector('span:last-of-type').textContent='Documentos';invoices.insertAdjacentHTML('afterend','<button class="nav-item" data-experience-view="history"><span class="nav-icon">◷</span><span>Historial</span></button>')}
     const settings=$('[data-view="settings"]');if(settings)settings.querySelector('span:last-of-type').textContent='Configuración';
   }
-  const bottom=$('.bottom-nav');if(bottom&&!bottom.dataset.experience){bottom.dataset.experience='1';bottom.innerHTML='<button class="bottom-item active" data-view="dashboard"><span>⌂</span><small>Inicio</small></button><button class="bottom-item" data-experience-view="receiving"><span>▤</span><small>Pedidos</small></button><button class="bottom-create" id="mobileCreate" type="button" aria-label="Nuevo archivo">＋</button><button class="bottom-item" data-experience-view="history"><span>◷</span><small>Historial</small></button><button class="bottom-item" data-view="settings"><span>☰</span><small>Más</small></button>'}
+  const bottom=$('.bottom-nav');if(bottom&&!bottom.dataset.experience){bottom.dataset.experience='1';bottom.innerHTML='<button class="bottom-item active" data-view="dashboard"><span>⌂</span><small>Inicio</small></button><button class="bottom-item" data-view="orders"><span>▤</span><small>Por emitir</small></button><button class="bottom-create" id="mobileCreate" type="button" aria-label="Nuevo archivo">＋</button><button class="bottom-item" data-experience-view="history"><span>◷</span><small>Historial</small></button><button class="bottom-item" data-view="settings"><span>☰</span><small>Más</small></button>'}
 }
 function refreshExperience(event){
   injectNavigation();
@@ -25,7 +24,7 @@ function refreshExperience(event){
   if(!['receiving','history','operations'].includes(view))setExperienceActive(view);
 }
 export function initializeExperience(){
-  if(initialized)return;initialized=true;loadStyles();injectNavigation();initializeQuantityKeyboard();
+  if(initialized)return;initialized=true;loadStyles();injectNavigation();
   window.addEventListener('pedidos:view-rendered',refreshExperience);
   requestAnimationFrame(()=>refreshExperience());
 }
