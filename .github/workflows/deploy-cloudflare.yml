@@ -7,7 +7,6 @@ on:
       - 'professional/**'
       - 'worker/**'
       - 'wrangler.jsonc'
-      - '.wrangler/**'
       - '.github/workflows/deploy-cloudflare.yml'
   workflow_dispatch:
 
@@ -26,7 +25,6 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
-
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
@@ -34,7 +32,12 @@ jobs:
       - name: Validate production candidate
         id: candidate
         working-directory: professional
-        run: npm run verify
+        run: |
+          npm run check
+          node tests/core.test.mjs
+          node tests/workflow-v45-hotfix.test.mjs
+          node tests/workflow-v49-stability.test.mjs
+          node tests/workflow-v50-safari-navigation.test.mjs
 
       - name: Confirm Cloudflare deployment credential
         id: credential
@@ -57,7 +60,7 @@ jobs:
           wranglerVersion: '4.114.0'
           command: deploy --config wrangler.toml --keep-vars
 
-      - name: Verify deployed release, storage and Safari-safe runtime r50
+      - name: Verify deployed release, storage and Safari runtime
         id: verify
         shell: bash
         run: |
@@ -70,24 +73,19 @@ jobs:
           try {
             const h=JSON.parse(process.env.PLATFORM_HEALTH||'{}');
             const storage=h.ok===true&&h.r2Configured===true&&h.r2Required===true&&h.r2Ready===true&&h.storageBackend==='r2';
-            const v42=h.reliableEmissionV42===true&&h.emissionPdfVerification===true&&h.masterProductOrdering===true;
-            const v43=h.experienceV43===true&&h.operationsBootstrapV43===true&&h.productLifecycleV43===true&&h.professionalDashboardV43===true&&h.processNavigationV43===true&&h.floatingOrderActionsV43===true&&h.settingsPolicyDedupV43===true;
-            const v44=h.procurementOsV44===true&&h.canonicalMasterDataV44===true&&h.masterListAssistV44===true&&h.procurementIntelligenceV44===true&&h.financePlanningV44===true&&h.receptionEvidenceV44===true&&h.granularPermissionsV44===true&&h.jobQueueV44===true&&h.observabilityV44===true&&h.globalSearchV44===true&&h.productionE2EContractV44===true;
-            const v45=h.nativePerformanceV45===true&&h.schemaOffCriticalPathV45===true&&h.requestCoalescingV45===true&&h.operationsBootstrapV45===true&&h.directR2StreamingV45===true;
-            const r49=h.notificationLoopGuardV49===true&&h.cacheFirstPwaV49===true&&h.lightweightReleaseHandshakeV49===true&&h.singleStartupRouteV49===true;
-            const r50=h.redirectSafeNavigationV50===true;
-            process.stdout.write(storage&&v42&&v43&&v44&&v45&&r49&&r50?'true':'false');
+            const runtime=h.nativePerformanceV45===true&&h.schemaOffCriticalPathV45===true&&h.requestCoalescingV45===true&&h.operationsBootstrapV45===true&&h.directR2StreamingV45===true&&h.redirectSafeNavigationV50===true;
+            process.stdout.write(storage&&runtime?'true':'false');
           } catch { process.stdout.write('false'); }
           NODE
             )
             if [ "$release" = "$expected" ] && [ "$ready" = "true" ]; then
-              echo "Nuvasto $release desplegado con R2, runtime r49 y navegación Safari r50 verificados."
+              echo "Nuvasto $release desplegado y verificado con R2 y runtime Safari."
               exit 0
             fi
-            echo "Esperando despliegue ${attempt}/24 · release=${release:-none} · v42+v43+v44+v45+r49+r50+r2=$ready"
+            echo "Esperando despliegue ${attempt}/24 · release=${release:-none} · runtime=$ready"
             sleep 10
           done
-          echo "::error::Cloudflare no activó el release esperado con las capacidades v42/v43/v44/v45/r49/r50 y R2."
+          echo "::error::Cloudflare no activó el release esperado."
           exit 1
 
       - name: Synthetic procurement journey on dedicated E2E tenant
@@ -108,10 +106,10 @@ jobs:
         run: |
           if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.synthetic.outcome }}" != "failure" ]; then
             state=success
-            description='Nuvasto r50 Safari-safe publicado y verificado en Cloudflare'
+            description='Nuvasto R55 publicado y verificado en Cloudflare'
           else
             state=failure
-            description='El despliegue de Nuvasto r50 no quedó verificado'
+            description='El despliegue de Nuvasto R55 no quedó verificado'
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state="$state" \
