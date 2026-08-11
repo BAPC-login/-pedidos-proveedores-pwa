@@ -1,7 +1,7 @@
 // Compatibilidad histórica: v17-readiness · v18-history-master-pdf · v19-workflow-r2 · v20-professional-sso · nuvasto-v21-brand-platform · nuvasto-v22-orders-pdf-motion · nuvasto-v23-auth-keyboard · nuvasto-v26-r2-invoice-keyboard · v28-regression-suite · nuvasto-v29-invoice-checkout-r2 · nuvasto-v30-reliability-mobile · v31-invoice-storage · v32-professional-ux · v33-history-documents · v34-folio-invoice-visual · v35-orders-clean-slate · v36-invoice-review-save-icons · v36-date-only-consistency · v38-multiple-invoices-v38 · v39-multi-picker-cache-navigation · v40-professional-operations · v41-reception-payments-enterprise · v42-reliable-emission-master-ordering · v43-fast-ux-process-navigation · v44-procurement-os-suite.
 // Marcadores de compatibilidad exigidos por suites acumulativas: nuvasto-v39-multi-picker-cache-navigation · nuvasto-v40-professional-operations · nuvasto-v41-reception-payments-enterprise · nuvasto-v42-reliable-emission-master-ordering · nuvasto-v43-fast-ux-process-navigation · nuvasto-v44-procurement-os-suite · nuvasto-v50-safari-navigation · nuvasto-v52-operations-completion.
-// R54 consolida selector nativo de historial y estabilidad táctil de lista maestra en iOS.
-const VERSION='nuvasto-v54-mobile-consolidation';
+// R55 estabiliza navegación móvil, acciones nativas, lista maestra y recorrido de productos sin romper contratos históricos.
+const VERSION='nuvasto-v55-stable-mobile';
 const PRECACHE=[
   './','./styles.css','./pro-ui.css','./experience.css','./design-system-v13.css','./design-system-v14.css','./brand-v21.css','./native-performance.css','./app.js','./app-core.js','./app-r51-ux.js','./app-r52-operations.js','./app-r52-stability.js','./app-r54-consolidation.js','./app-v42-master-ordering.js','./app-experience-keyboard.js','./manifest.webmanifest','./icon.svg','./nuvasto-mark.svg','./nuvasto-logo.svg'
 ];
