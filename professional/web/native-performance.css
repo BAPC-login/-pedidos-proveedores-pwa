@@ -5,7 +5,9 @@ button,a,input,select,textarea,[role="button"]{touch-action:manipulation}
 #mainContent{contain:style;min-height:60dvh}
 .route-loading #mainContent{pointer-events:none}
 .route-loading .page-heading{opacity:.82;transform:translateY(0)}
-.v44-row,.order-file-row,.order-card,.history-card,.invoice-card,.product-card,.supplier-card,[data-order-id]{content-visibility:auto;contain-intrinsic-size:72px}
+.v44-row,.order-card,.history-card,.invoice-card,.product-card,.supplier-card,[data-order-id]{content-visibility:auto;contain-intrinsic-size:72px}
+.order-file-row{content-visibility:visible!important;contain:none!important}
+.order-file-quantity,.order-file-quantity input{pointer-events:auto!important;touch-action:manipulation!important}
 .v44-skeleton{position:relative!important;overflow:hidden!important;background:var(--soft)!important;animation:none!important;contain:paint!important}
 .v44-skeleton::after{content:"";position:absolute;inset:-20% -45%;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--card) 72%,transparent),transparent);transform:translate3d(-70%,0,0);animation:nuvasto-native-shimmer 1.15s linear infinite;will-change:transform}
 @keyframes nuvasto-native-shimmer{to{transform:translate3d(70%,0,0)}}
