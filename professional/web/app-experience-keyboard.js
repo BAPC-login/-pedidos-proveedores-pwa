@@ -12,6 +12,7 @@ function prepare(input){
   input.inputMode='decimal';
   input.enterKeyHint='next';
   input.autocomplete='off';
+  input.dataset.r51Keyboard='1';
   input.setAttribute('pattern','[0-9.,]*');
   input.setAttribute('aria-label',input.getAttribute('aria-label')||'Cantidad');
 }
