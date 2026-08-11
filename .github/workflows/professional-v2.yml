@@ -1,19 +1,14 @@
 name: Validate Pedidos Pro Platform
 
 on:
-  push:
-    branches: [agent/professional-saas-v1, main]
-    paths:
-      - 'professional/**'
-      - 'wrangler.jsonc'
-      - 'wrangler.ai.jsonc'
-      - '.github/workflows/professional-v2.yml'
   pull_request:
+    branches: [main]
     paths:
       - 'professional/**'
       - 'wrangler.jsonc'
       - 'wrangler.ai.jsonc'
       - '.github/workflows/professional-v2.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -26,8 +21,8 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       - name: Verify JavaScript and business rules
@@ -40,6 +35,5 @@ jobs:
           sqlite3 /tmp/pedidos-pro-platform.db < migrations/0002_procurement.sql
           sqlite3 /tmp/pedidos-pro-platform.db < migrations/0003_invoices.sql
           sqlite3 /tmp/pedidos-pro-platform.db "PRAGMA foreign_key_check;"
-          sqlite3 /tmp/pedidos-pro-platform.db ".tables"
       - name: Bundle Worker without deploying
         run: npx wrangler deploy --dry-run --outdir /tmp/pedidos-pro-platform-build
