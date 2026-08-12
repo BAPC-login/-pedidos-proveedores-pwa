@@ -1,7 +1,5 @@
 name: Deploy Nuvasto to Cloudflare
 
-# Único pipeline de producción. Valida, despliega y verifica main.
-# El repositorio consolidado no mantiene pipelines paralelos ni legacy en main.
 on:
   push:
     branches: [main]
@@ -19,7 +17,7 @@ permissions:
 
 concurrency:
   group: deploy-nuvasto-production
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -37,6 +35,7 @@ jobs:
         run: |
           npm run check
           node tests/core.test.mjs
+          node tests/canonical-runtime.test.mjs
 
       - name: Confirm Cloudflare deployment credential
         id: credential
@@ -59,7 +58,7 @@ jobs:
           wranglerVersion: '4.114.0'
           command: deploy --config wrangler.toml --keep-vars
 
-      - name: Verify deployed release, storage and Safari runtime
+      - name: Verify deployed release, storage and runtime
         id: verify
         shell: bash
         run: |
@@ -78,7 +77,7 @@ jobs:
           NODE
             )
             if [ "$release" = "$expected" ] && [ "$ready" = "true" ]; then
-              echo "Nuvasto $release desplegado y verificado con R2 y runtime Safari."
+              echo "Nuvasto $release desplegado y verificado con R2 y runtime."
               exit 0
             fi
             echo "Esperando despliegue ${attempt}/24 · release=${release:-none} · runtime=$ready"
@@ -98,7 +97,7 @@ jobs:
         run: node tests/production-e2e-v44.mjs
 
       - name: Publish production status on commit
-        if: always()
+        if: always() && !cancelled()
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
