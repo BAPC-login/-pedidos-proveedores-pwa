@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const read=path=>fs.readFileSync(path,'utf8');
+const combined=read('../worker/src/combined.js');
+const router=read('worker/src/router.js');
+const legacyGateway=read('worker/src/index-v45.js');
+const professional=read('web/app-professional.js');
+const retiredR52=read('web/app-r52-operations.js');
+assert.ok(combined.includes("professional/worker/src/router.js"),'combined worker must use canonical router');
+assert.ok(router.includes("from './routes/index.js'"),'router must resolve domains through route modules');
+assert.ok(router.includes('domainRouterV58:true'),'health must expose domain router');
+assert.ok(!router.includes('function isV44')&&!router.includes('function isV41'),'canonical router must not contain version predicate sprawl');
+assert.ok(legacyGateway.length<180,'index-v45 must be compatibility-only');
+assert.ok(professional.includes("from './app-runtime.js'"),'professional bootstrap must use canonical runtime');
+assert.ok(fs.existsSync('web/app-runtime.js')&&fs.existsSync('web/app-mobile-runtime.js'),'canonical runtimes must exist');
+assert.ok(retiredR52.length<220&&!retiredR52.includes('window.fetch'),'R52 request shield must stay retired');
+assert.ok(!fs.existsSync('../styles-v13.css')&&!fs.existsSync('../v6-management.js'),'root legacy app must be removed');
+const webFiles=fs.readdirSync('web').filter(name=>name.endsWith('.js'));
+for(const name of webFiles){const source=read(`web/${name}`);assert.equal((source.match(/window\.fetch\s*=/g)||[]).length,0,`${name} must not replace global fetch`)}
+console.log('architecture gate: OK');

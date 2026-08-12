@@ -1,5 +1,5 @@
 import aiWorker from './index.js';
-import platformWorker from '../../professional/worker/src/index-v45.js';
+import platformWorker from '../../professional/worker/src/router.js';
 
 const PLATFORM_RELEASE='2026.08.11.57';
 function rewritePath(request,pathname){const url=new URL(request.url);url.pathname=pathname;return new Request(url.toString(),request)}
