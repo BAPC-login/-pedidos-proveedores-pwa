@@ -13,8 +13,20 @@ async function ensureLockTable(env){
     updated_at TEXT NOT NULL,
     PRIMARY KEY(org_id,lock_key)
   )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS folio_sequences(
+    org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+    cost_center_id TEXT NOT NULL REFERENCES cost_centers(id) ON DELETE CASCADE,
+    prefix TEXT NOT NULL,
+    last_value INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(org_id,location_id,cost_center_id),
+    UNIQUE(org_id,prefix)
+  )`).run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_folio_locks_expiry ON folio_operation_locks(expires_at)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_orders_org_folio_lookup ON orders(org_id,folio)').run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_folio_sequences_scope ON folio_sequences(org_id,location_id,cost_center_id)').run();
 }
 
 async function acquireLock(env,orgId,lockKey,{ttlMs=20000,attempts=70}={}){
@@ -43,8 +55,53 @@ export async function withFolioWriteLockV34(env,orgId,work){
   try{return await work()}finally{await releaseLock(env,orgId,'folios',token)}
 }
 
+const cleanToken=(value,fallback)=>String(value||fallback||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'')||fallback;
+function prefixCandidates(locationCode,costCenterCode){
+  const location=cleanToken(locationCode,'LOC').slice(0,6),center=cleanToken(costCenterCode,'C').slice(0,10),candidates=[];
+  for(let length=1;length<=Math.min(6,center.length);length++)candidates.push(`${location}${center.slice(0,length)}`);
+  const stem=`${location}${center.slice(0,Math.min(4,center.length))}`;
+  for(let suffix=2;suffix<=99;suffix++)candidates.push(`${stem}${suffix}`);
+  return candidates;
+}
+async function existingSequenceMaximum(env,orgId,locationId,costCenterId,prefix){
+  const result=await env.DB.prepare(`SELECT o.folio FROM orders o
+    JOIN order_cost_centers occ ON occ.order_id=o.id AND occ.org_id=o.org_id
+    WHERE o.org_id=? AND o.location_id=? AND occ.cost_center_id=? AND o.status!='draft'`)
+    .bind(orgId,locationId,costCenterId).all();
+  const pattern=new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}(\\d{5,})$`);
+  let maximum=0;
+  for(const item of rows(result)){const match=String(item.folio||'').match(pattern);if(match)maximum=Math.max(maximum,Number(match[1])||0)}
+  return maximum;
+}
+async function ensureSequence(env,orgId,scope){
+  const current=await env.DB.prepare('SELECT prefix,last_value FROM folio_sequences WHERE org_id=? AND location_id=? AND cost_center_id=?')
+    .bind(orgId,scope.locationId,scope.costCenterId).first();
+  if(current)return current;
+  for(const prefix of prefixCandidates(scope.locationCode,scope.costCenterCode||scope.costCenterName)){
+    const maximum=await existingSequenceMaximum(env,orgId,scope.locationId,scope.costCenterId,prefix),timestamp=nowIso();
+    await env.DB.prepare(`INSERT OR IGNORE INTO folio_sequences(org_id,location_id,cost_center_id,prefix,last_value,created_at,updated_at)
+      VALUES(?,?,?,?,?,?,?)`).bind(orgId,scope.locationId,scope.costCenterId,prefix,maximum,timestamp,timestamp).run();
+    const created=await env.DB.prepare('SELECT prefix,last_value FROM folio_sequences WHERE org_id=? AND location_id=? AND cost_center_id=?')
+      .bind(orgId,scope.locationId,scope.costCenterId).first();
+    if(created)return created;
+  }
+  throw new HttpError(409,'No fue posible reservar un prefijo único para el local y centro de costo.','folio_prefix_unavailable');
+}
+
+export async function allocateScopedFoliosV66(env,orgId,scope,count=1){
+  const amount=Math.max(1,Math.min(1000,Number(count)||1));
+  if(!scope?.locationId||!scope?.costCenterId)throw new HttpError(400,'El folio requiere local y centro de costo.','folio_scope_required');
+  const lockKey=`folio:${scope.locationId}:${scope.costCenterId}`,token=await acquireLock(env,orgId,lockKey,{ttlMs:25000,attempts:90});
+  try{
+    const sequence=await ensureSequence(env,orgId,scope),start=Number(sequence.last_value||0)+1,last=start+amount-1,timestamp=nowIso();
+    await env.DB.prepare(`UPDATE folio_sequences SET last_value=?,updated_at=?
+      WHERE org_id=? AND location_id=? AND cost_center_id=?`).bind(last,timestamp,orgId,scope.locationId,scope.costCenterId).run();
+    return Array.from({length:amount},(_,index)=>`${sequence.prefix}${String(start+index).padStart(5,'0')}`);
+  }finally{await releaseLock(env,orgId,lockKey,token)}
+}
+
 function folioParts(value){
-  const match=String(value||'').match(/^(.*-)(\d{3,})$/);
+  const match=String(value||'').match(/^(.*?)(\d{3,})$/);
   return match?{prefix:match[1],width:match[2].length}:null;
 }
 
@@ -55,8 +112,8 @@ function nextFolio(used,current){
     do{candidate=`${parts.prefix}${String(number++).padStart(parts.width,'0')}`}while(used.has(candidate));
     used.add(candidate);return candidate;
   }
-  const base=`FIX-${new Date().toISOString().slice(0,10).replaceAll('-','')}-`;let number=1,candidate='';
-  do{candidate=`${base}${String(number++).padStart(4,'0')}`}while(used.has(candidate));
+  const base='FIX';let number=1,candidate='';
+  do{candidate=`${base}${String(number++).padStart(5,'0')}`}while(used.has(candidate));
   used.add(candidate);return candidate;
 }
 
