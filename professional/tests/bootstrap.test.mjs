@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';import fs from 'node:fs';const read=path=>fs.readFileSync(path,'utf8');
-const app=read('web/app.js'),bootstrap=read('web/app-bootstrap.js'),shell=read('web/index.html'),mobile=read('web/app-mobile-runtime.js'),legal=read('web/app-legal.js'),sw=read('web/sw.js');
+const app=read('web/app.js'),bootstrap=read('web/app-bootstrap.js'),shell=read('web/index.html'),mobile=read('web/app-mobile-runtime.js'),legal=read('web/app-legal.js'),sw=read('web/sw.js'),entry=read('web/app-procurement-entry.js');
 assert.ok(app.includes("from './app-bootstrap.js'"),'app.js must delegate feature initialization to canonical bootstrap');
 for(const retired of ['app-commercial-v16.js','app-experience.js','app-history-v18.js','app-pdf-v18.js','app-workflow-v19.js','app-history-semantic-v20.js','app-ux-v22.js','app-nuvasto-v23.js','app-professional-hotfix-v24.js'])assert.ok(!app.includes(retired)&&!bootstrap.includes(retired),`${retired} must not be active in bootstrap`);
 assert.ok(bootstrap.includes("from './app-professional.js'")&&bootstrap.includes('initializeProfessional()'),'semantic professional runtime must initialize explicitly');
 assert.ok(!bootstrap.includes("app-master-v18.js")&&!bootstrap.includes('initializeMasterV18'),'legacy master enhancer must stay retired');
 assert.ok(shell.includes('src="./app-mobile-runtime.js"')&&!shell.includes('src="./app-mobile-runtime-v57.js"'),'shell must load canonical mobile runtime directly');
-assert.ok(sw.includes('nuvasto-v61-product-qa')&&sw.includes("'./app-bootstrap.js'")&&sw.includes("'./app-mobile-runtime.js'"),'service worker must precache product QA canonical shell');
+assert.ok(sw.includes('nuvasto-v62-product-complete')&&sw.includes("'./app-bootstrap.js'")&&sw.includes("'./app-mobile-runtime.js'"),'service worker must precache V62 canonical shell');
 assert.ok(!legal.includes('quantitySelector')&&!legal.includes('focusin')&&!legal.includes('visualViewport'),'legal experience must not own keyboard behavior');
-assert.ok(!mobile.includes("addEventListener('focusin'")&&!mobile.includes("addEventListener('pointerdown'"),'mobile runtime must not steal quantity focus');
-assert.ok(mobile.includes("input.enterKeyHint='next'")&&mobile.includes("input.inputMode='decimal'"),'quantity inputs must advertise native numeric next behavior');
+assert.ok(!mobile.includes("addEventListener('focusin'")&&!mobile.includes("addEventListener('pointerdown'")&&!mobile.includes("addEventListener('keydown'"),'mobile runtime must not steal quantity focus');
+assert.ok(!entry.includes('MutationObserver'),'procurement entry must not observe the full app shell');
 console.log('bootstrap gate: OK');
