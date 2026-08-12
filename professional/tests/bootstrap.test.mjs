@@ -5,7 +5,8 @@ for(const retired of ['app-commercial-v16.js','app-experience.js','app-history-v
 assert.ok(bootstrap.includes("from './app-professional.js'")&&bootstrap.includes('initializeProfessional()'),'semantic professional runtime must initialize explicitly');
 assert.ok(!bootstrap.includes("app-master-v18.js")&&!bootstrap.includes('initializeMasterV18'),'legacy master enhancer must stay retired');
 assert.ok(shell.includes('src="./app-mobile-runtime.js"')&&!shell.includes('src="./app-mobile-runtime-v57.js"'),'shell must load canonical mobile runtime directly');
-assert.ok(sw.includes('nuvasto-v63-native-dashboard-ordering')&&sw.includes("'./app-bootstrap.js'")&&sw.includes("'./app-mobile-runtime.js'"),'service worker must precache V63 canonical shell');
+assert.ok(sw.includes('nuvasto-v64-offline-data')&&sw.includes("'./app-bootstrap.js'")&&sw.includes("'./app-mobile-runtime.js'")&&sw.includes("'./app-procurement-settings.js'"),'service worker must precache V64 canonical shell and critical procurement modules');
+assert.ok(app.includes("CLIENT_RELEASE='2026.08.11.64'")&&app.includes('Las sesiones ya abiertas sí pueden restaurarse offline'),'client must describe the supported offline session model');
 assert.ok(!legal.includes('quantitySelector')&&!legal.includes('focusin')&&!legal.includes('visualViewport'),'legal experience must not own keyboard behavior');
 assert.ok(!mobile.includes("addEventListener('focusin'")&&!mobile.includes("addEventListener('pointerdown'")&&!mobile.includes("addEventListener('keydown'"),'mobile runtime must not steal quantity focus');
 assert.ok(!entry.includes('MutationObserver'),'procurement entry must not observe the full app shell');
