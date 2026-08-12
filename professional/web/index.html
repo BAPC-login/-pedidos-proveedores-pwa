@@ -23,124 +23,23 @@
   <link rel="modulepreload" href="./app-navigation-v14.js">
   <link rel="modulepreload" href="./app-dashboard-v14.js">
   <link rel="modulepreload" href="./app-nuvasto-v21.js">
-  <link rel="modulepreload" href="./app-r52-operations.js">
-  <link rel="modulepreload" href="./app-r54-consolidation.js">
+  <link rel="modulepreload" href="./app-r56-mobile.js">
   <title>Nuvasto</title>
 </head>
 <body>
-  <div class="ambient ambient-a"></div>
-  <div class="ambient ambient-b"></div>
-
-  <section class="auth-screen" id="startupScreen">
-    <div class="auth-brand nuvasto-wordmark"><div class="brand-mark" aria-hidden="true"><img src="./nuvasto-mark.svg" alt=""></div><div class="nuvasto-wordmark-copy"><strong>Nuvasto</strong><span>PROCUREMENT OS</span></div></div>
-    <div class="auth-copy"><span class="eyebrow">INICIANDO</span><h1>Restaurando tu sesión y la configuración de compras.</h1><p>No necesitas volver a ingresar mientras tu sesión siga vigente.</p></div>
-    <div class="auth-card glass"><div class="auth-card-head"><span class="status-dot"></span><span>Cargando información…</span></div></div>
-  </section>
-
-  <section class="auth-screen hidden" id="authScreen">
-    <div class="auth-brand nuvasto-wordmark">
-      <div class="brand-mark" aria-hidden="true"><img src="./nuvasto-mark.svg" alt=""></div>
-      <div class="nuvasto-wordmark-copy"><strong>Nuvasto</strong><span>PROCUREMENT OS</span></div>
-    </div>
-    <div class="auth-copy">
-      <span class="eyebrow">COMPRAS Y ABASTECIMIENTO</span>
-      <h1>Compras claras. Abastecimiento inteligente.</h1>
-      <p>Pedidos, proveedores, recepción, facturas y trazabilidad en una plataforma profesional para operaciones multiempresa.</p>
-    </div>
-    <div class="auth-card glass">
-      <div class="auth-card-head"><span class="status-dot"></span><span>Acceso seguro</span></div>
-      <form id="loginForm" class="stack">
-        <label class="field"><span>Correo</span><input id="loginEmail" name="email" type="email" autocomplete="username" required placeholder="nombre@empresa.cl"></label>
-        <label class="field"><span>Contraseña</span><input id="loginPassword" name="password" type="password" autocomplete="current-password" required minlength="10" placeholder="••••••••••"></label>
-        <button class="btn primary wide" type="submit"><span>Ingresar</span><span aria-hidden="true">→</span></button>
-      </form>
-      <button class="link-btn hidden" id="openBootstrap" type="button">Primera instalación</button>
-      <div class="auth-note">Las cuentas son individuales. Un administrador puede crear usuarios, asignar roles y habilitar el acceso mediante Google y Cloudflare Access.</div>
-    </div>
-  </section>
-
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+  <section class="auth-screen" id="startupScreen"><div class="auth-brand nuvasto-wordmark"><div class="brand-mark" aria-hidden="true"><img src="./nuvasto-mark.svg" alt=""></div><div class="nuvasto-wordmark-copy"><strong>Nuvasto</strong><span>PROCUREMENT OS</span></div></div><div class="auth-copy"><span class="eyebrow">INICIANDO</span><h1>Restaurando tu sesión y la configuración de compras.</h1><p>No necesitas volver a ingresar mientras tu sesión siga vigente.</p></div><div class="auth-card glass"><div class="auth-card-head"><span class="status-dot"></span><span>Cargando información…</span></div></div></section>
+  <section class="auth-screen hidden" id="authScreen"><div class="auth-brand nuvasto-wordmark"><div class="brand-mark" aria-hidden="true"><img src="./nuvasto-mark.svg" alt=""></div><div class="nuvasto-wordmark-copy"><strong>Nuvasto</strong><span>PROCUREMENT OS</span></div></div><div class="auth-copy"><span class="eyebrow">COMPRAS Y ABASTECIMIENTO</span><h1>Compras claras. Abastecimiento inteligente.</h1><p>Pedidos, proveedores, recepción, facturas y trazabilidad en una plataforma profesional para operaciones multiempresa.</p></div><div class="auth-card glass"><div class="auth-card-head"><span class="status-dot"></span><span>Acceso seguro</span></div><form id="loginForm" class="stack"><label class="field"><span>Correo</span><input id="loginEmail" name="email" type="email" autocomplete="username" required placeholder="nombre@empresa.cl"></label><label class="field"><span>Contraseña</span><input id="loginPassword" name="password" type="password" autocomplete="current-password" required minlength="10" placeholder="••••••••••"></label><button class="btn primary wide" type="submit"><span>Ingresar</span><span aria-hidden="true">→</span></button></form><button class="link-btn hidden" id="openBootstrap" type="button">Primera instalación</button><div class="auth-note">Las cuentas son individuales. Un administrador puede crear usuarios y asignar roles por local.</div></div></section>
   <div class="app-shell hidden" id="appShell">
-    <aside class="sidebar">
-      <div class="sidebar-brand nuvasto-wordmark">
-        <div class="brand-mark small"><img src="./nuvasto-mark.svg" alt=""></div>
-        <div class="nuvasto-wordmark-copy"><strong>Nuvasto</strong><span>PROCUREMENT OS</span></div>
-      </div>
-      <button class="workspace-card selectable" id="workspaceCard" type="button">
-        <span class="workspace-avatar" id="workspaceAvatar">MD</span>
-        <span class="workspace-copy"><strong id="workspaceName">Madriguera</strong><small id="workspacePlan">Owner de plataforma</small></span>
-        <span class="chevron" id="workspaceChevron">⌄</span>
-      </button>
-      <nav class="side-nav" aria-label="Navegación principal">
-        <button class="nav-item active" data-view="dashboard"><span class="nav-icon">⌂</span><span>Inicio</span></button>
-        <button class="nav-item" data-view="orders"><span class="nav-icon">▤</span><span>Pedidos</span><b class="nav-count" id="pendingCount">0</b></button>
-        <button class="nav-item" data-view="history"><span class="nav-icon">◷</span><span>Historial</span></button>
-        <button class="nav-item" data-view="invoices"><span class="nav-icon">▧</span><span>Facturas</span></button>
-        <button class="nav-item" data-view="catalog"><span class="nav-icon">◫</span><span>Productos</span></button>
-        <button class="nav-item" data-view="suppliers"><span class="nav-icon">◇</span><span>Proveedores</span></button>
-        <button class="nav-item admin-only" data-view="team"><span class="nav-icon">◎</span><span>Usuarios</span></button>
-        <button class="nav-item admin-only" data-view="audit"><span class="nav-icon">◴</span><span>Auditoría</span></button>
-      </nav>
-      <div class="sidebar-spacer"></div>
-      <nav class="side-nav lower">
-        <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>Configuración</span></button>
-        <button class="nav-item danger-text" id="logoutButton"><span class="nav-icon">↪</span><span>Cerrar sesión</span></button>
-      </nav>
-      <div class="user-mini">
-        <span class="user-avatar" id="userAvatar">BP</span>
-        <div><strong id="userName">Usuario</strong><small id="userRole">Rol</small></div>
-      </div>
-    </aside>
-
-    <header class="topbar">
-      <button class="route-back hidden" id="routeBack" type="button" aria-label="Volver a la vista anterior">←</button>
-      <button class="mobile-workspace-button" id="mobileWorkspaceButton" type="button" aria-label="Cambiar empresa y abrir configuración">
-        <div class="brand-mark tiny"><img src="./nuvasto-mark.svg" alt=""></div>
-        <span><strong>Nuvasto</strong><small id="mobileWorkspaceName">Madriguera</small></span>
-        <b>⌄</b>
-      </button>
-      <div class="page-heading"><span class="eyebrow" id="pageEyebrow">OPERACIÓN</span><h1 id="pageTitle">Inicio</h1></div>
-      <label class="global-search"><span>⌕</span><input id="globalSearch" placeholder="Buscar o ir a una sección" autocomplete="off"><kbd>⌘ K</kbd></label>
-      <div class="top-actions">
-        <button class="sync-chip" id="syncChip"><i></i><span>Sincronizado</span></button>
-        <button class="icon-button" id="themeButton" aria-label="Cambiar apariencia">◐</button>
-        <button class="mobile-user-button" id="mobileUserButton" type="button" aria-label="Abrir cuenta"><span id="mobileUserAvatar">BP</span></button>
-        <button class="btn primary" id="primaryAction"><span>＋</span><span>Nuevo pedido</span></button>
-      </div>
-    </header>
-
+    <aside class="sidebar"><div class="sidebar-brand nuvasto-wordmark"><div class="brand-mark small"><img src="./nuvasto-mark.svg" alt=""></div><div class="nuvasto-wordmark-copy"><strong>Nuvasto</strong><span>PROCUREMENT OS</span></div></div><button class="workspace-card selectable" id="workspaceCard" type="button"><span class="workspace-avatar" id="workspaceAvatar">MD</span><span class="workspace-copy"><strong id="workspaceName">Madriguera</strong><small id="workspacePlan">Owner de plataforma</small></span><span class="chevron" id="workspaceChevron">⌄</span></button><nav class="side-nav" aria-label="Navegación principal"><button class="nav-item active" data-view="dashboard"><span class="nav-icon">⌂</span><span>Inicio</span></button><button class="nav-item" data-view="orders"><span class="nav-icon">▤</span><span>Por emitir</span><b class="nav-count" id="pendingCount">0</b></button><button class="nav-item" data-view="history"><span class="nav-icon">◷</span><span>Historial</span></button><button class="nav-item" data-view="invoices"><span class="nav-icon">▧</span><span>Facturas</span></button><button class="nav-item" data-view="catalog"><span class="nav-icon">◫</span><span>Productos</span></button><button class="nav-item" data-view="suppliers"><span class="nav-icon">◇</span><span>Proveedores</span></button><button class="nav-item admin-only" data-view="team"><span class="nav-icon">◎</span><span>Usuarios</span></button><button class="nav-item admin-only" data-view="audit"><span class="nav-icon">◴</span><span>Auditoría</span></button></nav><div class="sidebar-spacer"></div><nav class="side-nav lower"><button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>Configuración</span></button><button class="nav-item danger-text" id="logoutButton"><span class="nav-icon">↪</span><span>Cerrar sesión</span></button></nav><div class="user-mini"><span class="user-avatar" id="userAvatar">BP</span><div><strong id="userName">Usuario</strong><small id="userRole">Rol</small></div></div></aside>
+    <header class="topbar"><button class="route-back hidden" id="routeBack" type="button" aria-label="Volver a la vista anterior">←</button><button class="mobile-workspace-button" id="mobileWorkspaceButton" type="button" aria-label="Cambiar empresa y abrir configuración"><div class="brand-mark tiny"><img src="./nuvasto-mark.svg" alt=""></div><span><strong>Nuvasto</strong><small id="mobileWorkspaceName">Madriguera</small></span><b>⌄</b></button><div class="page-heading"><span class="eyebrow" id="pageEyebrow">OPERACIÓN</span><h1 id="pageTitle">Inicio</h1></div><label class="global-search"><span>⌕</span><input id="globalSearch" placeholder="Buscar o ir a una sección" autocomplete="off"><kbd>⌘ K</kbd></label><div class="top-actions"><button class="sync-chip" id="syncChip"><i></i><span>Sincronizado</span></button><button class="icon-button" id="themeButton" aria-label="Cambiar apariencia">◐</button><button class="mobile-user-button" id="mobileUserButton" type="button" aria-label="Abrir cuenta"><span id="mobileUserAvatar">BP</span></button><button class="btn primary" id="primaryAction"><span>＋</span><span>Nuevo pedido</span></button></div></header>
     <main class="content" id="mainContent" tabindex="-1"></main>
-
-    <nav class="bottom-nav" aria-label="Navegación móvil">
-      <button class="bottom-item active" data-view="dashboard"><span>⌂</span><small>Inicio</small></button>
-      <button class="bottom-item" data-view="orders"><span>▤</span><small>Pedidos</small></button>
-      <button class="bottom-create" id="mobileCreate" type="button" aria-label="Nuevo pedido">＋</button>
-      <button class="bottom-item" data-view="history"><span>◷</span><small>Historial</small></button>
-      <button class="bottom-item" data-view="settings"><span>☰</span><small>Más</small></button>
-    </nav>
+    <nav class="bottom-nav" aria-label="Navegación móvil"><button class="bottom-item active" data-view="dashboard"><span>⌂</span><small>Inicio</small></button><button class="bottom-item" data-view="orders"><span>▤</span><small>Por emitir</small></button><button class="bottom-create" id="mobileCreate" type="button" aria-label="Nuevo pedido">＋</button><button class="bottom-item" data-view="history"><span>◷</span><small>Historial</small></button><button class="bottom-item" data-view="settings"><span>☰</span><small>Más</small></button></nav>
   </div>
-
-  <dialog class="modal" id="modal">
-    <form class="modal-frame" id="modalFrame" novalidate>
-      <header class="modal-head">
-        <div><span class="eyebrow" id="modalEyebrow">NUVASTO</span><h2 id="modalTitle">Título</h2><p id="modalSubtitle"></p></div>
-        <button class="icon-button" id="modalClose" type="button" aria-label="Cerrar">×</button>
-      </header>
-      <div class="modal-body" id="modalBody"></div>
-      <footer class="modal-foot" id="modalFoot"></footer>
-    </form>
-  </dialog>
-
-  <div class="command-menu hidden" id="commandMenu">
-    <div class="command-box glass">
-      <label><span>⌕</span><input id="commandInput" placeholder="Ir a una sección..."></label>
-      <div id="commandResults"></div><small>Esc para cerrar · Enter para abrir</small>
-    </div>
-  </div>
-
+  <dialog class="modal" id="modal"><form class="modal-frame" id="modalFrame" novalidate><header class="modal-head"><div><span class="eyebrow" id="modalEyebrow">NUVASTO</span><h2 id="modalTitle">Título</h2><p id="modalSubtitle"></p></div><button class="icon-button" id="modalClose" type="button" aria-label="Cerrar">×</button></header><div class="modal-body" id="modalBody"></div><footer class="modal-foot" id="modalFoot"></footer></form></dialog>
+  <div class="command-menu hidden" id="commandMenu"><div class="command-box glass"><label><span>⌕</span><input id="commandInput" placeholder="Ir a una sección..."></label><div id="commandResults"></div><small>Esc para cerrar · Enter para abrir</small></div></div>
   <div class="toast-region" id="toastRegion" aria-live="polite"></div>
   <script type="module" src="./app.js"></script>
-  <script type="module" src="./app-r52-operations.js"></script>
-  <script type="module" src="./app-r52-stability.js"></script>
-  <script type="module" src="./app-r54-consolidation.js"></script>
+  <script type="module" src="./app-r56-mobile.js"></script>
 </body>
 </html>
