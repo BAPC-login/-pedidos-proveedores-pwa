@@ -12,11 +12,13 @@ assert.ok(!bootstrap.includes('initializeMasterV18')&&!bootstrap.includes("app-m
 assert.ok(runtime.includes("registerRouteRenderer('dashboard'")&&runtime.includes("registerRouteRenderer('operations'")&&runtime.includes('Estructura de compras'),'runtime must own clear navigation semantics');
 assert.ok((mobile.match(/MutationObserver/g)||[]).length<=1&&mobile.includes("modalObserver.observe(body,{subtree:true,childList:true})"),'the only mobile observer must be modal-scoped');
 assert.ok(!mobile.includes('applyConfiguredMasterOrder')&&!mobile.includes('section.append(row)'),'mobile runtime must never reorder mounted quantity rows');
+assert.ok(mobile.includes('unit.tabIndex=-1')&&mobile.includes('supplier.tabIndex=-1'),'native keyboard arrows must skip order format and supplier selectors');
 assert.ok(orderCore.includes('groupProductsByConfiguredOrder(visible,activeConfig)'),'master ordering must happen before row render');
 assert.ok(orderCore.includes('if(relations.length<=1)')&&orderCore.includes('<select data-order-relation>'),'products with multiple suppliers must render a supplier select');
 assert.ok(mobile.includes('.order-file-supplier:has(select[data-order-relation])'),'mobile layout must expose the multi-supplier selector');
 assert.ok(orderCore.includes('function focusNext(current)')&&orderCore.includes('[data-core-quantity]'),'next traversal must remain quantity-based');
-assert.ok(procurement.includes('productOrder')&&procurement.includes('orderedProducts'),'configured product ordering must be part of procurement settings and data ordering');
+assert.ok(procurement.includes('mergeCanonicalProductOrder')&&procurement.includes("fresh:true")&&procurement.includes("/api/master-list-ordering?costCenterId=")&&procurement.includes("method:'PUT'")&&procurement.includes('Productos dentro del recorrido'),'configured order must be refreshed, restored, editable and persisted in one canonical flow');
+assert.ok(runtime.includes('.v40-dashboard-head')&&runtime.includes('.v40-chart-line')&&runtime.includes('.v40-donut'),'dashboard must retain professional visual components and charts');
 assert.ok(!entry.includes('MutationObserver'),'procurement settings entry must not observe the full app DOM');
 assert.ok(!reception.includes('MutationObserver'),'reception enhancement must not observe the entire DOM');
 assert.ok(routes.includes("path==='/api/master-list-ordering'"),'master ordering must expose the canonical unversioned endpoint');
