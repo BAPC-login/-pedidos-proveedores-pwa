@@ -4,8 +4,8 @@ import {refreshBranding} from './app-branding.js';
 import {openInitialRouteV14,openRoute} from './app-navigation-v14.js';
 import {initializePlatform} from './app-bootstrap.js';
 
-const CLIENT_RELEASE='2026.08.11.64';
-const OFFLINE_WARM_KEY='nuvasto:offline-warm-v64';
+const CLIENT_RELEASE='2026.08.12.65';
+const OFFLINE_WARM_KEY='nuvasto:offline-warm-v65';
 document.documentElement.dataset.clientRelease=CLIENT_RELEASE;
 const releaseFetch=window.fetch.bind(window);
 initializePlatform();
