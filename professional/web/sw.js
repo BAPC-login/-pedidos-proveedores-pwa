@@ -1,5 +1,5 @@
-const VERSION='nuvasto-v59-semantic-modules';
-const PRECACHE=['./','./styles.css','./pro-ui.css','./experience.css','./design-system-v13.css','./design-system-v14.css','./brand-v21.css','./native-performance.css','./app.js','./app-core.js','./app-professional.js','./app-runtime.js','./app-mobile-runtime.js','./app-orders.js','./app-catalog.js','./manifest.webmanifest','./icon.svg','./nuvasto-mark.svg','./nuvasto-logo.svg'];
+const VERSION='nuvasto-v60-bootstrap-qa';
+const PRECACHE=['./','./styles.css','./pro-ui.css','./experience.css','./design-system-v13.css','./design-system-v14.css','./brand-v21.css','./native-performance.css','./app.js','./app-core.js','./app-bootstrap.js','./app-professional.js','./app-runtime.js','./app-mobile-runtime.js','./app-orders.js','./app-catalog.js','./manifest.webmanifest','./icon.svg','./nuvasto-mark.svg','./nuvasto-logo.svg'];
 const networkWithTimeout=(request,ms=7000)=>{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),ms);return fetch(request,{cache:'no-store',signal:controller.signal}).finally(()=>clearTimeout(timer))};
 function safeResponse(response){return new Response(response.body,{status:response.status,statusText:response.statusText,headers:new Headers(response.headers)})}
 async function store(cache,request,response){if(response?.ok&&!response.redirected)await cache.put(request,response.clone());return response}

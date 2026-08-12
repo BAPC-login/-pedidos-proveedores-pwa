@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';const read=path=>fs.readFileSync(path,'utf8');
+const orders=read('web/app-orders.js'),catalog=read('web/app-catalog.js'),files=read('web/app-file-actions.js'),professional=read('web/app-professional.js'),runtime=read('web/app-runtime.js'),mobile=read('web/app-mobile-runtime.js');
+assert.ok(orders.includes("order.status==='draft'")&&orders.includes("order.status!=='draft'&&order.status!=='cancelled'"),'Por emitir and Historial must be separated before render');
+assert.ok(orders.includes('data-v57-order-actions')&&orders.includes('<select'),'history action control must be a native select');
+assert.equal((catalog.match(/data-v32-photo=/g)||[]).length,1,'catalog product card must expose exactly one photo action');
+assert.ok(!files.includes('IntersectionObserver')&&!files.includes('MutationObserver'),'PDF generation/share must never preload from viewport or DOM observers');
+assert.ok(professional.includes("from './app-orders.js'")&&professional.includes("from './app-catalog.js'")&&professional.includes("from './app-reception.js'"),'professional bootstrap must use semantic feature owners');
+assert.ok(runtime.includes("registerRouteRenderer('dashboard'")&&runtime.includes("registerRouteRenderer('operations'"),'runtime must own dashboard and operations routes');
+assert.ok((mobile.match(/MutationObserver/g)||[]).length<=1&&mobile.includes("observe(body,{subtree:true,childList:true})"),'the only mobile observer must be modal-scoped');
+console.log('functional contracts: OK');
