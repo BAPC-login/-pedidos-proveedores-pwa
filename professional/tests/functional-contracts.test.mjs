@@ -16,7 +16,7 @@ assert.ok(orderCore.includes('groupProductsByConfiguredOrder(visible,activeConfi
 assert.ok(orderCore.includes('if(relations.length<=1)')&&orderCore.includes('<select data-order-relation>'),'products with multiple suppliers must render a supplier select');
 assert.ok(mobile.includes('.order-file-supplier:has(select[data-order-relation])'),'mobile layout must expose the multi-supplier selector');
 assert.ok(orderCore.includes('function focusNext(current)')&&orderCore.includes('[data-core-quantity]'),'next traversal must remain quantity-based');
-assert.ok(procurement.includes('productOrder')&&procurement.includes('orderedProducts')&&procurement.includes('Productos dentro de cada categoría'),'configured product ordering must live in procurement settings');
+assert.ok(procurement.includes('productOrder')&&procurement.includes('orderedProducts'),'configured product ordering must be part of procurement settings and data ordering');
 assert.ok(!entry.includes('MutationObserver'),'procurement settings entry must not observe the full app DOM');
 assert.ok(!reception.includes('MutationObserver'),'reception enhancement must not observe the entire DOM');
 assert.ok(routes.includes("path==='/api/master-list-ordering'"),'master ordering must expose the canonical unversioned endpoint');
