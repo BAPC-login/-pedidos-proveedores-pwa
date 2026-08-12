@@ -6,6 +6,6 @@ export function matchProcurementDomain(path,method){
   if(method==='POST'&&path==='/api/invoices/analyze')return{implementation:'procurement',layer:'invoices'};
   if(method==='GET'&&path.startsWith('/api/finance/'))return{implementation:'procurement',layer:'finance'};
   if(method==='POST'&&/^\/api\/approvals\/[^/]+\/resolve$/.test(path))return{implementation:'procurement',layer:'approvals'};
-  if(path==='/api/master-list-ordering-v42'||(method==='POST'&&/^\/api\/order-batches\/[^/]+\/regenerate-documents$/.test(path)))return{implementation:'ordering',layer:'master-ordering'};
+  if(path==='/api/master-list-ordering'||path==='/api/master-list-ordering-v42'||(method==='POST'&&/^\/api\/order-batches\/[^/]+\/regenerate-documents$/.test(path)))return{implementation:'ordering',layer:'master-ordering'};
   return null;
 }

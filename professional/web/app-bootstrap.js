@@ -10,7 +10,6 @@ import {initializeSettingsPanelsV13} from './app-settings-panels-v13.js';
 import {initializeTelemetryV13} from './app-telemetry-v13.js';
 import {initializeNavigationV14} from './app-navigation-v14.js';
 import {initializeImportPreviewV17} from './app-import-preview-v17.js';
-import {initializeMasterV18} from './app-master-v18.js';
 import {initializeSsoV20} from './app-sso-v20.js';
 import {initializeProfessionalV20} from './app-professional-v20.js';
 import {initializeNuvastoV21} from './app-nuvasto-v21.js';
@@ -34,7 +33,6 @@ export function initializePlatform(){
   initializeTelemetryV13();
   initializeNavigationV14();
   initializeImportPreviewV17();
-  initializeMasterV18();
   initializeSsoV20();
   initializeProfessionalV20();
   initializeCheckoutInvoiceV29();
