@@ -1,5 +1,7 @@
-import assert from 'node:assert/strict';import fs from 'node:fs';const read=path=>fs.readFileSync(path,'utf8');
-const orders=read('web/app-orders.js'),catalog=read('web/app-catalog.js'),files=read('web/app-file-actions.js'),professional=read('web/app-professional.js'),runtime=read('web/app-runtime.js'),mobile=read('web/app-mobile-runtime.js'),bootstrap=read('web/app-bootstrap.js'),procurement=read('web/app-procurement-settings.js'),reception=read('web/app-reception.js'),routes=read('worker/src/routes/procurement.js');
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const read=path=>fs.readFileSync(path,'utf8');
+const orders=read('web/app-orders.js'),catalog=read('web/app-catalog.js'),files=read('web/app-file-actions.js'),professional=read('web/app-professional.js'),runtime=read('web/app-runtime.js'),mobile=read('web/app-mobile-runtime.js'),bootstrap=read('web/app-bootstrap.js'),procurement=read('web/app-procurement-settings.js'),orderCore=read('web/app-order-core-v15.js'),reception=read('web/app-reception.js'),routes=read('worker/src/routes/procurement.js'),entry=read('web/app-procurement-entry.js');
 assert.ok(orders.includes("order.status==='draft'")&&orders.includes("order.status!=='draft'&&order.status!=='cancelled'"),'Por emitir and Historial must be separated before render');
 assert.ok(orders.includes('data-v57-order-actions')&&orders.includes('<select'),'history action control must be a native select');
 assert.ok(!orders.includes('v57BulkShare')&&orders.includes('navigator.share({title:`${files.length} pedido'),'draft bulk actions must not share and emitted batches must share independent PDF files');
@@ -9,8 +11,13 @@ assert.ok(professional.includes("from './app-orders.js'")&&professional.includes
 assert.ok(!bootstrap.includes('initializeMasterV18')&&!bootstrap.includes("app-master-v18.js"),'legacy master-list DOM observer must stay out of bootstrap');
 assert.ok(runtime.includes("registerRouteRenderer('dashboard'")&&runtime.includes("registerRouteRenderer('operations'")&&runtime.includes('Estructura de compras'),'runtime must own clear navigation semantics');
 assert.ok((mobile.match(/MutationObserver/g)||[]).length<=1&&mobile.includes("modalObserver.observe(body,{subtree:true,childList:true})"),'the only mobile observer must be modal-scoped');
-assert.ok(mobile.includes("setAttribute('tabindex','-1')")&&mobile.includes('focusNextQuantity'),'keyboard next/down traversal must skip unit/supplier controls and target quantity inputs');
-assert.ok(mobile.includes('/api/master-list-ordering?')&&routes.includes("path==='/api/master-list-ordering'"),'master ordering must use the canonical unversioned endpoint');
-assert.ok(procurement.includes('productOrder')&&procurement.includes('orderedProducts'),'configured product ordering must be part of the master-list configuration');
+assert.ok(!mobile.includes('applyConfiguredMasterOrder')&&!mobile.includes('section.append(row)'),'mobile runtime must never reorder mounted quantity rows');
+assert.ok(orderCore.includes('groupProductsByConfiguredOrder(visible,activeConfig)'),'master ordering must happen before row render');
+assert.ok(orderCore.includes('if(relations.length<=1)')&&orderCore.includes('<select data-order-relation>'),'products with multiple suppliers must render a supplier select');
+assert.ok(mobile.includes('.order-file-supplier:has(select[data-order-relation])'),'mobile layout must expose the multi-supplier selector');
+assert.ok(orderCore.includes('function focusNext(current)')&&orderCore.includes('[data-core-quantity]'),'next traversal must remain quantity-based');
+assert.ok(procurement.includes('productOrder')&&procurement.includes('orderedProducts')&&procurement.includes('Productos dentro de cada categoría'),'configured product ordering must live in procurement settings');
+assert.ok(!entry.includes('MutationObserver'),'procurement settings entry must not observe the full app DOM');
 assert.ok(!reception.includes('MutationObserver'),'reception enhancement must not observe the entire DOM');
+assert.ok(routes.includes("path==='/api/master-list-ordering'"),'master ordering must expose the canonical unversioned endpoint');
 console.log('functional contracts: OK');
