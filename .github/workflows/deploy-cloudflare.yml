@@ -49,8 +49,8 @@ jobs:
             const storage=h.ok===true&&h.r2Configured===true&&h.r2Required===true&&h.r2Ready===true&&h.storageBackend==='r2';
             const runtime=h.nativePerformanceV45===true&&h.schemaOffCriticalPathV45===true&&h.requestCoalescingV45===true&&h.operationsBootstrapV45===true&&h.directR2StreamingV45===true&&h.redirectSafeNavigationV50===true;
             const migration=h.folioMigrationV67===true&&Number(h.folioMigrationDetails?.skipped||0)===0;
-            const r68=h.domainRouterV68===true&&h.ordersSchemaV67===true&&h.scopedHistoricalFoliosV67===true&&h.cursorOrdersV67===true&&h.reconciliationRequiredForClosure===true&&h.legacyDateFoliosRetired===true&&h.readOnlyOrderQueriesV68===true&&migration;
-            process.stdout.write(storage&&runtime&&r68?'true':'false');
+            const r69=h.domainRouterV69===true&&h.ordersSchemaV67===true&&h.scopedHistoricalFoliosV67===true&&h.cursorOrdersV67===true&&h.reconciliationRequiredForClosure===true&&h.legacyDateFoliosRetired===true&&h.readOnlyOrderQueriesV68===true&&h.durableMasterDraftV69===true&&h.draftSaveNoFolioLockV69===true&&migration;
+            process.stdout.write(storage&&runtime&&r69?'true':'false');
           } catch { process.stdout.write('false'); }
           NODE
             )
@@ -60,21 +60,31 @@ jobs:
           done
           stamp=$(date +%s)
           curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/app.js?v=$stamp" > /tmp/app.js
+          curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/app-bootstrap.js?v=$stamp" > /tmp/app-bootstrap.js
+          curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/app-order-core.js?v=$stamp" > /tmp/app-order-core.js
           curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/app-orders.js?v=$stamp" > /tmp/app-orders.js
           curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/app-invoice-entry-v29.js?v=$stamp" > /tmp/app-invoice-entry.js
           curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/app-mobile-runtime.js?v=$stamp" > /tmp/app-mobile-runtime.js
           curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/sw.js?v=$stamp" > /tmp/sw.js
           grep -Fq "CLIENT_RELEASE='$expected'" /tmp/app.js || { echo '::error::app.js productivo no coincide con el release'; exit 1; }
+          grep -Fq "from './app-order-core.js'" /tmp/app-bootstrap.js || { echo '::error::bootstrap no usa el propietario canónico de Lista Maestra'; exit 1; }
+          if grep -Fq 'app-order-core-v15.js' /tmp/app-bootstrap.js; then echo '::error::bootstrap todavía activa una versión antigua de Lista Maestra'; exit 1; fi
+          grep -Fq 'LOCAL_DRAFT_VERSION=69' /tmp/app-order-core.js || { echo '::error::protección local de borrador r69 no está en producción'; exit 1; }
+          grep -Fq 'SERVER_AUTOSAVE_DELAY=10000' /tmp/app-order-core.js || { echo '::error::autosave de Lista Maestra sigue siendo demasiado agresivo'; exit 1; }
+          grep -Fq "'Idempotency-Key':payload.idempotencyKey" /tmp/app-order-core.js || { echo '::error::Guardar archivo no tiene idempotencia estable'; exit 1; }
+          grep -Fq 'timeout:45000,persist:true' /tmp/app-order-core.js || { echo '::error::Guardar archivo no tiene timeout operacional'; exit 1; }
           grep -Fq 'TRAZABILIDAD CERRADA' /tmp/app-orders.js || { echo '::error::app-orders.js productivo no tiene separación Pedidos/Historial'; exit 1; }
           grep -Fq 'data-v67-order-actions' /tmp/app-orders.js || { echo '::error::menú nativo de pedidos no está en producción'; exit 1; }
           grep -Fq "view:history?'history':'active'" /tmp/app-orders.js || { echo '::error::consulta canónica active/history no está en producción'; exit 1; }
           if grep -Fq "app-orders-v30.js" /tmp/app-invoice-entry.js; then echo '::error::un renderer antiguo todavía compite por la ruta Orders'; exit 1; fi
-          grep -Fq 'r68-canonical-mobile' /tmp/app-mobile-runtime.js || { echo '::error::runtime móvil r68 no está en producción'; exit 1; }
+          grep -Fq 'r69-canonical-mobile' /tmp/app-mobile-runtime.js || { echo '::error::runtime móvil r69 no está en producción'; exit 1; }
           grep -Fq 'keepQuantityVisible' /tmp/app-mobile-runtime.js || { echo '::error::scroll de flechas no está en producción'; exit 1; }
-          grep -Fq 'nuvasto-v68-offline-data' /tmp/sw.js || { echo '::error::service worker r68 no está en producción'; exit 1; }
+          grep -Fq 'nuvasto-v69-offline-data' /tmp/sw.js || { echo '::error::service worker r69 no está en producción'; exit 1; }
+          grep -Fq "'./app-order-core.js'" /tmp/sw.js || { echo '::error::Lista Maestra canónica no está en precache'; exit 1; }
+          if grep -Fq "'./app-order-core-v15.js'" /tmp/sw.js; then echo '::error::Service Worker todavía precarga Lista Maestra versionada'; exit 1; fi
           grep -Fq 'apiNetworkTimeout' /tmp/sw.js || { echo '::error::timeout API adaptable no está en producción'; exit 1; }
           grep -Fq 'releaseAssetResponse' /tmp/sw.js || { echo '::error::assets release no están en network-first'; exit 1; }
-          echo "Nuvasto $release · backend, migración D1/R2 y assets frontend r68 verificados."
+          echo "Nuvasto $release · backend, migración D1/R2, Lista Maestra durable y assets frontend r69 verificados."
       - name: Production procurement journey
         id: synthetic
         if: steps.verify.outcome == 'success'
@@ -92,7 +102,7 @@ jobs:
           E2E_EMAIL: '${{ secrets.NUVASTO_E2E_EMAIL }}'
           E2E_PASSWORD: '${{ secrets.NUVASTO_E2E_PASSWORD }}'
         run: |
-          if [ -n "$E2E_EMAIL" ] && [ -n "$E2E_PASSWORD" ]; then echo 'authenticated=true' >> "$GITHUB_OUTPUT"; echo 'E2E autenticado configurado.'; else echo 'authenticated=false' >> "$GITHUB_OUTPUT"; echo '::warning::E2E autenticado no configurado; el smoke público r68 sí fue ejecutado.'; fi
+          if [ -n "$E2E_EMAIL" ] && [ -n "$E2E_PASSWORD" ]; then echo 'authenticated=true' >> "$GITHUB_OUTPUT"; echo 'E2E autenticado configurado.'; else echo 'authenticated=false' >> "$GITHUB_OUTPUT"; echo '::warning::E2E autenticado no configurado; el smoke público r69 sí fue ejecutado.'; fi
       - name: Publish production status on commit
         if: always() && !cancelled()
         shell: bash
@@ -100,6 +110,6 @@ jobs:
         run: |
           if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.synthetic.outcome }}" != "failure" ]; then
             state=success
-            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto r68 publicado; frontend/backend y E2E autenticado OK'; else description='Nuvasto r68 publicado; frontend/backend/migración OK, E2E auth sin secretos'; fi
-          else state=failure; description='El despliegue de Nuvasto r68 no quedó verificado'; fi
+            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto r69 publicado; master durable y E2E autenticado OK'; else description='Nuvasto r69 publicado; master durable/frontend/backend OK'; fi
+          else state=failure; description='El despliegue de Nuvasto r69 no quedó verificado'; fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state="$state" -f context='nuvasto/production' -f description="$description" -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
