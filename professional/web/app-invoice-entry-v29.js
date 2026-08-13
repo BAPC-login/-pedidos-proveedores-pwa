@@ -5,11 +5,8 @@ import './app-history-bridge-v31.js';
 import './app-v32-entry.js';
 import {$,state,api,toast,setBusy} from './app-core.js';
 import {openInvoiceAnalysisV30} from './app-invoice-v30.js';
-import {initializeOrdersV30} from './app-orders-v30.js';
 
-setTimeout(()=>initializeOrdersV30(),0);
 let opening=false;
-
 async function freshOrders(){const payload=await api('/api/orders',{fresh:true,timeout:20000});state.cache.orders=payload.orders||[];return state.cache.orders}
 async function orderForTrigger(trigger){
   const directId=trigger?.dataset?.v16Invoice||trigger?.dataset?.orderId||'';
@@ -30,7 +27,7 @@ window.addEventListener('click',async event=>{
   try{
     const orderId=detail||history?await orderForTrigger(trigger):'';
     if((detail||history)&&!orderId)throw new Error('No se pudo identificar el pedido pendiente');
-    await openInvoiceAnalysisV30(orderId?{orderId,returnToHistory:true}:{});
+    await openInvoiceAnalysisV30(orderId?{orderId,returnToHistory:false}:{});
   }catch(error){toast(error.message||'No se pudo abrir el ingreso de factura','error')}
   finally{if(trigger?.isConnected)setBusy(trigger,false);opening=false}
 },true);
