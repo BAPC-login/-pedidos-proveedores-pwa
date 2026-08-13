@@ -46,7 +46,7 @@ export function openModal({eyebrow='PEDIDOS PRO',title,subtitle='',body,submitLa
     const button=$('#modalSubmit');
     if(!button||button.disabled)return;
     const ownerSequence=sequence;
-    setBusy(button,true,title==='Lista maestra'?'Creando documento…':/Analizar documento|Adjuntar documento/i.test(title)?'Leyendo y cotejando…':'Guardando…');
+    setBusy(button,true,title==='Lista maestra'?'Guardando pedidos…':/Analizar documento|Adjuntar documento/i.test(title)?'Leyendo y cotejando…':'Guardando…');
     try{
       if(typeof onSubmit!=='function')throw new Error('La acción de guardado no está disponible');
       await onSubmit(new FormData(frame),frame);
