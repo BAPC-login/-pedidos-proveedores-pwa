@@ -34,6 +34,9 @@ assert.ok(folios.includes('order_folio_aliases')&&folios.includes('folio_migrati
 assert.ok(operations.includes('order_cost_centers occ')&&operations.includes('cost_center_id')&&operations.includes('allocateScopedFoliosV66'),'emission must allocate folios from the local plus cost-center scope');
 assert.ok(orderFile.includes('BORRADOR-')&&!orderFile.includes('getUTCFullYear'),'draft creation must not consume or embed calendar dates in emitted folio logic');
 assert.ok(workerCore.includes('listOrdersCanonical')&&workerCore.includes('migrateLegacyFoliosV67'),'canonical worker must own paginated order reads and historical folio cutover');
+assert.ok(workerCore.includes("url.pathname==='/api/orders'")&&workerCore.includes("url.pathname==='/api/order-batches'")&&workerCore.includes('createCanonicalBatchFromLegacy'),'legacy creation endpoints must be routed through the canonical no-date folio flow');
+assert.ok(workerCore.includes('legacyDateFoliosRetired:true')&&workerCore.includes('canonicalOrderDetailV67:true'),'health must expose the canonical order cutover contract');
+assert.ok(workerCore.includes('canonicalOrderDetail')&&workerCore.includes('batchId:meta?.batch_id'),'order detail must expose batch identity so draft bulk emission does not need a legacy route');
 assert.ok(ordersQuery.includes('payment_schedules')&&ordersQuery.includes('paymentState'),'order queue must expose payment and overdue state without extra browser requests');
 assert.ok(sw.includes('RELEASE_ASSET')&&sw.includes('releaseAssetResponse'),'release assets must be network-first so iOS cannot remain pinned to an old module graph');
 assert.ok(telemetry.includes('BUDGET_KEY')&&telemetry.includes('DAY_LIMIT=100000'),'request budget diagnostics must be local and bounded');
