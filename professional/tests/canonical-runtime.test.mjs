@@ -18,7 +18,8 @@ assert.ok(mobile.includes('.order-file-supplier{display:block!important')&&mobil
 assert.ok(mobile.includes('.order-file-category>.order-file-row:nth-of-type(even)'),'master rows must use alternating theme-aware tones');
 assert.ok(mobile.includes('.v44-favorite,[data-v44-master-mode="favorites"]{display:none!important'),'favorite controls must not consume master-list space');
 assert.ok(orderCore.includes('groupProductsByConfiguredOrder(visible,activeConfig)'),'master list must be ordered before DOM render');
-assert.ok(orderCore.includes("LOCAL_DRAFT_VERSION=69")&&orderCore.includes('SERVER_AUTOSAVE_DELAY=10000')&&orderCore.includes('idempotencyKey'),'master list must protect its draft locally and retry saves idempotently');
+assert.ok(orderCore.includes('LOCAL_DRAFT_VERSION=70')&&orderCore.includes('SERVER_AUTOSAVE_DELAY=1200')&&orderCore.includes('idempotencyKey')&&orderCore.includes("api('/api/autosave'")&&orderCore.includes('Guardado en sistema · disponible en otros dispositivos'),'master list must protect locally and synchronize a retry-safe draft to the system');
+assert.ok(orderCore.includes('id="clearMasterQuantities"')&&orderCore.includes('Eliminar todo')&&orderCore.includes("for(const value of selections.values())value.quantity=''"),'master list must clear all quantity inputs with one explicit action');
 assert.ok(runtime.includes('.v40-dashboard')&&runtime.includes('.v40-chart-line'),'dashboard visual system must be loaded by canonical runtime');
 assert.ok(/nuvasto-v\d+-offline-data/.test(sw)&&sw.includes('sessionCacheKey')&&sw.includes('apiDataResponse'),'service worker must provide authenticated offline data fallback');
 assert.ok(sw.includes("'./app-order-core.js'")&&!sw.includes("'./app-order-core-v15.js'"),'critical shell must not reactivate a versioned master owner');
