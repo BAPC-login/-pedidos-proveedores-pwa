@@ -11,6 +11,8 @@ import {initializeProcurementOSV44 as initializeProcurement} from './app-procure
 import {initializeMasterEditingV44 as initializeMasterEditing} from './app-master-edit.js';
 import {initializeReceivingPlusV44 as initializeReception} from './app-reception.js';
 import {initializeRuntimeV57 as initializeRuntime} from './app-runtime.js';
+import {initializePaymentWorkflow} from './app-payment-workflow.js';
+import {initializeOrderWorkflow} from './app-order-workflow.js';
 let initialized=false;
-export function initializeProfessional(){if(initialized)return;initialized=true;injectProfessionalStyles();initializeOrdersHistory();initializeCatalog();initializeEnhancements();initializeDocuments();initializePolish();initializeInvoiceReview();initializeEnterprise();initializeProcurement();initializeMasterEditing();initializeReception();initializeRuntime()}
+export function initializeProfessional(){if(initialized)return;initialized=true;injectProfessionalStyles();initializeOrdersHistory();initializeCatalog();initializeEnhancements();initializeDocuments();initializePolish();initializeInvoiceReview();initializeEnterprise();initializeProcurement();initializeMasterEditing();initializeReception();initializePaymentWorkflow();initializeOrderWorkflow();initializeRuntime()}
 setTimeout(initializeProfessional,120);
