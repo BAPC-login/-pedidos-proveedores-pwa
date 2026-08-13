@@ -5,6 +5,7 @@ const orders=read('web/app-orders.js'),catalog=read('web/app-catalog.js'),files=
 assert.ok(orders.includes("new Set(['closed','cancelled'])")&&orders.includes("view:history?'history':'active'")&&orders.includes('Solo pedidos cerrados o anulados'),'Pedidos must contain active work while Historial contains terminal operations only');
 assert.ok(ordersQuery.includes("view==='history'")&&ordersQuery.includes("o.status IN ('closed','cancelled')")&&ordersQuery.includes("o.status NOT IN ('closed','cancelled')"),'server query must enforce mutually exclusive operational ledgers');
 assert.ok(ordersQuery.includes('cursorValue')&&ordersQuery.includes('nextCursor')&&ordersQuery.includes('limit+1'),'large order histories must use cursor pagination');
+assert.ok(!ordersQuery.includes('o.cost_center_id')&&ordersQuery.includes('occ.cost_center_id'),'order reads must use the canonical order_cost_centers relation only');
 assert.ok(orders.includes('data-v67-order-actions')&&orders.includes('<select'),'order action control must be a native select in operational and history views');
 assert.ok(orders.includes("action.startsWith('state:')")&&orders.includes("/transition`"),'operational orders must expose canonical state transitions');
 assert.ok(orders.includes("received:[['reconciled','Marcar conciliado']]")&&orders.includes("reconciled:[['closed','Cerrar pedido']]") ,'closure must follow reconciliation instead of bypassing it');
@@ -31,13 +32,15 @@ assert.ok(!reception.includes('MutationObserver'),'reception enhancement must no
 assert.ok(routes.includes("path==='/api/master-list-ordering'"),'master ordering must expose the canonical unversioned endpoint');
 assert.ok(folios.includes('CREATE TABLE IF NOT EXISTS folio_sequences')&&folios.includes('allocateScopedFoliosV66')&&folios.includes("padStart(5,'0')"),'folios must persist a five-digit monotonic sequence per scope');
 assert.ok(folios.includes('order_folio_aliases')&&folios.includes('folio_migrations')&&folios.includes('migrateLegacyFoliosV67'),'legacy folios must migrate once while retaining a searchable alias');
+assert.ok(!folios.includes('COALESCE(occ.cost_center_id,o.cost_center_id)')&&folios.includes('LEFT JOIN cost_centers cc ON cc.id=occ.cost_center_id'),'folio migration must use the canonical center relation');
 assert.ok(operations.includes('order_cost_centers occ')&&operations.includes('cost_center_id')&&operations.includes('allocateScopedFoliosV66'),'emission must allocate folios from the local plus cost-center scope');
 assert.ok(orderFile.includes('BORRADOR-')&&!orderFile.includes('getUTCFullYear'),'draft creation must not consume or embed calendar dates in emitted folio logic');
 assert.ok(workerCore.includes('listOrdersCanonical')&&workerCore.includes('migrateLegacyFoliosV67'),'canonical worker must own paginated order reads and historical folio cutover');
 assert.ok(workerCore.includes("url.pathname==='/api/orders'")&&workerCore.includes("url.pathname==='/api/order-batches'")&&workerCore.includes('createCanonicalBatchFromLegacy'),'legacy creation endpoints must be routed through the canonical no-date folio flow');
 assert.ok(workerCore.includes('legacyDateFoliosRetired:true')&&workerCore.includes('canonicalOrderDetailV67:true'),'health must expose the canonical order cutover contract');
+assert.ok(workerCore.includes('ensureReleaseDataV67')&&workerCore.includes('folioMigrationV67:migration.ready'),'production health must complete the one-time historical folio migration before declaring r67 ready');
 assert.ok(workerCore.includes('canonicalOrderDetail')&&workerCore.includes('batchId:meta?.batch_id'),'order detail must expose batch identity so draft bulk emission does not need a legacy route');
 assert.ok(ordersQuery.includes('payment_schedules')&&ordersQuery.includes('paymentState'),'order queue must expose payment and overdue state without extra browser requests');
 assert.ok(sw.includes('RELEASE_ASSET')&&sw.includes('releaseAssetResponse'),'release assets must be network-first so iOS cannot remain pinned to an old module graph');
-assert.ok(telemetry.includes('BUDGET_KEY')&&telemetry.includes('DAY_LIMIT=100000'),'request budget diagnostics must be local and bounded');
+assert.ok(telemetry.includes('BUDGET_KEY')&&telemetry.includes('DAY_LIMIT=100000')&&telemetry.includes("status&&status!=='ok'"),'request budget diagnostics must be local, bounded and count failures correctly');
 console.log('functional contracts: OK');
