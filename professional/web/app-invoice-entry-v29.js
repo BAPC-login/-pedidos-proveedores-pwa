@@ -7,13 +7,13 @@ import {$,state,api,toast,setBusy} from './app-core.js';
 import {openInvoiceAnalysisV30} from './app-invoice-v30.js';
 
 let opening=false;
-async function freshOrders(){const payload=await api('/api/orders',{fresh:true,timeout:20000});state.cache.orders=payload.orders||[];return state.cache.orders}
+async function freshOrders(){const payload=await api('/api/orders/advanced?view=active&limit=150',{fresh:true,timeout:20000});state.cache.orders=payload.orders||[];return state.cache.orders}
 async function orderForTrigger(trigger){
   const directId=trigger?.dataset?.v16Invoice||trigger?.dataset?.orderId||'';
   if(directId)return directId;
   const folio=$('#modalTitle')?.textContent?.trim()||'';
   const orders=state.cache.orders.length?state.cache.orders:await freshOrders();
-  return orders.find(order=>String(order.folio||'')===folio)?.id||'';
+  return orders.find(order=>String(order.folio||'')===folio||String(order.legacyFolio||'')===folio)?.id||'';
 }
 
 window.addEventListener('click',async event=>{
