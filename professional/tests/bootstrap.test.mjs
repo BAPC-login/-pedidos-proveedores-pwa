@@ -8,6 +8,7 @@ assert.ok(shell.includes('src="./app-mobile-runtime.js"')&&!shell.includes('src=
 assert.ok(/nuvasto-v\d+-offline-data/.test(sw)&&sw.includes("'./app-bootstrap.js'")&&sw.includes("'./app-mobile-runtime.js'")&&sw.includes("'./app-procurement-settings.js'"),'service worker must precache the canonical shell and critical procurement modules');
 assert.ok(/CLIENT_RELEASE='\d{4}\.\d{2}\.\d{2}\.\d+'/.test(app)&&app.includes('Las sesiones ya abiertas sí pueden restaurarse offline'),'client must describe the supported offline session model');
 assert.ok(!legal.includes('quantitySelector')&&!legal.includes('focusin')&&!legal.includes('visualViewport'),'legal experience must not own keyboard behavior');
-assert.ok(!mobile.includes("addEventListener('focusin'")&&!mobile.includes("addEventListener('pointerdown'")&&!mobile.includes("addEventListener('keydown'"),'mobile runtime must not steal quantity focus');
+assert.ok(!mobile.includes("addEventListener('pointerdown'")&&!mobile.includes("addEventListener('keydown'")&&!mobile.includes('preventDefault()'),'mobile runtime may observe quantity focus for scrolling but must never intercept keyboard or pointer input');
+assert.ok(mobile.includes("body.addEventListener('focusin'")&&mobile.includes('keepQuantityVisible'),'canonical mobile runtime must keep the arrow-selected quantity row visible');
 assert.ok(!entry.includes('MutationObserver'),'procurement entry must not observe the full app shell');
 console.log('bootstrap gate: OK');
