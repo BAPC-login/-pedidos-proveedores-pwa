@@ -123,14 +123,13 @@ export async function migrateLegacyFoliosV67(env,orgId){
   await ensureLockTable(env);const version='scoped-sequence-v67';
   const completed=await env.DB.prepare('SELECT migrated_count,skipped_count,completed_at FROM folio_migrations WHERE org_id=? AND version=?').bind(orgId,version).first();
   if(completed)return{migrated:Number(completed.migrated_count||0),skipped:Number(completed.skipped_count||0),completedAt:completed.completed_at,alreadyMigrated:true};
-  const result=await env.DB.prepare(`SELECT o.id,o.folio,o.location_id,
-      COALESCE(occ.cost_center_id,o.cost_center_id) AS cost_center_id,
+  const result=await env.DB.prepare(`SELECT o.id,o.folio,o.location_id,occ.cost_center_id,
       l.code AS location_code,l.name AS location_name,cc.code AS cost_center_code,cc.name AS cost_center_name,
       COALESCE(o.emitted_at,o.sent_at,o.created_at) AS sequence_at,o.created_at
     FROM orders o
     JOIN locations l ON l.id=o.location_id AND l.org_id=o.org_id
     LEFT JOIN order_cost_centers occ ON occ.order_id=o.id AND occ.org_id=o.org_id
-    LEFT JOIN cost_centers cc ON cc.id=COALESCE(occ.cost_center_id,o.cost_center_id) AND cc.org_id=o.org_id
+    LEFT JOIN cost_centers cc ON cc.id=occ.cost_center_id AND cc.org_id=o.org_id
     WHERE o.org_id=? AND o.status!='draft'
     ORDER BY sequence_at,o.created_at,o.id`).bind(orgId).all(),orders=rows(result),timestamp=nowIso();
   const eligible=orders.filter(order=>order.location_id&&order.cost_center_id&&order.cost_center_code),skipped=orders.length-eligible.length;
@@ -142,8 +141,8 @@ export async function migrateLegacyFoliosV67(env,orgId){
   await runBatches(env,aliasStatements);
   await runBatches(env,eligible.map(order=>env.DB.prepare('UPDATE orders SET folio=?,updated_at=? WHERE id=? AND org_id=?').bind(`MIG-${order.id}-${uuid().slice(0,8)}`,timestamp,order.id,orgId)));
   const finalStatements=[];let migrated=0;
-  for(const[key,items]of groups){const sequence=sequences.get(key);items.forEach((order,index)=>{const folio=`${sequence.prefix}${String(index+1).padStart(5,'0')}`;finalStatements.push(env.DB.prepare('UPDATE orders SET folio=?,revision=revision+1,updated_at=? WHERE id=? AND org_id=?').bind(folio,timestamp,order.id,orgId));finalStatements.push(env.DB.prepare('UPDATE order_folio_aliases SET current_folio=?,migrated_at=? WHERE org_id=? AND order_id=?').bind(folio,timestamp,orgId,order.id));finalStatements.push(env.DB.prepare(`INSERT INTO audit_logs(id,org_id,actor_user_id,actor_email,action,entity_type,entity_id,metadata_json,ip_hash,created_at)
-      VALUES(?,?,NULL,'system@nuvasto.local','system.folio_scope_migration','order',?,?,'',?)`).bind(uuid(),orgId,order.id,JSON.stringify({from:order.folio,to:folio,locationId:order.location_id,costCenterId:order.cost_center_id,version}),timestamp));migrated++});finalStatements.push(env.DB.prepare('UPDATE folio_sequences SET last_value=?,updated_at=? WHERE org_id=? AND location_id=? AND cost_center_id=?').bind(items.length,timestamp,orgId,items[0].location_id,items[0].cost_center_id))}
+  for(const[key,items]of groups){const sequence=sequences.get(key),lastValue=Math.max(Number(sequence.last_value||0),items.length);items.forEach((order,index)=>{const folio=`${sequence.prefix}${String(index+1).padStart(5,'0')}`;finalStatements.push(env.DB.prepare('UPDATE orders SET folio=?,revision=revision+1,updated_at=? WHERE id=? AND org_id=?').bind(folio,timestamp,order.id,orgId));finalStatements.push(env.DB.prepare('UPDATE order_folio_aliases SET current_folio=?,migrated_at=? WHERE org_id=? AND order_id=?').bind(folio,timestamp,orgId,order.id));finalStatements.push(env.DB.prepare(`INSERT INTO audit_logs(id,org_id,actor_user_id,actor_email,action,entity_type,entity_id,metadata_json,ip_hash,created_at)
+      VALUES(?,?,NULL,'system@nuvasto.local','system.folio_scope_migration','order',?,?,'',?)`).bind(uuid(),orgId,order.id,JSON.stringify({from:order.folio,to:folio,locationId:order.location_id,costCenterId:order.cost_center_id,version}),timestamp));migrated++});finalStatements.push(env.DB.prepare('UPDATE folio_sequences SET last_value=?,updated_at=? WHERE org_id=? AND location_id=? AND cost_center_id=?').bind(lastValue,timestamp,orgId,items[0].location_id,items[0].cost_center_id))}
   await runBatches(env,finalStatements);
   await env.DB.prepare('INSERT INTO folio_migrations(org_id,version,migrated_count,skipped_count,completed_at) VALUES(?,?,?,?,?)').bind(orgId,version,migrated,skipped,timestamp).run();
   return{migrated,skipped,completedAt:timestamp,alreadyMigrated:false};
