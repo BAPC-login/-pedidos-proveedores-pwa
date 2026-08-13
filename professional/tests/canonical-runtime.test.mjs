@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';import fs from 'node:fs';const read=path=>fs.readFileSync(path,'utf8');
-const app=read('web/app.js'),entry=read('web/app-professional.js'),runtime=read('web/app-runtime.js'),mobile=read('web/app-mobile-runtime.js'),bootstrap=read('web/app-bootstrap.js'),files=read('web/app-file-actions.js'),orders=read('web/app-orders.js'),catalog=read('web/app-catalog.js'),sw=read('web/sw.js'),orderCore=read('web/app-order-core-v15.js'),invoiceEntry=read('web/app-invoice-entry-v29.js'),telemetry=read('web/app-telemetry-v13.js');
+const app=read('web/app.js'),entry=read('web/app-professional.js'),runtime=read('web/app-runtime.js'),mobile=read('web/app-mobile-runtime.js'),bootstrap=read('web/app-bootstrap.js'),files=read('web/app-file-actions.js'),orders=read('web/app-orders.js'),catalog=read('web/app-catalog.js'),sw=read('web/sw.js'),orderCore=read('web/app-order-core.js'),invoiceEntry=read('web/app-invoice-entry-v29.js'),telemetry=read('web/app-telemetry-v13.js');
 assert.equal((app.match(/window\.fetch\s*=/g)||[]).length,0,'app.js must not wrap global fetch');
 assert.ok(entry.includes("from './app-orders.js'")&&entry.includes("from './app-catalog.js'"),'professional bootstrap must use semantic modules');
 assert.ok(runtime.includes("from './app-operations-dashboard.js'")&&runtime.includes("registerRouteRenderer('dashboard'")&&runtime.includes("registerRouteRenderer('operations'"),'canonical runtime must own dashboard and operations through semantic modules');
+assert.ok(bootstrap.includes("from './app-order-core.js'")&&bootstrap.includes('initializeOrderCore()')&&!bootstrap.includes('app-order-core-v15.js'),'bootstrap must load one canonical master-list owner');
 assert.ok(!bootstrap.includes("app-master-v18.js")&&!bootstrap.includes('initializeMasterV18'),'legacy master enhancer must not run');
 assert.ok(!invoiceEntry.includes("app-orders-v30.js")&&!invoiceEntry.includes('initializeOrdersV30'),'legacy order renderer must never register the orders route');
 assert.ok(!files.includes('IntersectionObserver')&&!files.includes('MutationObserver'),'sharing must be explicit and must not scan DOM from the file layer');
@@ -17,8 +18,10 @@ assert.ok(mobile.includes('.order-file-supplier{display:block!important')&&mobil
 assert.ok(mobile.includes('.order-file-category>.order-file-row:nth-of-type(even)'),'master rows must use alternating theme-aware tones');
 assert.ok(mobile.includes('.v44-favorite,[data-v44-master-mode="favorites"]{display:none!important'),'favorite controls must not consume master-list space');
 assert.ok(orderCore.includes('groupProductsByConfiguredOrder(visible,activeConfig)'),'master list must be ordered before DOM render');
+assert.ok(orderCore.includes("LOCAL_DRAFT_VERSION=69")&&orderCore.includes('SERVER_AUTOSAVE_DELAY=10000')&&orderCore.includes('idempotencyKey'),'master list must protect its draft locally and retry saves idempotently');
 assert.ok(runtime.includes('.v40-dashboard')&&runtime.includes('.v40-chart-line'),'dashboard visual system must be loaded by canonical runtime');
 assert.ok(/nuvasto-v\d+-offline-data/.test(sw)&&sw.includes('sessionCacheKey')&&sw.includes('apiDataResponse'),'service worker must provide authenticated offline data fallback');
+assert.ok(sw.includes("'./app-order-core.js'")&&!sw.includes("'./app-order-core-v15.js'"),'critical shell must not reactivate a versioned master owner');
 assert.ok(sw.includes('RELEASE_ASSET')&&sw.includes('releaseAssetResponse')&&sw.includes("cache:'no-store'"),'release JS/CSS must be network-first with offline fallback');
 assert.ok(app.includes('controllerchange')&&app.includes("registration?.waiting?.postMessage?.({type:'SKIP_WAITING'})"),'client must force a clean service-worker release cutover');
 assert.ok(telemetry.includes("window.addEventListener('nuvasto:api-metric'")&&telemetry.includes('requestBudget')&&telemetry.includes('DAY_LIMIT=100000'),'request budgets must be measured without adding per-request telemetry calls');
