@@ -4,6 +4,7 @@ const rows=result=>result?.results||[];
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 let integrityPromise=null;
 
+async function runBatches(env,statements,size=70){for(let index=0;index<statements.length;index+=size)await env.DB.batch(statements.slice(index,index+size))}
 async function ensureLockTable(env){
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS folio_operation_locks(
     org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -24,9 +25,27 @@ async function ensureLockTable(env){
     PRIMARY KEY(org_id,location_id,cost_center_id),
     UNIQUE(org_id,prefix)
   )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS order_folio_aliases(
+    org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    legacy_folio TEXT NOT NULL,
+    current_folio TEXT NOT NULL,
+    migrated_at TEXT NOT NULL,
+    PRIMARY KEY(org_id,order_id),
+    UNIQUE(org_id,legacy_folio)
+  )`).run();
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS folio_migrations(
+    org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    version TEXT NOT NULL,
+    migrated_count INTEGER NOT NULL DEFAULT 0,
+    skipped_count INTEGER NOT NULL DEFAULT 0,
+    completed_at TEXT NOT NULL,
+    PRIMARY KEY(org_id,version)
+  )`).run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_folio_locks_expiry ON folio_operation_locks(expires_at)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_orders_org_folio_lookup ON orders(org_id,folio)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_folio_sequences_scope ON folio_sequences(org_id,location_id,cost_center_id)').run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_folio_alias_current ON order_folio_aliases(org_id,current_folio)').run();
 }
 
 async function acquireLock(env,orgId,lockKey,{ttlMs=20000,attempts=70}={}){
@@ -51,7 +70,7 @@ async function releaseLock(env,orgId,lockKey,token){
 }
 
 export async function withFolioWriteLockV34(env,orgId,work){
-  const token=await acquireLock(env,orgId,'folios');
+  const token=await acquireLock(env,orgId,'folios',{ttlMs:60000,attempts:100});
   try{return await work()}finally{await releaseLock(env,orgId,'folios',token)}
 }
 
@@ -98,6 +117,40 @@ export async function allocateScopedFoliosV66(env,orgId,scope,count=1){
       WHERE org_id=? AND location_id=? AND cost_center_id=?`).bind(last,timestamp,orgId,scope.locationId,scope.costCenterId).run();
     return Array.from({length:amount},(_,index)=>`${sequence.prefix}${String(start+index).padStart(5,'0')}`);
   }finally{await releaseLock(env,orgId,lockKey,token)}
+}
+
+export async function migrateLegacyFoliosV67(env,orgId){
+  await ensureLockTable(env);const version='scoped-sequence-v67';
+  const completed=await env.DB.prepare('SELECT migrated_count,skipped_count,completed_at FROM folio_migrations WHERE org_id=? AND version=?').bind(orgId,version).first();
+  if(completed)return{migrated:Number(completed.migrated_count||0),skipped:Number(completed.skipped_count||0),completedAt:completed.completed_at,alreadyMigrated:true};
+  const result=await env.DB.prepare(`SELECT o.id,o.folio,o.location_id,
+      COALESCE(occ.cost_center_id,o.cost_center_id) AS cost_center_id,
+      l.code AS location_code,l.name AS location_name,cc.code AS cost_center_code,cc.name AS cost_center_name,
+      COALESCE(o.emitted_at,o.sent_at,o.created_at) AS sequence_at,o.created_at
+    FROM orders o
+    JOIN locations l ON l.id=o.location_id AND l.org_id=o.org_id
+    LEFT JOIN order_cost_centers occ ON occ.order_id=o.id AND occ.org_id=o.org_id
+    LEFT JOIN cost_centers cc ON cc.id=COALESCE(occ.cost_center_id,o.cost_center_id) AND cc.org_id=o.org_id
+    WHERE o.org_id=? AND o.status!='draft'
+    ORDER BY sequence_at,o.created_at,o.id`).bind(orgId).all(),orders=rows(result),timestamp=nowIso();
+  const eligible=orders.filter(order=>order.location_id&&order.cost_center_id&&order.cost_center_code),skipped=orders.length-eligible.length;
+  if(!eligible.length){await env.DB.prepare('INSERT INTO folio_migrations(org_id,version,migrated_count,skipped_count,completed_at) VALUES(?,?,?,?,?)').bind(orgId,version,0,skipped,timestamp).run();return{migrated:0,skipped,completedAt:timestamp}}
+  const groups=new Map();for(const order of eligible){const key=`${order.location_id}:${order.cost_center_id}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(order)}
+  const sequences=new Map();for(const[key,items]of groups){const first=items[0],sequence=await ensureSequence(env,orgId,{locationId:first.location_id,locationCode:first.location_code,costCenterId:first.cost_center_id,costCenterCode:first.cost_center_code,costCenterName:first.cost_center_name});sequences.set(key,sequence)}
+  const aliasStatements=eligible.map(order=>env.DB.prepare(`INSERT INTO order_folio_aliases(org_id,order_id,legacy_folio,current_folio,migrated_at)
+    VALUES(?,?,?,?,?) ON CONFLICT(org_id,order_id) DO UPDATE SET current_folio=excluded.current_folio,migrated_at=excluded.migrated_at`).bind(orgId,order.id,String(order.folio||''),String(order.folio||''),timestamp));
+  await runBatches(env,aliasStatements);
+  await runBatches(env,eligible.map(order=>env.DB.prepare('UPDATE orders SET folio=?,updated_at=? WHERE id=? AND org_id=?').bind(`MIG-${order.id}-${uuid().slice(0,8)}`,timestamp,order.id,orgId)));
+  const finalStatements=[];let migrated=0;
+  for(const[key,items]of groups){const sequence=sequences.get(key);items.forEach((order,index)=>{const folio=`${sequence.prefix}${String(index+1).padStart(5,'0')}`;finalStatements.push(env.DB.prepare('UPDATE orders SET folio=?,revision=revision+1,updated_at=? WHERE id=? AND org_id=?').bind(folio,timestamp,order.id,orgId));finalStatements.push(env.DB.prepare('UPDATE order_folio_aliases SET current_folio=?,migrated_at=? WHERE org_id=? AND order_id=?').bind(folio,timestamp,orgId,order.id));finalStatements.push(env.DB.prepare(`INSERT INTO audit_logs(id,org_id,actor_user_id,actor_email,action,entity_type,entity_id,metadata_json,ip_hash,created_at)
+      VALUES(?,?,NULL,'system@nuvasto.local','system.folio_scope_migration','order',?,?,'',?)`).bind(uuid(),orgId,order.id,JSON.stringify({from:order.folio,to:folio,locationId:order.location_id,costCenterId:order.cost_center_id,version}),timestamp));migrated++});finalStatements.push(env.DB.prepare('UPDATE folio_sequences SET last_value=?,updated_at=? WHERE org_id=? AND location_id=? AND cost_center_id=?').bind(items.length,timestamp,orgId,items[0].location_id,items[0].cost_center_id))}
+  await runBatches(env,finalStatements);
+  await env.DB.prepare('INSERT INTO folio_migrations(org_id,version,migrated_count,skipped_count,completed_at) VALUES(?,?,?,?,?)').bind(orgId,version,migrated,skipped,timestamp).run();
+  return{migrated,skipped,completedAt:timestamp,alreadyMigrated:false};
+}
+
+export async function folioAliasMapV67(env,orgId,orderIds=[]){
+  await ensureLockTable(env);const ids=[...new Set(orderIds.map(String).filter(Boolean))];if(!ids.length)return new Map();const placeholders=ids.map(()=>'?').join(','),result=await env.DB.prepare(`SELECT order_id,legacy_folio,current_folio FROM order_folio_aliases WHERE org_id=? AND order_id IN (${placeholders})`).bind(orgId,...ids).all();return new Map(rows(result).map(item=>[item.order_id,{legacyFolio:item.legacy_folio,currentFolio:item.current_folio}]))
 }
 
 function folioParts(value){
