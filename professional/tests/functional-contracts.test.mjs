@@ -38,9 +38,12 @@ assert.ok(orderFile.includes('BORRADOR-')&&!orderFile.includes('getUTCFullYear')
 assert.ok(workerCore.includes('listOrdersCanonical')&&workerCore.includes('migrateLegacyFoliosV67'),'canonical worker must own paginated order reads and historical folio cutover');
 assert.ok(workerCore.includes("url.pathname==='/api/orders'")&&workerCore.includes("url.pathname==='/api/order-batches'")&&workerCore.includes('createCanonicalBatchFromLegacy'),'legacy creation endpoints must be routed through the canonical no-date folio flow');
 assert.ok(workerCore.includes('legacyDateFoliosRetired:true')&&workerCore.includes('canonicalOrderDetailV67:true'),'health must expose the canonical order cutover contract');
-assert.ok(workerCore.includes('ensureReleaseDataV67')&&workerCore.includes('folioMigrationV67:migration.ready'),'production health must complete the one-time historical folio migration before declaring r67 ready');
+assert.ok(workerCore.includes('ensureReleaseDataV67')&&workerCore.includes('folioMigrationV67:migration.ready'),'production health must complete the one-time historical folio migration before declaring the release ready');
 assert.ok(workerCore.includes('canonicalOrderDetail')&&workerCore.includes('batchId:meta?.batch_id'),'order detail must expose batch identity so draft bulk emission does not need a legacy route');
+assert.ok(workerCore.includes('async function prepareOrders(){return null}')&&workerCore.includes('readOnlyOrderQueriesV68:true'),'order reads must never wait for folio write locks after the release migration');
 assert.ok(ordersQuery.includes('payment_schedules')&&ordersQuery.includes('paymentState'),'order queue must expose payment and overdue state without extra browser requests');
 assert.ok(sw.includes('RELEASE_ASSET')&&sw.includes('releaseAssetResponse'),'release assets must be network-first so iOS cannot remain pinned to an old module graph');
+assert.ok(sw.includes('apiNetworkTimeout')&&sw.includes("path==='/api/orders/advanced'")&&sw.includes('32000'),'history reads must not be killed by the service worker before the application timeout');
+assert.ok(sw.includes("code:'request_timeout'")&&sw.includes("code:'offline_cache_miss'"),'service worker must distinguish a slow backend from a real offline cache miss');
 assert.ok(telemetry.includes('BUDGET_KEY')&&telemetry.includes('DAY_LIMIT=100000')&&telemetry.includes("status&&status!=='ok'"),'request budget diagnostics must be local, bounded and count failures correctly');
 console.log('functional contracts: OK');
