@@ -12,7 +12,7 @@ function filters(actor,url){
   if(scope)addIn(conditions,params,'o.location_id',scope.length?scope:['__none__']);
   if(view==='history')conditions.push("o.status IN ('closed','cancelled')");else if(view==='all'){}else conditions.push("o.status NOT IN ('closed','cancelled')");
   const supplier=String(url.searchParams.get('supplier')||''),location=String(url.searchParams.get('location')||''),center=String(url.searchParams.get('center')||''),status=String(url.searchParams.get('status')||''),invoice=String(url.searchParams.get('invoice')||''),reception=String(url.searchParams.get('reception')||''),brand=String(url.searchParams.get('brand')||''),category=String(url.searchParams.get('category')||''),from=String(url.searchParams.get('from')||''),to=String(url.searchParams.get('to')||''),q=String(url.searchParams.get('q')||'').trim();
-  if(supplier){conditions.push('o.supplier_id=?');params.push(supplier)}if(location){conditions.push('o.location_id=?');params.push(location)}if(center){conditions.push('COALESCE(occ.cost_center_id,o.cost_center_id)=?');params.push(center)}if(status){conditions.push('o.status=?');params.push(status)}
+  if(supplier){conditions.push('o.supplier_id=?');params.push(supplier)}if(location){conditions.push('o.location_id=?');params.push(location)}if(center){conditions.push('occ.cost_center_id=?');params.push(center)}if(status){conditions.push('o.status=?');params.push(status)}
   if(from){conditions.push("substr(COALESCE(o.emitted_at,o.sent_at,o.created_at),1,10)>=?");params.push(from)}if(to){conditions.push("substr(COALESCE(o.emitted_at,o.sent_at,o.created_at),1,10)<=?");params.push(to)}
   if(invoice==='pending')conditions.push('NOT EXISTS(SELECT 1 FROM invoice_order_links x WHERE x.order_id=o.id)');else if(invoice==='linked')conditions.push('EXISTS(SELECT 1 FROM invoice_order_links x WHERE x.order_id=o.id)');
   if(reception==='pending')conditions.push("NOT EXISTS(SELECT 1 FROM receptions rx WHERE rx.order_id=o.id AND rx.status='completed')");else if(reception==='received')conditions.push("EXISTS(SELECT 1 FROM receptions rx WHERE rx.order_id=o.id AND rx.status='completed')");
@@ -38,7 +38,7 @@ async function metadata(env,actor,scope){
 
 export async function listOrdersCanonical(env,actor,url){
   const limit=clamp(url.searchParams.get('limit')||60,20,150),{conditions,params,view,scope}=filters(actor,url),result=await env.DB.prepare(`SELECT o.id,o.batch_id,o.folio,o.status,o.delivery_date,o.created_at,o.updated_at,o.sent_at,o.emitted_at,o.gross_total,o.supplier_id,o.location_id,
-      COALESCE(occ.cost_center_id,o.cost_center_id) AS cost_center_id,s.name AS supplier_name,l.name AS location_name,cc.name AS cost_center_name,u.display_name AS requested_by,
+      occ.cost_center_id AS cost_center_id,s.name AS supplier_name,l.name AS location_name,cc.name AS cost_center_name,u.display_name AS requested_by,
       fa.legacy_folio,COALESCE(o.emitted_at,o.sent_at,o.created_at) AS sort_at,
       (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id=o.id) AS item_count,
       (SELECT COUNT(*) FROM invoice_order_links iol WHERE iol.order_id=o.id) AS invoice_count,
@@ -48,7 +48,7 @@ export async function listOrdersCanonical(env,actor,url){
       (SELECT MAX(r.received_at) FROM receptions r WHERE r.order_id=o.id AND r.status='completed') AS last_received_at
     FROM orders o JOIN suppliers s ON s.id=o.supplier_id AND s.org_id=o.org_id JOIN locations l ON l.id=o.location_id AND l.org_id=o.org_id
     LEFT JOIN order_cost_centers occ ON occ.order_id=o.id AND occ.org_id=o.org_id
-    LEFT JOIN cost_centers cc ON cc.id=COALESCE(occ.cost_center_id,o.cost_center_id) AND cc.org_id=o.org_id
+    LEFT JOIN cost_centers cc ON cc.id=occ.cost_center_id AND cc.org_id=o.org_id
     LEFT JOIN users u ON u.id=o.requested_by
     LEFT JOIN order_folio_aliases fa ON fa.org_id=o.org_id AND fa.order_id=o.id
     WHERE ${conditions.join(' AND ')} ORDER BY sort_at DESC,o.id DESC LIMIT ?`).bind(...params,limit+1).all(),items=rows(result),hasMore=items.length>limit,pageRows=items.slice(0,limit),ids=pageRows.map(item=>item.id),tags=new Map();
