@@ -19,14 +19,8 @@ export async function prepareDraftFoliosV40(env,orgId){
 
 export async function createOrderFileV40(request,env,actor){
   assertMinimumRole(actor.role,ROLES.PURCHASER);
-  await prepareDraftFoliosV40(env,actor.orgId);
-  const response=await createOrderFileV4(request,env,actor),timestamp=nowIso(),orders=response.orders||[];
-  if(!orders.length)return response;
-  const statements=orders.map((order,index)=>env.DB.prepare("UPDATE orders SET folio=?,updated_at=? WHERE id=? AND org_id=? AND status='draft'").bind(draftFolio(response.batchId,index),timestamp,order.id,actor.orgId));
-  await env.DB.batch(statements);
-  const updated=orders.map((order,index)=>({...order,folio:draftFolio(response.batchId,index),folioPending:true}));
-  await writeAudit(env,actor,request,'order_file.draft_folio','order_batch',response.batchId,{orders:updated.map(order=>order.id)});
-  return{...response,orders:updated,foliosAssignedOnEmission:true,folioStrategy:'local-cost-center-sequence'};
+  const response=await createOrderFileV4(request,env,actor);
+  return{...response,orders:(response.orders||[]).map(order=>({...order,folioPending:true})),foliosAssignedOnEmission:true,folioStrategy:'local-cost-center-sequence'};
 }
 
 export async function emitOrderBatchV40(request,env,actor,batchId,ctx){
