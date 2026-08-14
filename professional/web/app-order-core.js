@@ -1,5 +1,6 @@
 import {$,state,api,toast} from './app-core.js';
 
+export const DIRECT_DRAFT_EDIT_RELEASE='r73-canonical';
 let initialized=false,opening=false;
 const isNewOrderTarget=target=>target?.id==='mobileCreate'||target?.dataset?.action==='new-order'||(target?.id==='primaryAction'&&['dashboard','orders'].includes(state.view));
 async function master(){return import('./app-master-order.js')}
