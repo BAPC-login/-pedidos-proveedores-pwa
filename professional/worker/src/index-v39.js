@@ -30,7 +30,7 @@ export default{
       }
       if(method==='GET'&&url.pathname==='/health'){
         const response=await platformWorker.fetch(request,env,ctx),payload=await response.clone().json().catch(()=>({}));
-        return decorate(ok({...payload,version:RELEASE_VERSION,multiFilePickerVersion:39,maxDocumentBytes:MAX_DOCUMENT_BYTES,maxDocumentSizeMb:20,forcedPwaRefreshVersion:39,navigationStabilityVersion:39,multipleInvoicesPerOrder:true,maxDocumentsPerUpload:5},request,env),request,env);
+        return decorate(ok({...payload,version:RELEASE_VERSION,multiFilePickerVersion:39,maxDocumentBytes:MAX_DOCUMENT_BYTES,maxDocumentSizeMb:20,forcedPwaRefreshVersion:39,navigationStabilityVersion:39,multipleInvoicesPerOrder:true,maxDocumentsPerUpload:5,supplierEvidenceReconciliationV75:true,serverOrderReconciliationContextV75:true,historicalInvoiceAliasMatchingV75:true},request,env),request,env);
       }
       return decorate(await platformWorker.fetch(request,env,ctx),request,env);
     }catch(error){return decorate(errorResponse(error,request,env),request,env)}
