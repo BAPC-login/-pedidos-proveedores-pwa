@@ -25,7 +25,7 @@ assert.ok(master.includes('LOCAL_DRAFT_VERSION=71')&&master.includes('SERVER_AUT
 assert.ok(master.includes('id="clearMasterQuantities"')&&master.includes("for(const value of selections.values())value.quantity=''"), 'master list must clear all quantity inputs without recapturing stale DOM values');
 assert.ok(master.includes('Formato: <b>')&&master.includes('openMasterOrder({order:'),'create and edit must share the same master order renderer with visible purchase format');
 assert.ok(runtime.includes('.v40-dashboard')&&runtime.includes('.v40-chart-line'),'dashboard visual system must be loaded by canonical runtime');
-assert.ok(sw.includes('nuvasto-v74-payment-documents')&&sw.includes('sessionCacheKey')&&sw.includes('apiDataResponse'),'service worker must provide authenticated offline data fallback');
+assert.ok(sw.includes('nuvasto-v75-invoice-arithmetic')&&sw.includes('sessionCacheKey')&&sw.includes('apiDataResponse'),'service worker must provide authenticated offline data fallback and invalidate stale invoice UI');
 assert.ok(!sw.includes("'./app-procurement.js'")&&!sw.includes("'./app-enterprise.js'"),'service worker critical precache must exclude noncritical feature bundles');
 assert.ok(sw.includes('RELEASE_ASSET')&&sw.includes('releaseAssetResponse')&&sw.includes('const cached=await cache.match'),'release JS/CSS must be cache-first inside a release-scoped cache');
 assert.ok(documents.includes('minValue')&&documents.includes('meta.suppliers')&&documents.includes('data-v32-image-key'),'documents must expose preview and operational filters');

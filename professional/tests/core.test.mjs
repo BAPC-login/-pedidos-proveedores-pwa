@@ -34,8 +34,9 @@ assert.equal(reconciledLine.productId,'coke-zero','supplier alias must resolve a
 assert.equal(reconciledLine.packSize,6,'explicit invoice pack must be preserved');
 assert.equal(reconciledLine.units,6,'invoice package quantity must normalize to base units');
 assert.equal(reconciledLine.orderedFormatQty,1,'base units must reconcile to the order purchase format');
-assert.equal(reconciledLine.grossUnitPrice,2000,'unit price must be derived from line total and normalized units');
-assert.equal(reconciledLine.priceVerified,true,'deterministic line arithmetic must mark price as verified');
+assert.equal(reconciledLine.grossUnitPrice,2000,'line total can remain a fallback when invoice-level arithmetic is unavailable');
+assert.equal(reconciledLine.priceVerified,false,'a gross line value without printed invoice totals must not be presented as verified');
+assert.equal(reconciledLine.priceSource,'document-line-fallback','unverified line pricing must expose its fallback provenance');
 assert.equal(reconciledLine.matchMethod,'supplier-alias','learned supplier alias should be recorded as the match method');
 
 console.log('professional core tests: OK');
