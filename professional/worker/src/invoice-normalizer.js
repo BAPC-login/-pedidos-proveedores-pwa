@@ -18,7 +18,18 @@ function variantPenalty(left,right){const a=expand(left),b=expand(right);let del
 function scoreCandidate(source,label){if(!source||!label)return 0;let score=similarity(source,label)+variantPenalty(source,label);const a=contentMl(source),b=contentMl(label);if(a&&b)score+=a===b?.20:-.55;const left=expand(source),right=expand(label);if(left===right)score=Math.max(score,.98);else if(left.length>=7&&right.length>=7&&(left.includes(right)||right.includes(left)))score=Math.max(score,.86);return Math.max(0,Math.min(1,score))}
 function lineSource(line){return[line.code,line.supplierSku,line.sourceLine,line.descriptionOriginal,line.description].filter(Boolean).join(' ').trim()}
 function productLabels(product){return[product.description,product.catalogName,product.supplierProductName,product.supplierName].map(value=>String(value||'').trim()).filter(Boolean)}
-function identifierEvidence(line,product,source){const lineIds=[line.code,line.supplierSku,line.sku,line.barcode].map(usefulIdentifier).filter(Boolean),productIds=[product.supplierSku,product.barcode].map(usefulIdentifier).filter(Boolean);for(const target of productIds){if(lineIds.includes(target))return{score:1,method:target===usefulIdentifier(product.barcode)?'barcode':'supplier-sku',reason:'Coincidencia exacta por identificador del proveedor'}const words=text(source).split(' ').map(usefulIdentifier).filter(Boolean);if(words.includes(target))return{score:.98,method:target===usefulIdentifier(product.barcode)?'barcode':'supplier-sku',reason:'Identificador del proveedor presente en la línea'}}return null}
+function identifierEvidence(line,product,source){
+  const lineIds=[line.code,line.supplierSku,line.sku,line.barcode].map(usefulIdentifier).filter(Boolean);
+  const productIds=[product.supplierSku,product.barcode].map(usefulIdentifier).filter(Boolean);
+  const words=text(source).split(' ').map(usefulIdentifier).filter(Boolean);
+  const barcodeId=usefulIdentifier(product.barcode);
+  for(const target of productIds){
+    const method=target===barcodeId?'barcode':'supplier-sku';
+    if(lineIds.includes(target))return{score:1,method,reason:'Coincidencia exacta por identificador del proveedor'};
+    if(words.includes(target))return{score:.98,method,reason:'Identificador del proveedor presente en la línea'};
+  }
+  return null;
+}
 function productScore(line,product,aliasMap){const source=lineSource(line),idHit=identifierEvidence(line,product,source);if(idHit)return{product,score:idHit.score,method:idHit.method,reason:idHit.reason,evidence:'identifier'};let score=0,method='catalog-name',reason='Coincidencia por nombre, variante y formato',evidence='catalog';for(const label of productLabels(product)){const candidate=scoreCandidate(source,label);if(candidate>score){score=candidate;method=label===product.supplierProductName?'supplier-product-name':'catalog-name';reason=method==='supplier-product-name'?'Coincidencia con el nombre usado por el proveedor':'Coincidencia por nombre, variante y formato';evidence=method}}for(const alias of aliasMap.get(String(product.productId))||[]){const aliasScore=scoreCandidate(source,alias.alias)+Math.min(.12,Math.max(0,numeric(alias.confidence)-.5)*.18)+Math.min(.05,Math.log10(1+Math.max(0,numeric(alias.usageCount)))*.03);if(aliasScore>score){score=aliasScore;method='supplier-alias';reason='Coincidencia con descripción histórica confirmada para este proveedor';evidence='historical-alias'}}return{product,score:Math.min(1,score),method,reason,evidence}}
 function findProduct(line,products,aliasMap){
   const source=lineSource(line),ids=[line.productId,line.matchedOrderProductId,line.suggestedProductId].map(String).filter(Boolean);
