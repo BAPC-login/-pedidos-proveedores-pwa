@@ -78,7 +78,15 @@ jobs:
           if grep -Fq "upload.append('orderFile'" professional/web/app-invoice-v30.js; then echo '::error::Invoice analysis still duplicates structured order as PDF'; exit 1; fi
           grep -Fq 'context.aliases' professional/worker/src/invoice-normalizer.js
           grep -Fq 'supplier-alias' professional/worker/src/invoice-normalizer.js
-          grep -Fq 'normalizationVersion:73' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'normalizationVersion:76' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'allocateInvoicePricing' professional/worker/src/invoice-normalizer.js
+          grep -Fq "priceSource='invoice-total-tax-allocation'" professional/worker/src/invoice-normalizer.js
+          grep -Fq 'documentTotalComputed' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'checksumDelta' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'orderId:queue.orderId' professional/web/app-multi-invoice.js
+          grep -Fq 'Bruto final calculado' professional/web/app-multi-invoice.js
+          grep -Fq 'Precio trazable desde la factura' professional/web/app-multi-invoice.js
+          if grep -Fq "upload.append('orderFile'" professional/web/app-multi-invoice.js; then echo '::error::Multi-invoice flow still duplicates the canonical order PDF'; exit 1; fi
           grep -Fq 'Medio de pago detectado por IA' professional/web/app-invoice-v30.js
           grep -Fq 'chequeCollectionDate' professional/web/app-invoice-v30.js
           grep -Fq 'mobileMoreIcon' professional/web/app.js
