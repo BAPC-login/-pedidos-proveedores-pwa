@@ -36,8 +36,23 @@ jobs:
           grep -Fq 'data-v32-matrix-product' professional/web/app-catalog.js
           grep -Fq 'document_name_locked' professional/worker/src/index-v33.js
           grep -Fq 'minValue' professional/web/app-documents.js
-          grep -Fq 'orderIds' professional/worker/src/api/payments.js
+          grep -Fq 'payment_methods' professional/worker/src/api/schema-v41.js
+          grep -Fq 'cheque_collection_date' professional/worker/src/api/schema-v41.js
+          grep -Fq 'listPaymentMethodsCanonical' professional/worker/src/api/payments.js
+          grep -Fq 'listChequeScheduleCanonical' professional/worker/src/api/payments.js
+          grep -Fq 'applyInvoicePaymentMetadata' professional/worker/src/api/payments.js
           grep -Fq 'openPaymentForOrder' professional/web/app-payment-workflow.js
+          grep -Fq 'openPaymentMethodsManager' professional/web/app-payment-workflow.js
+          grep -Fq 'Cobros programados' professional/web/app-payment-workflow.js
+          if grep -Fq 'MutationObserver' professional/web/app-payment-workflow.js; then echo '::error::Payment workflow must not observe the whole DOM'; exit 1; fi
+          grep -Fq 'Medio de pago detectado por IA' professional/web/app-invoice-v30.js
+          grep -Fq 'chequeCollectionDate' professional/web/app-invoice-v30.js
+          grep -Fq "methodKind: {type: 'STRING'}" worker/src/index.js
+          grep -Fq "cheque.serialNumber" worker/src/index.js
+          grep -Fq 'Jamás inventes campos de pago' worker/src/index.js
+          grep -Fq 'SESSION_TOUCH_INTERVAL_MS=10*60*1000' professional/worker/src/auth.js
+          grep -Fq 'LEFT JOIN platform_owners po' professional/worker/src/auth.js
+          if grep -Fq "SELECT user_id FROM platform_owners WHERE user_id" professional/worker/src/auth.js; then echo '::error::Authentication still performs a second platform-owner query'; exit 1; fi
           grep -Fq 'priceReconciliation' professional/worker/src/api/invoice-analysis-core-v39.js
           grep -Fq 'priceVerified:true' professional/worker/src/invoice-normalizer.js
           grep -Fq 'nuvasto-v71-native-fast' professional/web/sw.js
