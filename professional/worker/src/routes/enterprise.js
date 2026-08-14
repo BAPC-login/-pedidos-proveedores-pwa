@@ -1,5 +1,5 @@
 export function matchEnterpriseDomain(path,method){
-  const exact=new Set(['/api/dashboard/analytics-v41','/api/receptions/work-queue','/api/finance/payments','/api/finance/payment-methods','/api/finance/cheques','/api/finance/payment-documents','/api/finance/payment-candidates','/api/approvals','/api/approval-policies','/api/order-templates','/api/notifications-v41','/api/report-views','/api/presence','/api/global-search','/api/supplier-scorecards','/api/orders/close-reconciled','/api/platform/usage-v41']);
+  const exact=new Set(['/api/dashboard/analytics-v41','/api/receptions/work-queue','/api/finance/payments','/api/finance/payment-methods','/api/finance/cheques','/api/finance/payment-documents','/api/finance/payment-candidates','/api/finance/payment-proof-analysis','/api/approvals','/api/approval-policies','/api/order-templates','/api/notifications-v41','/api/report-views','/api/presence','/api/global-search','/api/supplier-scorecards','/api/orders/close-reconciled','/api/platform/usage-v41']);
   if(exact.has(path))return{implementation:'enterprise',layer:path.startsWith('/api/finance/')?'finance':'enterprise'};
   if(method==='POST'&&path==='/api/order-batches/v2')return{implementation:'enterprise',layer:'orders'};
   if(method==='POST'&&/^\/api\/orders\/[^/]+\/receptions$/.test(path))return{implementation:'enterprise',layer:'reception'};
