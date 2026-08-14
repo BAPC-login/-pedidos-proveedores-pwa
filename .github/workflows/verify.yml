@@ -51,7 +51,7 @@ jobs:
           grep -Fq 'minValue' professional/web/app-documents.js
           grep -Fq "'/api/finance/payment-methods'" professional/worker/src/routes/enterprise.js
           grep -Fq "'/api/finance/cheques'" professional/worker/src/routes/enterprise.js
-          grep -Fq 'finance\\/payment-methods' professional/worker/src/routes/enterprise.js
+          grep -Fq 'finance-payment-methods' professional/worker/src/routes/enterprise.js
           grep -Fq 'ensureOrderPaymentSchedules' professional/worker/src/api/payments.js
           grep -Fq "url.searchParams.get('orderId')" professional/worker/src/api/payments.js
           grep -Fq 'paymentsForOrder' professional/web/app-payment-workflow.js
