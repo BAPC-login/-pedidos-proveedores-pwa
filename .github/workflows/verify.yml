@@ -111,7 +111,7 @@ jobs:
           grep -Fq 'sameSupplierPaymentV74:true' professional/worker/src/router.js
           grep -Fq 'multiInvoicePaymentV74:true' professional/worker/src/router.js
           grep -Fq 'multiOrderPaymentV74:true' professional/worker/src/router.js
-          grep -Fq 'nuvasto-v74-payment-documents' professional/web/sw.js
+          grep -Fq 'nuvasto-v75-invoice-arithmetic' professional/web/sw.js
           if grep -Fq "'./app-procurement.js'" professional/web/sw.js; then echo '::error::Service worker precache still contains noncritical procurement bundle'; exit 1; fi
           grep -Fq 'overflow-y:auto' professional/web/native-performance.css
           grep -Fq 'initializeOrderSelection' professional/web/app-bootstrap.js
