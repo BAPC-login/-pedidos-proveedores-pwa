@@ -27,8 +27,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -Fq "CLIENT_RELEASE='2026.08.14.74'" professional/web/app.js
-          grep -Fq "PLATFORM_RELEASE='2026.08.14.74'" worker/src/combined.js
+          grep -Fq "CLIENT_RELEASE='2026.08.14.76'" professional/web/app.js
+          grep -Fq "PLATFORM_RELEASE='2026.08.14.76'" worker/src/combined.js
           grep -Fq "import './app-session-bootstrap.js'" professional/web/app.js
           grep -Fq 'nuvasto:ephemeral-token' professional/web/app-session-bootstrap.js
           grep -Fq 'isUserVerifyingPlatformAuthenticatorAvailable' professional/web/app-auth-experience.js
@@ -80,12 +80,21 @@ jobs:
           grep -Fq 'supplier-alias' professional/worker/src/invoice-normalizer.js
           grep -Fq 'normalizationVersion:76' professional/worker/src/invoice-normalizer.js
           grep -Fq 'allocateInvoicePricing' professional/worker/src/invoice-normalizer.js
-          grep -Fq "priceSource='invoice-total-tax-allocation'" professional/worker/src/invoice-normalizer.js
+          grep -Fq 'printed-final-unit-column' professional/worker/src/invoice-normalizer.js
+          grep -Fq "priceSource:'printed-final-unit'" professional/worker/src/invoice-normalizer.js
+          grep -Fq 'supplier-total-x-unidad' professional/worker/src/invoice-normalizer.js
           grep -Fq 'documentTotalComputed' professional/worker/src/invoice-normalizer.js
           grep -Fq 'checksumDelta' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'finalUnitPrice' worker/src/index.js
+          grep -Fq 'Total x Unidad' worker/src/index.js
+          grep -Fq 'PISQUERA DE CHILE' worker/src/index.js
+          grep -Fq 'VINA SAN PEDRO' worker/src/index.js
           grep -Fq 'orderId:queue.orderId' professional/web/app-multi-invoice.js
-          grep -Fq 'Bruto final calculado' professional/web/app-multi-invoice.js
-          grep -Fq 'Precio trazable desde la factura' professional/web/app-multi-invoice.js
+          grep -Fq 'Precio final impreso · Total x Unidad' professional/web/app-multi-invoice.js
+          grep -Fq 'data-printed-final-unit' professional/web/app-multi-invoice.js
+          grep -Fq 'supplierFinalUnitReadersV76:true' professional/worker/src/router.js
+          grep -Fq 'printedFinalUnitPricingV76:true' professional/worker/src/router.js
+          grep -Fq 'supplierInvoiceProfilesV76:true' professional/worker/src/router.js
           if grep -Fq "upload.append('orderFile'" professional/web/app-multi-invoice.js; then echo '::error::Multi-invoice flow still duplicates the canonical order PDF'; exit 1; fi
           grep -Fq 'Medio de pago detectado por IA' professional/web/app-invoice-v30.js
           grep -Fq 'chequeCollectionDate' professional/web/app-invoice-v30.js
@@ -111,7 +120,7 @@ jobs:
           grep -Fq 'sameSupplierPaymentV74:true' professional/worker/src/router.js
           grep -Fq 'multiInvoicePaymentV74:true' professional/worker/src/router.js
           grep -Fq 'multiOrderPaymentV74:true' professional/worker/src/router.js
-          grep -Fq 'nuvasto-v75-invoice-arithmetic' professional/web/sw.js
+          grep -Fq 'nuvasto-v76-supplier-final-unit' professional/web/sw.js
           if grep -Fq "'./app-procurement.js'" professional/web/sw.js; then echo '::error::Service worker precache still contains noncritical procurement bundle'; exit 1; fi
           grep -Fq 'overflow-y:auto' professional/web/native-performance.css
           grep -Fq 'initializeOrderSelection' professional/web/app-bootstrap.js

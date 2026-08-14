@@ -54,7 +54,8 @@ jobs:
             const r72=h.domainRouterV72===true&&h.passkeyAuthV72===true&&h.platformBiometricLoginV72===true&&h.optionalRememberDeviceV72===true&&h.legalTermsV2V72===true;
             const r73=h.domainRouterV73===true&&h.reconciliationAliasResolverV73===true&&h.reconciliationListV73===true&&h.financeRoutingV73===true&&h.orderPaymentRepairV73===true&&h.directDraftEditV73===true&&h.nativeMotionV73===true&&h.structuredInvoiceComparisonV73===true;
             const r74=h.domainRouterV74===true&&h.paymentDocumentsV74===true&&h.collectivePaymentAllocationV74===true&&h.sameSupplierPaymentV74===true&&h.multiInvoicePaymentV74===true&&h.multiOrderPaymentV74===true;
-            process.stdout.write(storage&&runtime&&legacy&&r71&&r72&&r73&&r74&&migration?'true':'false');
+            const r76=h.supplierFinalUnitReadersV76===true&&h.printedFinalUnitPricingV76===true&&h.supplierInvoiceProfilesV76===true;
+            process.stdout.write(storage&&runtime&&legacy&&r71&&r72&&r73&&r74&&r76&&migration?'true':'false');
           } catch { process.stdout.write('false'); }
           NODE
             )
@@ -94,8 +95,8 @@ jobs:
           grep -Fq 'nuvasto_supplier_alias' /tmp/app-invoice-v30.js || { echo '::error::cotejo local no usa alias del proveedor'; exit 1; }
           if grep -Fq "upload.append('orderFile'" /tmp/app-invoice-v30.js; then echo '::error::factura sigue enviando PDF duplicado del pedido al motor'; exit 1; fi
           grep -Fq 'orderId:queue.orderId' /tmp/app-multi-invoice.js || { echo '::error::carga de factura perdió el pedido de origen'; exit 1; }
-          grep -Fq 'Bruto final calculado' /tmp/app-multi-invoice.js || { echo '::error::revisión de factura no muestra bruto final calculado'; exit 1; }
-          grep -Fq 'Precio trazable desde la factura' /tmp/app-multi-invoice.js || { echo '::error::revisión no explica la trazabilidad de precio'; exit 1; }
+          grep -Fq 'Precio final impreso · Total x Unidad' /tmp/app-multi-invoice.js || { echo '::error::revisión no expone el precio final unitario impreso'; exit 1; }
+          grep -Fq 'data-printed-final-unit' /tmp/app-multi-invoice.js || { echo '::error::revisión no preserva la columna Total x Unidad'; exit 1; }
           if grep -Fq "upload.append('orderFile'" /tmp/app-multi-invoice.js; then echo '::error::carga múltiple todavía duplica el PDF del pedido'; exit 1; fi
           grep -Fq 'v30-reconcile-row' /tmp/app-runtime-v30.js || { echo '::error::estilos de lista de cotejo no están en producción'; exit 1; }
           grep -Fq 'Medio de pago detectado por IA' /tmp/app-invoice-v30.js || { echo '::error::revisión de factura no presenta pago detectado por IA'; exit 1; }
@@ -107,11 +108,11 @@ jobs:
           grep -Fq 'duration:140' /tmp/app-router-v14.js || { echo '::error::transición rápida de rutas no está en producción'; exit 1; }
           grep -Fq 'nuvasto-modal-enter' /tmp/native-performance.css || { echo '::error::transición de modal no está en producción'; exit 1; }
           grep -Fq 'overflow-y:auto' /tmp/native-performance.css || { echo '::error::contenido principal no tiene scroll nativo'; exit 1; }
-          grep -Fq 'nuvasto-v75-invoice-arithmetic' /tmp/sw.js || { echo '::error::service worker no activó el corte de caché del motor de facturas'; exit 1; }
+          grep -Fq 'nuvasto-v76-supplier-final-unit' /tmp/sw.js || { echo '::error::service worker no activó el corte de caché del motor de facturas'; exit 1; }
           if grep -Fq "'./app-procurement.js'" /tmp/sw.js; then echo '::error::Service Worker aún precarga bundles no críticos'; exit 1; fi
           grep -Fq 'apiNetworkTimeout' /tmp/sw.js || { echo '::error::timeout API adaptable no está en producción'; exit 1; }
           grep -Fq 'const cached=await cache.match' /tmp/sw.js || { echo '::error::assets de release no usan cache-first'; exit 1; }
-          echo "Nuvasto $release · precios de factura y contexto de pedido verificados en producción."
+          echo "Nuvasto $release · lectores CCU/Pisquera/VSPT y precio final unitario verificados en producción."
       - name: Production procurement journey
         id: synthetic
         if: steps.verify.outcome == 'success'
