@@ -14,6 +14,7 @@ import {initializeSsoV20} from './app-sso-v20.js';
 import {initializeProfessionalV20} from './app-professional-v20.js';
 import {initializeNuvastoV21} from './app-nuvasto-v21.js';
 import {initializeCheckoutInvoiceV29} from './app-checkout-invoice-v29.js';
+import {initializePaymentWorkflow} from './app-payment-workflow.js';
 import {initializeLegalExperience} from './app-legal.js';
 import {initializeProfessional} from './app-professional.js';
 
@@ -36,6 +37,7 @@ export function initializePlatform(){
   initializeSsoV20();
   initializeProfessionalV20();
   initializeCheckoutInvoiceV29();
+  initializePaymentWorkflow();
   initializeLegalExperience();
   initializeProfessional();
 }
