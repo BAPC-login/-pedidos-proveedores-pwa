@@ -1,26 +1,11 @@
 import {$,state,api,toast} from './app-core.js';
-import {closeModal} from './app-modal.js';
 
 let initialized=false,opening=false;
 const isNewOrderTarget=target=>target?.id==='mobileCreate'||target?.dataset?.action==='new-order'||(target?.id==='primaryAction'&&['dashboard','orders'].includes(state.view));
 async function master(){return import('./app-master-order.js')}
 export async function openMasterOrder(options={}){const module=await master();return module.openMasterOrder(options)}
-async function openExistingFromDetail(){
-  if(opening)return;opening=true;
-  try{
-    const folio=String($('#modalEyebrow')?.textContent||'').trim();
-    const summary=(state.cache.orders||[]).find(item=>String(item.folio||'').trim()===folio)||null;
-    if(!summary?.id)throw new Error('No se pudo identificar el pedido en edición');
-    const payload=await api(`/api/orders/${encodeURIComponent(summary.id)}`,{fresh:true,timeout:20000});
-    closeModal('edit');setTimeout(()=>openMasterOrder({order:payload.order}).catch(error=>toast(error.message,'error')),0);
-  }catch(error){toast(error.message,'error')}finally{opening=false}
-}
-function intercept(event){
-  const target=event.target.closest('button,[data-action]');if(!target)return;
-  if(target.id==='v30EditOrder'){
-    event.preventDefault();event.stopImmediatePropagation();openExistingFromDetail();return;
-  }
-  if(!isNewOrderTarget(target))return;
-  event.preventDefault();event.stopImmediatePropagation();openMasterOrder().catch(error=>toast(error.message,'error'));
-}
-export function initializeOrderCore(){if(initialized)return;initialized=true;document.addEventListener('click',intercept,true)}
+async function openExistingById(orderId){if(opening)return;opening=true;try{const [payload,module]=await Promise.all([api(`/api/orders/${encodeURIComponent(orderId)}`,{fresh:true,timeout:20000}),master()]);if(!payload?.order)throw new Error('No se pudo cargar el borrador');return module.openMasterOrder({order:payload.order})}finally{opening=false}}
+async function openExistingFromDetail(){const folio=String($('#modalEyebrow')?.textContent||'').trim(),summary=(state.cache.orders||[]).find(item=>String(item.folio||'').trim()===folio)||null;if(!summary?.id)throw new Error('No se pudo identificar el pedido en edición');return openExistingById(summary.id)}
+function clickIntercept(event){const target=event.target.closest('button,[data-action]');if(!target)return;if(target.id==='v30EditOrder'){event.preventDefault();event.stopImmediatePropagation();openExistingFromDetail().catch(error=>toast(error.message,'error'));return}const primary=target.closest?.('[data-v32-order-primary]');if(primary){const summary=(state.cache.orders||[]).find(item=>String(item.id)===String(primary.dataset.v32OrderPrimary));if(summary?.status==='draft'){event.preventDefault();event.stopImmediatePropagation();openExistingById(summary.id).catch(error=>toast(error.message,'error'));return}}if(!isNewOrderTarget(target))return;event.preventDefault();event.stopImmediatePropagation();openMasterOrder().catch(error=>toast(error.message,'error'))}
+function changeIntercept(event){const select=event.target.closest?.('select[data-v67-order-actions]');if(!select||select.value!=='edit')return;const summary=(state.cache.orders||[]).find(item=>String(item.id)===String(select.dataset.v67OrderActions));if(!summary||summary.status!=='draft')return;event.preventDefault();event.stopImmediatePropagation();select.value='';openExistingById(summary.id).catch(error=>toast(error.message,'error'))}
+export function initializeOrderCore(){if(initialized)return;initialized=true;document.addEventListener('click',clickIntercept,true);document.addEventListener('change',changeIntercept,true)}

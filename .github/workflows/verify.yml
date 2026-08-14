@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -Fq "CLIENT_RELEASE='2026.08.14.72'" professional/web/app.js
+          grep -Fq "CLIENT_RELEASE='2026.08.14.73'" professional/web/app.js
           grep -Fq "import './app-session-bootstrap.js'" professional/web/app.js
           grep -Fq 'nuvasto:ephemeral-token' professional/web/app-session-bootstrap.js
           grep -Fq 'isUserVerifyingPlatformAuthenticatorAvailable' professional/web/app-auth-experience.js
@@ -40,6 +40,8 @@ jobs:
           grep -Fq 'Versión 2.0 · agosto de 2026' professional/web/app-legal.js
           if grep -Fq 'app-sso-v20.js' professional/web/app-bootstrap.js; then echo '::error::Cloudflare Access SSO remains active in canonical bootstrap'; exit 1; fi
           grep -Fq "import('./app-master-order.js')" professional/web/app-order-core.js
+          grep -Fq 'data-v32-order-primary' professional/web/app-order-core.js
+          grep -Fq 'changeIntercept' professional/web/app-order-core.js
           grep -Fq 'LOCAL_DRAFT_VERSION=71' professional/web/app-master-order.js
           grep -Fq 'SERVER_AUTOSAVE_DELAY=1200' professional/web/app-master-order.js
           grep -Fq 'id="clearMasterQuantities"' professional/web/app-master-order.js
@@ -47,17 +49,29 @@ jobs:
           grep -Fq 'data-v32-matrix-product' professional/web/app-catalog.js
           grep -Fq 'document_name_locked' professional/worker/src/index-v33.js
           grep -Fq 'minValue' professional/web/app-documents.js
-          grep -Fq 'payment_methods' professional/worker/src/api/schema-v41.js
-          grep -Fq 'cheque_collection_date' professional/worker/src/api/schema-v41.js
-          grep -Fq 'listPaymentMethodsCanonical' professional/worker/src/api/payments.js
-          grep -Fq 'listChequeScheduleCanonical' professional/worker/src/api/payments.js
-          grep -Fq 'applyInvoicePaymentMetadata' professional/worker/src/api/payments.js
-          grep -Fq 'openPaymentForOrder' professional/web/app-payment-workflow.js
+          grep -Fq "'/api/finance/payment-methods'" professional/worker/src/routes/enterprise.js
+          grep -Fq "'/api/finance/cheques'" professional/worker/src/routes/enterprise.js
+          grep -Fq 'finance-payment-methods' professional/worker/src/routes/enterprise.js
+          grep -Fq 'ensureOrderPaymentSchedules' professional/worker/src/api/payments.js
+          grep -Fq "url.searchParams.get('orderId')" professional/worker/src/api/payments.js
+          grep -Fq 'paymentsForOrder' professional/web/app-payment-workflow.js
+          grep -Fq '/api/finance/payments?orderId=' professional/web/app-payment-workflow.js
           grep -Fq 'openPaymentMethodsManager' professional/web/app-payment-workflow.js
           grep -Fq 'Cobros programados' professional/web/app-payment-workflow.js
           if grep -Fq 'MutationObserver' professional/web/app-payment-workflow.js; then echo '::error::Payment workflow must not observe the whole DOM'; exit 1; fi
+          grep -Fq 'v30-reconcile-list' professional/web/app-invoice-v30.js
+          grep -Fq 'nuvasto_supplier_alias' professional/web/app-invoice-v30.js
+          if grep -Fq "upload.append('orderFile'" professional/web/app-invoice-v30.js; then echo '::error::Invoice analysis still duplicates structured order as PDF'; exit 1; fi
+          grep -Fq 'context.aliases' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'supplier-alias' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'normalizationVersion:73' professional/worker/src/invoice-normalizer.js
           grep -Fq 'Medio de pago detectado por IA' professional/web/app-invoice-v30.js
           grep -Fq 'chequeCollectionDate' professional/web/app-invoice-v30.js
+          grep -Fq 'mobileMoreIcon' professional/web/app.js
+          grep -Fq 'Medios de pago' professional/web/app.js
+          grep -Fq 'mobile-more-grid' professional/web/native-performance.css
+          grep -Fq 'duration:140' professional/web/app-router-v14.js
+          grep -Fq 'nuvasto-modal-enter' professional/web/native-performance.css
           grep -Fq "methodKind: {type: 'STRING'}" worker/src/index.js
           grep -Fq "cheque.serialNumber" worker/src/index.js
           grep -Fq 'Jamás inventes campos de pago' worker/src/index.js
@@ -66,7 +80,10 @@ jobs:
           if grep -Fq "SELECT user_id FROM platform_owners WHERE user_id" professional/worker/src/auth.js; then echo '::error::Authentication still performs a second platform-owner query'; exit 1; fi
           grep -Fq 'priceReconciliation' professional/worker/src/api/invoice-analysis-core-v39.js
           grep -Fq 'priceVerified:true' professional/worker/src/invoice-normalizer.js
-          grep -Fq 'nuvasto-v71-native-fast-r72-auth-passkeys' professional/web/sw.js
+          grep -Fq 'domainRouterV73:true' professional/worker/src/router.js
+          grep -Fq 'financeRoutingV73:true' professional/worker/src/router.js
+          grep -Fq 'reconciliationAliasResolverV73:true' professional/worker/src/router.js
+          grep -Fq 'nuvasto-v71-native-fast-r73-reconcile-finance' professional/web/sw.js
           if grep -Fq "'./app-procurement.js'" professional/web/sw.js; then echo '::error::Service worker precache still contains noncritical procurement bundle'; exit 1; fi
           grep -Fq 'overflow-y:auto' professional/web/native-performance.css
           grep -Fq 'initializeOrderSelection' professional/web/app-bootstrap.js

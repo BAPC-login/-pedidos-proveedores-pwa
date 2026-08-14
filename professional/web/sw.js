@@ -1,4 +1,4 @@
-const VERSION='nuvasto-v71-native-fast-r72-auth-passkeys';
+const VERSION='nuvasto-v71-native-fast-r73-reconcile-finance';
 const DATA_CACHE=`${VERSION}-data`;
 const PRECACHE=['./','./styles.css','./pro-ui.css','./experience.css','./design-system-v13.css','./design-system-v14.css','./brand-v21.css','./native-performance.css','./app.js','./app-core.js','./app-bootstrap.js','./app-session-bootstrap.js','./app-auth-experience.js','./app-legal.js','./manifest.webmanifest','./icon.svg','./nuvasto-mark.svg','./nuvasto-logo.svg'];
 const RELEASE_ASSET=/\.(?:js|css|webmanifest)$/i;
