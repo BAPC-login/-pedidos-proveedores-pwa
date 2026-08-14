@@ -4,50 +4,9 @@ import {writeAudit} from '../auth.js';
 const rows=result=>result?.results||[];
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santiago'}).format(new Date());
 let columnsPromise=null;
-
-async function ensurePaymentColumns(env){
-  if(columnsPromise)return columnsPromise;
-  columnsPromise=(async()=>{
-    const info=rows(await env.DB.prepare('PRAGMA table_info(payment_schedules)').all()),names=new Set(info.map(item=>item.name));
-    const definitions={payment_method:"TEXT NOT NULL DEFAULT ''",payment_date:'TEXT',cheque_number:"TEXT NOT NULL DEFAULT ''",proof_file_id:'TEXT',paid_amount:'INTEGER NOT NULL DEFAULT 0'};
-    for(const[column,definition]of Object.entries(definitions))if(!names.has(column))await env.DB.prepare(`ALTER TABLE payment_schedules ADD COLUMN ${column} ${definition}`).run();
-    return true;
-  })().catch(error=>{columnsPromise=null;throw error});
-  return columnsPromise;
-}
-
+async function ensurePaymentColumns(env){if(columnsPromise)return columnsPromise;columnsPromise=(async()=>{const info=rows(await env.DB.prepare('PRAGMA table_info(payment_schedules)').all()),names=new Set(info.map(item=>item.name));const definitions={payment_method:"TEXT NOT NULL DEFAULT ''",payment_date:'TEXT',cheque_number:"TEXT NOT NULL DEFAULT ''",proof_file_id:'TEXT',paid_amount:'INTEGER NOT NULL DEFAULT 0'};for(const[column,definition]of Object.entries(definitions))if(!names.has(column))await env.DB.prepare(`ALTER TABLE payment_schedules ADD COLUMN ${column} ${definition}`).run();return true})().catch(error=>{columnsPromise=null;throw error});return columnsPromise}
 function cleanDate(value){const text=String(value||'').trim();return /^\d{4}-\d{2}-\d{2}$/.test(text)?text:''}
 function normalizeMethod(value){const method=String(value||'').trim().toLowerCase();return['transfer','cheque','cash','card','deposit','other'].includes(method)?method:''}
-
-export async function listPaymentsCanonical(env,actor,url){
-  await ensurePaymentColumns(env);assertMinimumRole(actor.role,ROLES.FINANCE);
-  const status=String(url.searchParams.get('status')||'');
-  const result=await env.DB.prepare(`SELECT ps.*,i.invoice_number,i.invoice_date,i.document_type,i.payment_status,s.name supplier_name,
-    f.storage_key proof_key,f.file_name proof_name,f.content_type proof_content_type
-    FROM payment_schedules ps
-    JOIN invoices i ON i.id=ps.invoice_id
-    JOIN suppliers s ON s.id=ps.supplier_id
-    LEFT JOIN files f ON f.id=ps.proof_file_id AND f.org_id=ps.org_id
-    WHERE ps.org_id=? AND (?='' OR ps.status=?)
-    ORDER BY CASE WHEN ps.status='pending' AND ps.due_date<date('now') THEN 0 ELSE 1 END,ps.due_date DESC,ps.created_at DESC`).bind(actor.orgId,status,status).all();
-  return rows(result).map(item=>({...item,amount:Number(item.amount||0),paid_amount:Number(item.paid_amount||0),overdue:item.status==='pending'&&item.due_date<today()}));
-}
-
-export async function updatePaymentCanonical(request,env,actor,id){
-  await ensurePaymentColumns(env);assertMinimumRole(actor.role,ROLES.FINANCE);
-  const current=await env.DB.prepare('SELECT * FROM payment_schedules WHERE id=? AND org_id=?').bind(id,actor.orgId).first();
-  if(!current)throw new HttpError(404,'Pago no encontrado','not_found');
-  const body=await readJson(request),status=['pending','scheduled','paid','overdue','disputed'].includes(String(body.status))?String(body.status):String(current.status||'pending'),stamp=nowIso();
-  const paymentMethod=normalizeMethod(body.paymentMethod??current.payment_method),paymentDate=cleanDate(body.paymentDate)||cleanDate(current.payment_date)||(status==='paid'?today():''),chequeNumber=optionalText(body.chequeNumber??current.cheque_number,{max:120}),reference=optionalText(body.reference??current.reference,{max:180}),note=optionalText(body.note??current.note,{max:800});
-  const proofFileId=String(body.proofFileId??current.proof_file_id??'').trim()||null,paidAmount=Math.max(0,Math.round(Number(body.paidAmount??current.paid_amount??current.amount??0)));
-  if(status==='paid'&&!paymentMethod)throw new HttpError(400,'Selecciona la forma de pago','payment_method_required');
-  if(status==='paid'&&paymentMethod==='cheque'&&!chequeNumber)throw new HttpError(400,'Ingresa el número o serie del cheque','cheque_number_required');
-  if(proofFileId){const file=await env.DB.prepare('SELECT id FROM files WHERE id=? AND org_id=?').bind(proofFileId,actor.orgId).first();if(!file)throw new HttpError(400,'El comprobante seleccionado no existe','invalid_payment_proof')}
-  await env.DB.prepare(`UPDATE payment_schedules SET status=?,scheduled_at=?,paid_at=?,reference=?,note=?,responsible_user_id=?,updated_at=?,payment_method=?,payment_date=?,cheque_number=?,proof_file_id=?,paid_amount=? WHERE id=? AND org_id=?`).bind(
-    status,status==='scheduled'?(current.scheduled_at||stamp):current.scheduled_at,status==='paid'?(current.paid_at||stamp):null,reference,note,body.responsibleUserId||actor.userId,stamp,paymentMethod,paymentDate||null,chequeNumber,proofFileId,paidAmount,id,actor.orgId
-  ).run();
-  await env.DB.prepare('UPDATE invoices SET payment_status=?,updated_at=? WHERE id=? AND org_id=?').bind(status,stamp,current.invoice_id,actor.orgId).run();
-  await writeAudit(env,actor,request,'payment.update','payment_schedule',id,{status,paymentMethod,paymentDate,chequeNumber,reference,proofFileId,paidAmount});
-  const result=await env.DB.prepare(`SELECT ps.*,i.invoice_number,i.invoice_date,s.name supplier_name,f.storage_key proof_key,f.file_name proof_name FROM payment_schedules ps JOIN invoices i ON i.id=ps.invoice_id JOIN suppliers s ON s.id=ps.supplier_id LEFT JOIN files f ON f.id=ps.proof_file_id AND f.org_id=ps.org_id WHERE ps.id=? AND ps.org_id=?`).bind(id,actor.orgId).first();
-  return result;
-}
+function publicPayment(item){return{...item,amount:Number(item.amount||0),paid_amount:Number(item.paid_amount||0),orderIds:String(item.order_ids||'').split(',').filter(Boolean),overdue:item.status==='pending'&&item.due_date<today()}}
+export async function listPaymentsCanonical(env,actor,url){await ensurePaymentColumns(env);assertMinimumRole(actor.role,ROLES.FINANCE);const status=String(url.searchParams.get('status')||'');const result=await env.DB.prepare(`SELECT ps.*,i.invoice_number,i.invoice_date,i.document_type,i.payment_status,s.name supplier_name,f.storage_key proof_key,f.file_name proof_name,f.content_type proof_content_type,GROUP_CONCAT(DISTINCT iol.order_id) AS order_ids FROM payment_schedules ps JOIN invoices i ON i.id=ps.invoice_id JOIN suppliers s ON s.id=ps.supplier_id LEFT JOIN files f ON f.id=ps.proof_file_id AND f.org_id=ps.org_id LEFT JOIN invoice_order_links iol ON iol.invoice_id=ps.invoice_id AND iol.org_id=ps.org_id WHERE ps.org_id=? AND (?='' OR ps.status=?) GROUP BY ps.id ORDER BY CASE WHEN ps.status='pending' AND ps.due_date<date('now') THEN 0 ELSE 1 END,ps.due_date DESC,ps.created_at DESC`).bind(actor.orgId,status,status).all();return rows(result).map(publicPayment)}
+export async function updatePaymentCanonical(request,env,actor,id){await ensurePaymentColumns(env);assertMinimumRole(actor.role,ROLES.FINANCE);const current=await env.DB.prepare('SELECT * FROM payment_schedules WHERE id=? AND org_id=?').bind(id,actor.orgId).first();if(!current)throw new HttpError(404,'Pago no encontrado','not_found');const body=await readJson(request),status=['pending','scheduled','paid','overdue','disputed'].includes(String(body.status))?String(body.status):String(current.status||'pending'),stamp=nowIso();const paymentMethod=normalizeMethod(body.paymentMethod??current.payment_method),paymentDate=cleanDate(body.paymentDate)||cleanDate(current.payment_date)||(status==='paid'?today():''),chequeNumber=optionalText(body.chequeNumber??current.cheque_number,{max:120}),reference=optionalText(body.reference??current.reference,{max:180}),note=optionalText(body.note??current.note,{max:800});const proofFileId=String(body.proofFileId??current.proof_file_id??'').trim()||null,paidAmount=Math.max(0,Math.round(Number(body.paidAmount??current.paid_amount??current.amount??0)));if(status==='paid'&&!paymentMethod)throw new HttpError(400,'Selecciona la forma de pago','payment_method_required');if(status==='paid'&&paymentMethod==='cheque'&&!chequeNumber)throw new HttpError(400,'Ingresa el número o serie del cheque','cheque_number_required');if(proofFileId){const file=await env.DB.prepare('SELECT id FROM files WHERE id=? AND org_id=?').bind(proofFileId,actor.orgId).first();if(!file)throw new HttpError(400,'El comprobante seleccionado no existe','invalid_payment_proof')}await env.DB.prepare(`UPDATE payment_schedules SET status=?,scheduled_at=?,paid_at=?,reference=?,note=?,responsible_user_id=?,updated_at=?,payment_method=?,payment_date=?,cheque_number=?,proof_file_id=?,paid_amount=? WHERE id=? AND org_id=?`).bind(status,status==='scheduled'?(current.scheduled_at||stamp):current.scheduled_at,status==='paid'?(current.paid_at||stamp):null,reference,note,body.responsibleUserId||actor.userId,stamp,paymentMethod,paymentDate||null,chequeNumber,proofFileId,paidAmount,id,actor.orgId).run();await env.DB.prepare('UPDATE invoices SET payment_status=?,updated_at=? WHERE id=? AND org_id=?').bind(status,stamp,current.invoice_id,actor.orgId).run();await writeAudit(env,actor,request,'payment.update','payment_schedule',id,{status,paymentMethod,paymentDate,chequeNumber,reference,proofFileId,paidAmount});const result=await env.DB.prepare(`SELECT ps.*,i.invoice_number,i.invoice_date,s.name supplier_name,f.storage_key proof_key,f.file_name proof_name,GROUP_CONCAT(DISTINCT iol.order_id) AS order_ids FROM payment_schedules ps JOIN invoices i ON i.id=ps.invoice_id JOIN suppliers s ON s.id=ps.supplier_id LEFT JOIN files f ON f.id=ps.proof_file_id AND f.org_id=ps.org_id LEFT JOIN invoice_order_links iol ON iol.invoice_id=ps.invoice_id AND iol.org_id=ps.org_id WHERE ps.id=? AND ps.org_id=? GROUP BY ps.id`).bind(id,actor.orgId).first();return publicPayment(result)}
