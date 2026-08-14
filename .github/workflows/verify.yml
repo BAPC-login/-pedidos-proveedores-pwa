@@ -27,7 +27,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -Fq "CLIENT_RELEASE='2026.08.13.71'" professional/web/app.js
+          grep -Fq "CLIENT_RELEASE='2026.08.14.72'" professional/web/app.js
+          grep -Fq "import './app-session-bootstrap.js'" professional/web/app.js
+          grep -Fq 'nuvasto:ephemeral-token' professional/web/app-session-bootstrap.js
+          grep -Fq 'isUserVerifyingPlatformAuthenticatorAvailable' professional/web/app-auth-experience.js
+          grep -Fq '/api/auth/passkeys/login/options' professional/web/app-auth-experience.js
+          grep -Fq 'navigator.credentials.create' professional/web/app-auth-experience.js
+          grep -Fq 'passkey_credentials' professional/worker/src/api/passkeys.js
+          grep -Fq 'passkey_user_verification_required' professional/worker/src/api/passkeys.js
+          grep -Fq 'passkeyAuthV72:true' professional/worker/src/router.js
+          grep -Fq 'optionalRememberDeviceV72:true' professional/worker/src/router.js
+          grep -Fq 'Versión 2.0 · agosto de 2026' professional/web/app-legal.js
+          if grep -Fq 'app-sso-v20.js' professional/web/app-bootstrap.js; then echo '::error::Cloudflare Access SSO remains active in canonical bootstrap'; exit 1; fi
           grep -Fq "import('./app-master-order.js')" professional/web/app-order-core.js
           grep -Fq 'LOCAL_DRAFT_VERSION=71' professional/web/app-master-order.js
           grep -Fq 'SERVER_AUTOSAVE_DELAY=1200' professional/web/app-master-order.js
@@ -55,7 +66,7 @@ jobs:
           if grep -Fq "SELECT user_id FROM platform_owners WHERE user_id" professional/worker/src/auth.js; then echo '::error::Authentication still performs a second platform-owner query'; exit 1; fi
           grep -Fq 'priceReconciliation' professional/worker/src/api/invoice-analysis-core-v39.js
           grep -Fq 'priceVerified:true' professional/worker/src/invoice-normalizer.js
-          grep -Fq 'nuvasto-v71-native-fast' professional/web/sw.js
+          grep -Fq 'nuvasto-v71-native-fast-r72-auth-passkeys' professional/web/sw.js
           if grep -Fq "'./app-procurement.js'" professional/web/sw.js; then echo '::error::Service worker precache still contains noncritical procurement bundle'; exit 1; fi
           grep -Fq 'overflow-y:auto' professional/web/native-performance.css
           grep -Fq 'initializeOrderSelection' professional/web/app-bootstrap.js
