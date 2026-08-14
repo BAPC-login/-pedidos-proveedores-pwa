@@ -6,20 +6,28 @@ button,a,input,select,textarea,[role="button"]{touch-action:manipulation}
 .route-loading #mainContent{pointer-events:none}
 .route-loading .page-heading{opacity:.82;transform:translateY(0)}
 .v44-row,.order-card,.history-card,.invoice-card,.product-card,.supplier-card,[data-order-id]{content-visibility:auto;contain-intrinsic-size:72px}
-.order-file-row{content-visibility:visible!important;contain:none!important}
+.order-file-row{content-visibility:auto!important;contain-intrinsic-size:58px!important}
 .order-file-quantity,.order-file-quantity input{pointer-events:auto!important;touch-action:manipulation!important}
 .v44-skeleton{position:relative!important;overflow:hidden!important;background:var(--soft)!important;animation:none!important;contain:paint!important}
 .v44-skeleton::after{content:"";position:absolute;inset:-20% -45%;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--card) 72%,transparent),transparent);transform:translate3d(-70%,0,0);animation:nuvasto-native-shimmer 1.15s linear infinite;will-change:transform}
 @keyframes nuvasto-native-shimmer{to{transform:translate3d(70%,0,0)}}
 .toast{transform:translate3d(0,0,0);will-change:transform,opacity}
 .bottom-nav,.topbar{transform:translateZ(0)}
-.native-share-preparing{position:relative;opacity:.66!important;cursor:wait!important}
-.native-share-preparing::after{content:"";width:13px;height:13px;flex:0 0 13px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:nuvasto-share-spin .7s linear infinite}
-@keyframes nuvasto-share-spin{to{transform:rotate(360deg)}}
+.native-share-preparing{opacity:1!important;cursor:pointer!important}
+.native-share-preparing::after{display:none!important;content:none!important}
 .r55-native-action-wrap{position:relative!important;display:inline-grid!important;align-self:stretch!important}
 .r55-native-action-wrap>button{width:100%!important;height:100%!important;pointer-events:none!important}
 .r55-native-action-select{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;opacity:.001!important;z-index:80!important;border:0!important;background:transparent!important;color:transparent!important;-webkit-appearance:menulist!important;appearance:auto!important}
 [data-core-quantity],[data-edit-quantity]{pointer-events:auto!important;touch-action:manipulation!important;-webkit-user-select:text!important;user-select:text!important}
+.v32-matrix-toggle{width:38px;height:38px;display:inline-grid;place-items:center;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--muted);font-weight:900;font-size:16px;transition:transform .12s ease,background .12s ease,border-color .12s ease}.v32-matrix-toggle:hover{transform:translateY(-1px)}.v32-matrix-toggle.active{border-color:color-mix(in srgb,var(--success) 45%,var(--line));background:color-mix(in srgb,var(--success) 11%,var(--card));color:var(--success)}.v32-matrix-toggle:disabled{opacity:.55}
+@media(min-width:921px){
+  html,body{height:100%;overflow:hidden}
+  .app-shell{height:100dvh;min-height:0;overflow:hidden}
+  .content{height:100%;min-height:0;max-height:calc(100dvh - 86px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-x pan-y;scrollbar-gutter:stable}
+  .sidebar{min-height:0;overflow:hidden}
+  .sidebar .side-nav{min-height:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}
+}
+@media(max-width:920px){html,body{height:auto;overflow:auto}.app-shell{height:auto;overflow:visible}.content{max-height:none;overflow:visible;touch-action:pan-x pan-y}}
 @media(max-width:600px){
   .topbar{grid-template-columns:40px 44px minmax(0,1fr) auto!important;grid-template-areas:'back heading . actions' 'search search search search'!important;column-gap:8px!important;row-gap:8px!important;padding-left:max(14px,env(safe-area-inset-left))!important;padding-right:max(14px,env(safe-area-inset-right))!important}
   .route-back{grid-area:back!important}
@@ -30,4 +38,4 @@ button,a,input,select,textarea,[role="button"]{touch-action:manipulation}
   .top-actions .v41-bell,.top-actions .icon-button,.top-actions .mobile-user-button{flex:0 0 auto!important}
   .global-search{grid-area:search!important;min-width:0!important}
 }
-@media(prefers-reduced-motion:reduce){.v44-skeleton::after,.native-share-preparing::after{animation:none!important}.content{scroll-behavior:auto}}
+@media(prefers-reduced-motion:reduce){.v44-skeleton::after{animation:none!important}.content{scroll-behavior:auto}.v32-matrix-toggle{transition:none}}
