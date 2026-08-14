@@ -19,10 +19,9 @@ async function repairApprovalPolicyDrift(db){
   added.requiredRole=await ensureColumn(db,'approval_policies','required_role',"TEXT NOT NULL DEFAULT 'approver'");
   added.active=await ensureColumn(db,'approval_policies','active','INTEGER NOT NULL DEFAULT 1');
   added.createdBy=await ensureColumn(db,'approval_policies','created_by','TEXT');
-  const legacy=before;
-  if(legacy.has('amount_threshold'))await db.prepare('UPDATE approval_policies SET threshold_amount=CASE WHEN threshold_amount=0 THEN COALESCE(amount_threshold,0) ELSE threshold_amount END').run();
-  if(legacy.has('approver_role'))await db.prepare("UPDATE approval_policies SET required_role=CASE WHEN (required_role='' OR required_role='approver') AND COALESCE(approver_role,'')<>'' THEN approver_role ELSE required_role END").run();
-  if(legacy.has('enabled'))await db.prepare('UPDATE approval_policies SET active=COALESCE(enabled,active,1)').run();
+  if(before.has('amount_threshold'))await db.prepare('UPDATE approval_policies SET threshold_amount=CASE WHEN threshold_amount=0 THEN COALESCE(amount_threshold,0) ELSE threshold_amount END').run();
+  if(before.has('approver_role'))await db.prepare("UPDATE approval_policies SET required_role=CASE WHEN (required_role='' OR required_role='approver') AND COALESCE(approver_role,'')<>'' THEN approver_role ELSE required_role END").run();
+  if(before.has('enabled'))await db.prepare('UPDATE approval_policies SET active=COALESCE(enabled,active,1)').run();
   await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_v41_approval_policy_scope ON approval_policies(org_id,cost_center_id)').run();
   return{repaired:Object.values(added).some(Boolean),added};
 }
@@ -60,8 +59,7 @@ async function ensurePaymentSchema(db){
   const orgs=rows(await db.prepare("SELECT id FROM organizations WHERE status='active'").all()),stamp=new Date().toISOString();
   for(const org of orgs)for(let index=0;index<PAYMENT_METHOD_DEFAULTS.length;index++){
     const[code,name,kind,requirements]=PAYMENT_METHOD_DEFAULTS[index];
-    await db.prepare(`INSERT OR IGNORE INTO payment_methods(id,org_id,code,name,kind,active,requirements_json,sort_order,created_at,updated_at) VALUES(?,?,?,?,?,1,?,?,?,?)`)
-      .bind(crypto.randomUUID(),org.id,code,name,kind,JSON.stringify(requirements),index*10,stamp,stamp).run();
+    await db.prepare(`INSERT OR IGNORE INTO payment_methods(id,org_id,code,name,kind,active,requirements_json,sort_order,created_at,updated_at) VALUES(?,?,?,?,?,1,?,?,?,?)`).bind(crypto.randomUUID(),org.id,code,name,kind,JSON.stringify(requirements),index*10,stamp,stamp).run();
   }
   return{ready:true,added};
 }
@@ -79,10 +77,7 @@ export async function ensureEnterpriseSchemaV41(env){
   if(initializationPromise)return initializationPromise;
   initializationPromise=(async()=>{
     const marker=await markerReady(env.DB);
-    if(marker){
-      const paymentRepair=await ensurePaymentSchema(env.DB),healthy=await enterpriseSchemaReady(env.DB);
-      if(healthy)return{ready:true,added:{},paymentRepair,fastPath:true,driftRepaired:Object.values(paymentRepair.added||{}).some(Boolean)};
-    }
+    if(marker&&await enterpriseSchemaReady(env.DB))return{ready:true,added:{},fastPath:true,driftRepaired:false};
     const result=await ensureLegacyEnterpriseSchemaV41(env);
     const approvalRepair=await repairApprovalPolicyDrift(env.DB),paymentRepair=await ensurePaymentSchema(env.DB);
     const ready=await enterpriseSchemaReady(env.DB);
