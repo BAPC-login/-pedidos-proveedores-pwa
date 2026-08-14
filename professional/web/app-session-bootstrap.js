@@ -1,0 +1,1 @@
+(()=>{try{const ephemeral=localStorage.getItem('nuvasto:ephemeral-token')==='1',active=sessionStorage.getItem('nuvasto:ephemeral-session')==='1';if(ephemeral&&!active){localStorage.removeItem('pp:token');localStorage.removeItem('nuvasto:ephemeral-token')}else if(ephemeral)sessionStorage.setItem('nuvasto:ephemeral-session','1')}catch{}})();

@@ -1,6 +1,6 @@
-const VERSION='nuvasto-v71-native-fast';
+const VERSION='nuvasto-v71-native-fast-r72-auth-passkeys';
 const DATA_CACHE=`${VERSION}-data`;
-const PRECACHE=['./','./styles.css','./pro-ui.css','./experience.css','./design-system-v13.css','./design-system-v14.css','./brand-v21.css','./native-performance.css','./app.js','./app-core.js','./app-bootstrap.js','./manifest.webmanifest','./icon.svg','./nuvasto-mark.svg','./nuvasto-logo.svg'];
+const PRECACHE=['./','./styles.css','./pro-ui.css','./experience.css','./design-system-v13.css','./design-system-v14.css','./brand-v21.css','./native-performance.css','./app.js','./app-core.js','./app-bootstrap.js','./app-session-bootstrap.js','./app-auth-experience.js','./app-legal.js','./manifest.webmanifest','./icon.svg','./nuvasto-mark.svg','./nuvasto-logo.svg'];
 const RELEASE_ASSET=/\.(?:js|css|webmanifest)$/i;
 const networkWithTimeout=(request,ms=7000)=>{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),ms);return fetch(request,{cache:'no-store',signal:controller.signal}).finally(()=>clearTimeout(timer))};
 function apiNetworkTimeout(request){const path=new URL(request.url).pathname;if(path==='/api/orders/advanced'||path.startsWith('/api/dashboard/analytics')||path.startsWith('/api/receptions/work-queue')||path.startsWith('/api/global-search'))return 32000;return 18000}
