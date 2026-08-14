@@ -50,7 +50,7 @@ jobs:
             const runtime=h.nativePerformanceV45===true&&h.schemaOffCriticalPathV45===true&&h.requestCoalescingV45===true&&h.operationsBootstrapV45===true&&h.directR2StreamingV45===true&&h.redirectSafeNavigationV50===true;
             const migration=h.folioMigrationV67===true&&Number(h.folioMigrationDetails?.skipped||0)===0;
             const legacy=h.ordersSchemaV67===true&&h.scopedHistoricalFoliosV67===true&&h.cursorOrdersV67===true&&h.reconciliationRequiredForClosure===true&&h.legacyDateFoliosRetired===true&&h.readOnlyOrderQueriesV68===true&&h.durableMasterDraftV69===true&&h.draftSaveNoFolioLockV69===true&&h.crossDeviceMasterDraftV70===true&&h.masterDraftServerBackedV70===true&&h.bulkClearMasterQuantitiesV70===true;
-            const r71=h.domainRouterV71===true&&h.canonicalMasterOrderV71===true&&h.masterEditParityV71===true&&h.documentFolioNamesLockedV71===true&&h.deterministicInvoicePricingV71===true&&h.reducedPrecacheV71===true&&h.nativeScrollV71===true;
+            const r71=h.domainRouterV71===true&&h.canonicalMasterOrderV71===true&&h.masterEditParityV71===true&&h.documentFolioNamesLockedV71===true&&h.deterministicInvoicePricingV71===true&&h.reducedPrecacheV71===true&&h.nativeScrollV71===true&&h.configurablePaymentMethods===true&&h.chequeSchedule===true&&h.invoiceChequeExtraction===true&&h.authTouchCoalescedV71===true;
             process.stdout.write(storage&&runtime&&legacy&&r71&&migration?'true':'false');
           } catch { process.stdout.write('false'); }
           NODE
@@ -60,7 +60,7 @@ jobs:
             echo "Esperando despliegue ${attempt}/24 · release=${release:-none} · runtime=$ready"; sleep 10
           done
           stamp=$(date +%s)
-          for asset in app.js app-bootstrap.js app-order-core.js app-master-order.js app-order-selection.js app-orders.js app-catalog.js app-documents.js app-payment-workflow.js native-performance.css sw.js; do
+          for asset in app.js app-bootstrap.js app-order-core.js app-master-order.js app-order-selection.js app-orders.js app-catalog.js app-documents.js app-payment-workflow.js app-invoice-v30.js native-performance.css sw.js; do
             curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/$asset?v=$stamp" > "/tmp/$asset"
           done
           grep -Fq "CLIENT_RELEASE='$expected'" /tmp/app.js || { echo '::error::app.js productivo no coincide con el release'; exit 1; }
@@ -78,6 +78,10 @@ jobs:
           grep -Fq 'data-v32-image-key' /tmp/app-documents.js || { echo '::error::Documentos no expone vista previa de imágenes'; exit 1; }
           grep -Fq 'minValue' /tmp/app-documents.js || { echo '::error::Documentos no expone filtros de valor'; exit 1; }
           grep -Fq 'openPaymentForOrder' /tmp/app-payment-workflow.js || { echo '::error::pagos no son accesibles desde pedido'; exit 1; }
+          grep -Fq 'openPaymentMethodsManager' /tmp/app-payment-workflow.js || { echo '::error::no existe configuración de medios de pago'; exit 1; }
+          grep -Fq 'Cobros programados' /tmp/app-payment-workflow.js || { echo '::error::no existe panel de cobros programados'; exit 1; }
+          grep -Fq 'Medio de pago detectado por IA' /tmp/app-invoice-v30.js || { echo '::error::revisión de factura no presenta pago detectado por IA'; exit 1; }
+          grep -Fq 'chequeCollectionDate' /tmp/app-invoice-v30.js || { echo '::error::revisión de factura no captura fecha de cobro del cheque'; exit 1; }
           grep -Fq 'Seleccionar todos' /tmp/app-order-selection.js || { echo '::error::Pedidos no tiene selección total'; exit 1; }
           grep -Fq 'TRAZABILIDAD CERRADA' /tmp/app-orders.js || { echo '::error::Pedidos/Historial no están separados'; exit 1; }
           grep -Fq 'overflow-y:auto' /tmp/native-performance.css || { echo '::error::contenido principal no tiene scroll nativo'; exit 1; }
@@ -85,7 +89,7 @@ jobs:
           if grep -Fq "'./app-procurement.js'" /tmp/sw.js; then echo '::error::Service Worker aún precarga bundles no críticos'; exit 1; fi
           grep -Fq 'apiNetworkTimeout' /tmp/sw.js || { echo '::error::timeout API adaptable no está en producción'; exit 1; }
           grep -Fq 'const cached=await cache.match' /tmp/sw.js || { echo '::error::assets de release no usan cache-first'; exit 1; }
-          echo "Nuvasto $release · r71 native-fast verificado en producción."
+          echo "Nuvasto $release · r71 native-fast + finanzas/cheques verificado en producción."
       - name: Production procurement journey
         id: synthetic
         if: steps.verify.outcome == 'success'
@@ -111,6 +115,6 @@ jobs:
         run: |
           if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.synthetic.outcome }}" != "failure" ]; then
             state=success
-            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto r71 publicado; native-fast y E2E autenticado OK'; else description='Nuvasto r71 publicado; frontend/backend verificados'; fi
+            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto r71 publicado; native-fast, finanzas/cheques y E2E autenticado OK'; else description='Nuvasto r71 publicado; frontend/backend/finanzas verificados'; fi
           else state=failure; description='El despliegue de Nuvasto r71 no quedó verificado'; fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state="$state" -f context='nuvasto/production' -f description="$description" -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
