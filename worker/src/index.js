@@ -300,10 +300,11 @@ const responseSchema = {
           packSize: {type: 'NUMBER'}, units: {type: 'NUMBER'}, contentMl: {type: 'NUMBER'}, alcoholDegree: {type: 'NUMBER'},
           unitPriceNet: {type: 'NUMBER'}, discountPct: {type: 'NUMBER'}, netLineTotal: {type: 'NUMBER'}, freightLine: {type: 'NUMBER'},
           vatLine: {type: 'NUMBER'}, additionalTaxLine: {type: 'NUMBER'}, otherLineCharges: {type: 'NUMBER'}, grossLineTotal: {type: 'NUMBER'},
+          finalUnitPrice: {type: 'NUMBER'}, finalUnitPriceRaw: {type: 'STRING'}, finalUnitPriceHeader: {type: 'STRING'},
           matchedOrderProductId: {type: 'STRING'}, matchConfidence: {type: 'NUMBER'}, matchReason: {type: 'STRING'}, notes: {type: 'STRING'},
           isFree: {type: 'BOOLEAN'}, freeReason: {type: 'STRING'}
         },
-        required: ['code','descriptionOriginal','quantityCellRaw','invoiceQuantity','packSize','units','contentMl','alcoholDegree','unitPriceNet','discountPct','netLineTotal','freightLine','vatLine','additionalTaxLine','otherLineCharges','grossLineTotal','matchedOrderProductId','matchConfidence','matchReason','notes','isFree','freeReason']
+        required: ['code','descriptionOriginal','quantityCellRaw','invoiceQuantity','packSize','units','contentMl','alcoholDegree','unitPriceNet','discountPct','netLineTotal','freightLine','vatLine','additionalTaxLine','otherLineCharges','grossLineTotal','finalUnitPrice','finalUnitPriceRaw','finalUnitPriceHeader','matchedOrderProductId','matchConfidence','matchReason','notes','isFree','freeReason']
       }
     },
     warnings: {type: 'ARRAY', items: {type: 'STRING'}}
@@ -311,11 +312,18 @@ const responseSchema = {
   required: ['supplierName','invoiceNumber','documentType','documentTypeCode','totals','payment','items','warnings']
 };
 
+function supplierReaderProfile(raw = {}, context = {}) {
+  const label = normalize(`${context.providerName || ''} ${raw.supplierName || ''}`);
+  if (/PISQUERA DE CHILE|CCU|COMPANIA CERVECERIAS UNIDAS|CERVECERIAS UNIDAS|VINA SAN PEDRO|SAN PEDRO TARAPACA|VSPT/.test(label)) return 'ccu-vspt-total-x-unidad-v1';
+  return 'generic-document-v1';
+}
+
 function buildPrompt(context) {
   const products = (context.products || []).map(product => ({id: String(product.productId), d: String(product.description), u: String(product.unit || 'UNIDAD'), q: numeric(product.orderedQty), pack: orderPackSize(product.unit, product.description)}));
   return `<task>Extrae y coteja documento tributario A contra pedido B y CAT. Responde solo según JSON Schema.</task>
 <CAT>${JSON.stringify(products)}</CAT>
 <context>proveedor=${String(context.providerName || '')};folio=${String(context.folio || '')};archivo=${String(context.fileName || '')}</context>
+<readerProfile>${supplierReaderProfile({}, context)}</readerProfile>
 <rules>
 - Identifica documentType como FACTURA, BOLETA, GUIA_DESPACHO, NOTA_CREDITO u OTRO y documentTypeCode como 33, 39, 52, 61, 34 o 0.
 - Una salida por producto. Excluye flete, impuestos, descuentos, depósitos, garantías y totales.
@@ -325,6 +333,10 @@ function buildPrompt(context) {
 - matchedOrderProductId es un id exacto de CAT o vacío. Nunca inventes.
 - DISPLAY=24; 1.5L=6, salvo pack explícito.
 - Lee neto, descuento, flete, IVA, impuesto adicional, otros y total final por línea.
+- REGLA DE PRECIO FINAL: si existe una columna explícita llamada 'Total x Unidad', 'Total Unidad' o equivalente, copia ESA celda en finalUnitPrice. finalUnitPriceRaw conserva el texto visible (ej. 14.105,2) y finalUnitPriceHeader conserva literalmente el encabezado leído. No derives ese valor.
+- En documentos CCU, Compañía Pisquera de Chile/Pisquera de Chile y Viña San Pedro Tarapacá/VSPT, la columna extrema derecha 'Total x Unidad' representa el costo final por unidad base e incluye descuentos, impuestos y cargos prorrateados, incluido flete. Es la fuente prioritaria del precio final.
+- No confundas la columna 'Valor' con 'Total x Unidad': 'Valor' normalmente es el neto de la línea después del descuento; NO es el precio final unitario.
+- Si no existe o no se puede leer claramente 'Total x Unidad', usa finalUnitPrice=0 y strings vacíos. Nunca inventes el precio final.
 - Revisa si el documento contiene información explícita de pago o un cheque. payment.detected=true solo si la evidencia es visible en DOCUMENTO A.
 - Para cheque: payment.methodKind='cheque' y extrae cheque.serialNumber, cheque.collectionDate/fecha de cobro o pago, cheque.payee/destinatario, cheque.amount y cheque.bank si está visible.
 - No confundas número de factura con serie del cheque ni total de factura con monto del cheque. El cheque puede cubrir un monto parcial.
@@ -417,14 +429,18 @@ function freeLineSignal(line, sourceLine, invoiceQuantity) {
 }
 
 function distributeResidual(lines, targetTotal) {
-  const chargeable = lines.filter(line => !line.isFree);
-  const current = chargeable.reduce((sum, line) => sum + line.grossLineTotal, 0);
-  const residual = Math.round(targetTotal - current);
-  if (!targetTotal || !chargeable.length || Math.abs(residual) <= 1) return;
-  const basis = chargeable.reduce((sum, line) => sum + Math.max(0, line.netLineTotal), 0) || chargeable.length;
+  const fixed = lines.filter(line => !line.isFree && line.printedFinalUnitPrice > 0);
+  const adjustable = lines.filter(line => !line.isFree && !(line.printedFinalUnitPrice > 0));
+  if (!targetTotal || !adjustable.length) return;
+  const fixedTotal = fixed.reduce((sum, line) => sum + line.grossLineTotal, 0);
+  const targetAdjustable = Math.max(0, targetTotal - fixedTotal);
+  const current = adjustable.reduce((sum, line) => sum + line.grossLineTotal, 0);
+  const residual = Math.round(targetAdjustable - current);
+  if (Math.abs(residual) <= 1) return;
+  const basis = adjustable.reduce((sum, line) => sum + Math.max(0, line.netLineTotal), 0) || adjustable.length;
   let assigned = 0;
-  chargeable.forEach((line, index) => {
-    const share = index === chargeable.length - 1 ? residual - assigned : Math.round(residual * ((Math.max(0, line.netLineTotal) || 1) / basis));
+  adjustable.forEach((line, index) => {
+    const share = index === adjustable.length - 1 ? residual - assigned : Math.round(residual * ((Math.max(0, line.netLineTotal) || 1) / basis));
     line.grossLineTotal = Math.max(0, line.grossLineTotal + share); assigned += share;
   });
 }
@@ -459,6 +475,10 @@ function validateInvoice(raw, context) {
     if (product && normalize(product.unit).includes('DISPLAY') && !explicitPack) packSize = expectedOrderPack;
     const units = Math.max(0, invoiceQuantity * packSize);
     const isFree = freeLineSignal(line, sourceLine, invoiceQuantity);
+    const finalUnitPriceHeader = String(line.finalUnitPriceHeader || '').trim().slice(0,80);
+    const finalUnitPriceRaw = String(line.finalUnitPriceRaw || '').trim().slice(0,80);
+    const hasFinalUnitHeader = /TOTAL.*UNIDAD|UNIDAD.*TOTAL/.test(normalize(finalUnitPriceHeader));
+    const printedFinalUnitPrice = !isFree && hasFinalUnitHeader ? Math.max(0, numeric(line.finalUnitPrice)) : 0;
     let netLineTotal = Math.max(0, Math.round(numeric(line.netLineTotal)));
     let freightLine = Math.max(0, Math.round(numeric(line.freightLine)));
     let vatLine = Math.max(0, Math.round(numeric(line.vatLine)));
@@ -467,6 +487,7 @@ function validateInvoice(raw, context) {
     const componentTotal = netLineTotal + freightLine + vatLine + additionalTaxLine + otherLineCharges;
     let grossLineTotal = Math.max(0, Math.round(numeric(line.grossLineTotal)));
     if (isFree) {netLineTotal = 0; freightLine = 0; vatLine = 0; additionalTaxLine = 0; otherLineCharges = 0; grossLineTotal = 0;}
+    else if (printedFinalUnitPrice > 0 && units > 0) grossLineTotal = Math.round(printedFinalUnitPrice * units);
     else if (!grossLineTotal || Math.abs(grossLineTotal - componentTotal) > Math.max(3, componentTotal * .03)) grossLineTotal = componentTotal;
     const receivedOrderQty = product ? units / expectedOrderPack : 0;
     if (!product) warnings.push(`Sin coincidencia segura con el pedido: ${sourceLine || `línea ${index + 1}`}`);
@@ -477,7 +498,9 @@ function validateInvoice(raw, context) {
       unitPriceNet: isFree ? 0 : Math.max(0, Math.round(numeric(line.unitPriceNet))), discountPct: Math.max(0, numeric(line.discountPct)),
       netLineTotal, freightLine, vatLine, additionalTaxLine, otherLineCharges, grossLineTotal,
       grossPackPrice: isFree ? 0 : (invoiceQuantity ? Math.round(grossLineTotal / invoiceQuantity) : 0),
-      grossUnitPrice: isFree ? 0 : (units ? Math.round(grossLineTotal / units) : 0),
+      grossUnitPrice: isFree ? 0 : (printedFinalUnitPrice > 0 ? printedFinalUnitPrice : (units ? Math.round(grossLineTotal / units) : 0)),
+      printedFinalUnitPrice, finalUnitPrice: printedFinalUnitPrice, finalUnitPriceRaw, finalUnitPriceHeader,
+      priceSource: printedFinalUnitPrice > 0 ? 'printed-final-unit' : 'ai-line-components',
       productId: product?.productId || '', suggestedProductId: !product && candidate?.productId ? String(candidate.productId) : '',
       description: product?.description || sourceLine, receivedOrderQty: Number(receivedOrderQty.toFixed(3)), orderPackSize: expectedOrderPack,
       confidence: Math.max(0, Math.min(1, Math.max(numeric(line.matchConfidence), match.score || 0))),
@@ -489,14 +512,21 @@ function validateInvoice(raw, context) {
 
   distributeResidual(lines, totals.total);
   for (const line of lines) {
-    line.grossUnitPrice = line.isFree ? 0 : (line.units ? Math.round(line.grossLineTotal / line.units) : 0);
+    line.grossUnitPrice = line.isFree ? 0 : (line.printedFinalUnitPrice > 0 ? line.printedFinalUnitPrice : (line.units ? Math.round(line.grossLineTotal / line.units) : 0));
     line.grossPackPrice = line.isFree ? 0 : (line.invoiceQuantity ? Math.round(line.grossLineTotal / line.invoiceQuantity) : 0);
   }
   if (!lines.length) warnings.push('Gemini no detectó líneas de productos.');
+  const pricedLines = lines.filter(line => !line.isFree), printedLines = pricedLines.filter(line => line.printedFinalUnitPrice > 0);
+  const printedExtendedTotal = printedLines.reduce((sum,line) => sum + line.printedFinalUnitPrice * line.units, 0);
+  const printedTolerance = Math.max(2, totals.total * .0001);
+  const printedFinalUnitVerified = printedLines.length > 0 && printedLines.length === pricedLines.length && (!totals.total || Math.abs(totals.total - printedExtendedTotal) <= printedTolerance);
+  if (printedLines.length && printedLines.length !== pricedLines.length) warnings.push(`Se leyó Total x Unidad en ${printedLines.length} de ${pricedLines.length} productos; confirma las líneas faltantes.`);
+  else if (printedLines.length && !printedFinalUnitVerified) warnings.push(`Los precios Total x Unidad no cierran contra el total impreso (${Math.round(printedExtendedTotal)} vs ${Math.round(totals.total)}); revisa la lectura antes de guardar.`);
   const matched = lines.filter(line => line.productId).length;
   return {
     supplierName: String(raw.supplierName || ''), supplierRut: String(raw.supplierRut || ''), invoiceNumber: String(raw.invoiceNumber || ''),
     invoiceDate: String(raw.invoiceDate || ''), currency: String(raw.currency || 'CLP'), documentType: String(raw.documentType || ''), documentTypeCode: documentTypeCode(raw), totals, payment, lines,
+    supplierReaderProfile: supplierReaderProfile(raw, context), finalUnitSummary: {source:'Total x Unidad',read:printedLines.length,total:pricedLines.length,extendedTotal:Number(printedExtendedTotal.toFixed(3)),checksumDelta:totals.total?Number((totals.total-printedExtendedTotal).toFixed(3)):0,verified:printedFinalUnitVerified},
     matchSummary: {matched, unmatched: lines.length - matched, totalInvoiceLines: lines.length, freeLines: lines.filter(line => line.isFree).length},
     warnings: [...new Set(warnings.filter(Boolean))], rawText: JSON.stringify(raw)
   };
@@ -540,7 +570,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, {status: 204, headers: corsHeaders(origin)});
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === '/health') {
-      const base = {ok: true, service: 'pedidos-pro-ai', geminiConfigured: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL || DEFAULT_MODEL, resolver: 'catalog-v23-free-items-cheque-payment'};
+      const base = {ok: true, service: 'pedidos-pro-ai', geminiConfigured: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL || DEFAULT_MODEL, resolver: 'catalog-v24-supplier-final-unit'};
       if (url.searchParams.get('probe') !== '1' || !env.GEMINI_API_KEY) return json(base, 200, origin);
       try { return json({...base, probe: await probeGemini(env)}, 200, origin); }
       catch (error) { return json({...base, ok: false, probe: {ok: false, error: String(error.message || error)}}, 502, origin); }

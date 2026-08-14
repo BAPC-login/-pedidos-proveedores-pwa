@@ -7,8 +7,8 @@ import {openModal,closeModal} from './app-modal.js';
 import {initializePlatform,initializeAuthenticatedPlatform} from './app-bootstrap.js';
 import {rememberedLoginEmail,persistLoginSession,clearLoginPersistence} from './app-auth-experience.js';
 
-const CLIENT_RELEASE='2026.08.14.74';
-const OFFLINE_WARM_KEY='nuvasto:offline-warm-v74';
+const CLIENT_RELEASE='2026.08.14.76';
+const OFFLINE_WARM_KEY='nuvasto:offline-warm-v76';
 document.documentElement.dataset.clientRelease=CLIENT_RELEASE;
 const releaseFetch=window.fetch.bind(window);
 initializePlatform();
