@@ -1,0 +1,126 @@
+name: Verify Nuvasto candidate
+on:
+  pull_request:
+    branches: [main]
+    paths: ['professional/**','worker/**','wrangler.jsonc','.github/workflows/**']
+  push:
+    branches: ['agent/**']
+    paths: ['professional/**','worker/**','wrangler.jsonc','.github/workflows/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: 'verify-nuvasto-${{ github.ref }}'
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: {node-version: '22'}
+      - name: Verify syntax and contracts
+        working-directory: professional
+        run: npm run verify
+      - name: Canonical release source contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "CLIENT_RELEASE='2026.08.14.76'" professional/web/app.js
+          grep -Fq "PLATFORM_RELEASE='2026.08.14.76'" worker/src/combined.js
+          grep -Fq "import './app-session-bootstrap.js'" professional/web/app.js
+          grep -Fq 'nuvasto:ephemeral-token' professional/web/app-session-bootstrap.js
+          grep -Fq 'isUserVerifyingPlatformAuthenticatorAvailable' professional/web/app-auth-experience.js
+          grep -Fq '/api/auth/passkeys/login/options' professional/web/app-auth-experience.js
+          grep -Fq 'navigator.credentials.create' professional/web/app-auth-experience.js
+          grep -Fq 'passkey_credentials' professional/worker/src/api/passkeys.js
+          grep -Fq 'passkey_user_verification_required' professional/worker/src/api/passkeys.js
+          grep -Fq 'passkeyAuthV72:true' professional/worker/src/router.js
+          grep -Fq 'optionalRememberDeviceV72:true' professional/worker/src/router.js
+          grep -Fq 'Versión 2.0 · agosto de 2026' professional/web/app-legal.js
+          if grep -Fq 'app-sso-v20.js' professional/web/app-bootstrap.js; then echo '::error::Cloudflare Access SSO remains active in canonical bootstrap'; exit 1; fi
+          grep -Fq "import('./app-master-order.js')" professional/web/app-order-core.js
+          grep -Fq 'data-v32-order-primary' professional/web/app-order-core.js
+          grep -Fq 'changeIntercept' professional/web/app-order-core.js
+          grep -Fq 'LOCAL_DRAFT_VERSION=71' professional/web/app-master-order.js
+          grep -Fq 'SERVER_AUTOSAVE_DELAY=1200' professional/web/app-master-order.js
+          grep -Fq 'id="clearMasterQuantities"' professional/web/app-master-order.js
+          grep -Fq 'render({capture:false,persist:false})' professional/web/app-master-order.js
+          grep -Fq 'data-v32-matrix-product' professional/web/app-catalog.js
+          grep -Fq 'document_name_locked' professional/worker/src/index-v33.js
+          grep -Fq 'minValue' professional/web/app-documents.js
+          grep -Fq "'/api/finance/payment-methods'" professional/worker/src/routes/enterprise.js
+          grep -Fq "'/api/finance/payment-documents'" professional/worker/src/routes/enterprise.js
+          grep -Fq "'/api/finance/payment-candidates'" professional/worker/src/routes/enterprise.js
+          grep -Fq 'finance-payment-documents' professional/worker/src/routes/enterprise.js
+          grep -Fq 'CREATE TABLE IF NOT EXISTS payment_documents' professional/worker/src/api/schema-v41.js
+          grep -Fq 'CREATE TABLE IF NOT EXISTS payment_allocations' professional/worker/src/api/schema-v41.js
+          grep -Fq 'migrateLegacyPaymentSchedules' professional/worker/src/api/schema-v41.js
+          grep -Fq 'validateAllocationSet' professional/worker/src/api/payment-documents.js
+          grep -Fq 'Un documento de pago solo puede aplicarse a facturas del mismo proveedor' professional/worker/src/api/payment-documents.js
+          grep -Fq 'allocatedTotal' professional/worker/src/api/payment-documents.js
+          grep -Fq 'unallocatedAmount' professional/worker/src/api/payment-documents.js
+          grep -Fq 'createPaymentDocumentFromInvoiceCanonical' professional/worker/src/api/payment-documents.js
+          grep -Fq 'openPaymentDocumentComposer' professional/web/app-payment-workflow.js
+          grep -Fq 'openCollectivePayment' professional/web/app-payment-workflow.js
+          grep -Fq '/api/finance/payment-documents' professional/web/app-payment-workflow.js
+          grep -Fq '/api/finance/payment-candidates' professional/web/app-payment-workflow.js
+          grep -Fq 'Solo este pedido' professional/web/app-payment-workflow.js
+          grep -Fq 'Todo el proveedor' professional/web/app-payment-workflow.js
+          grep -Fq 'payment-collective' professional/web/app.js
+          grep -Fq 'Pago colectivo' professional/web/app.js
+          grep -Fq 'openPaymentMethodsManager' professional/web/app-payment-workflow.js
+          grep -Fq 'Cobros programados' professional/web/app-payment-workflow.js
+          if grep -Fq 'MutationObserver' professional/web/app-payment-workflow.js; then echo '::error::Payment workflow must not observe the whole DOM'; exit 1; fi
+          grep -Fq 'v30-reconcile-list' professional/web/app-invoice-v30.js
+          grep -Fq 'nuvasto_supplier_alias' professional/web/app-invoice-v30.js
+          if grep -Fq "upload.append('orderFile'" professional/web/app-invoice-v30.js; then echo '::error::Invoice analysis still duplicates structured order as PDF'; exit 1; fi
+          grep -Fq 'context.aliases' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'supplier-alias' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'normalizationVersion:76' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'allocateInvoicePricing' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'printed-final-unit-column' professional/worker/src/invoice-normalizer.js
+          grep -Fq "priceSource:'printed-final-unit'" professional/worker/src/invoice-normalizer.js
+          grep -Fq 'supplier-total-x-unidad' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'documentTotalComputed' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'checksumDelta' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'finalUnitPrice' worker/src/index.js
+          grep -Fq 'Total x Unidad' worker/src/index.js
+          grep -Fq 'PISQUERA DE CHILE' worker/src/index.js
+          grep -Fq 'VINA SAN PEDRO' worker/src/index.js
+          grep -Fq 'orderId:queue.orderId' professional/web/app-multi-invoice.js
+          grep -Fq 'Precio final impreso · Total x Unidad' professional/web/app-multi-invoice.js
+          grep -Fq 'data-printed-final-unit' professional/web/app-multi-invoice.js
+          grep -Fq 'supplierFinalUnitReadersV76:true' professional/worker/src/router.js
+          grep -Fq 'printedFinalUnitPricingV76:true' professional/worker/src/router.js
+          grep -Fq 'supplierInvoiceProfilesV76:true' professional/worker/src/router.js
+          if grep -Fq "upload.append('orderFile'" professional/web/app-multi-invoice.js; then echo '::error::Multi-invoice flow still duplicates the canonical order PDF'; exit 1; fi
+          grep -Fq 'Medio de pago detectado por IA' professional/web/app-invoice-v30.js
+          grep -Fq 'chequeCollectionDate' professional/web/app-invoice-v30.js
+          grep -Fq 'mobileMoreIcon' professional/web/app.js
+          grep -Fq 'Medios de pago' professional/web/app.js
+          grep -Fq 'mobile-more-grid' professional/web/native-performance.css
+          grep -Fq 'duration:140' professional/web/app-router-v14.js
+          grep -Fq 'nuvasto-modal-enter' professional/web/native-performance.css
+          grep -Fq "methodKind: {type: 'STRING'}" worker/src/index.js
+          grep -Fq "cheque.serialNumber" worker/src/index.js
+          grep -Fq 'Jamás inventes campos de pago' worker/src/index.js
+          grep -Fq 'SESSION_TOUCH_INTERVAL_MS=10*60*1000' professional/worker/src/auth.js
+          grep -Fq 'LEFT JOIN platform_owners po' professional/worker/src/auth.js
+          if grep -Fq "SELECT user_id FROM platform_owners WHERE user_id" professional/worker/src/auth.js; then echo '::error::Authentication still performs a second platform-owner query'; exit 1; fi
+          grep -Fq 'priceReconciliation' professional/worker/src/api/invoice-analysis-core-v39.js
+          grep -Fq 'priceVerified:true' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'domainRouterV73:true' professional/worker/src/router.js
+          grep -Fq 'financeRoutingV73:true' professional/worker/src/router.js
+          grep -Fq 'reconciliationAliasResolverV73:true' professional/worker/src/router.js
+          grep -Fq 'domainRouterV74:true' professional/worker/src/router.js
+          grep -Fq 'paymentDocumentsV74:true' professional/worker/src/router.js
+          grep -Fq 'collectivePaymentAllocationV74:true' professional/worker/src/router.js
+          grep -Fq 'sameSupplierPaymentV74:true' professional/worker/src/router.js
+          grep -Fq 'multiInvoicePaymentV74:true' professional/worker/src/router.js
+          grep -Fq 'multiOrderPaymentV74:true' professional/worker/src/router.js
+          grep -Fq 'nuvasto-v76-supplier-final-unit' professional/web/sw.js
+          if grep -Fq "'./app-procurement.js'" professional/web/sw.js; then echo '::error::Service worker precache still contains noncritical procurement bundle'; exit 1; fi
+          grep -Fq 'overflow-y:auto' professional/web/native-performance.css
+          grep -Fq 'initializeOrderSelection' professional/web/app-bootstrap.js
