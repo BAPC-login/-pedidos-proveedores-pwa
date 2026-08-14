@@ -33,7 +33,7 @@ jobs:
           workingDirectory: professional
           wranglerVersion: '4.114.0'
           command: deploy --config wrangler.toml --keep-vars
-      - name: Verify deployed release, schema, migration, storage and frontend assets
+      - name: Verify deployed release, schema, storage and native-fast frontend
         id: verify
         shell: bash
         run: |
@@ -49,45 +49,47 @@ jobs:
             const storage=h.ok===true&&h.r2Configured===true&&h.r2Required===true&&h.r2Ready===true&&h.storageBackend==='r2';
             const runtime=h.nativePerformanceV45===true&&h.schemaOffCriticalPathV45===true&&h.requestCoalescingV45===true&&h.operationsBootstrapV45===true&&h.directR2StreamingV45===true&&h.redirectSafeNavigationV50===true;
             const migration=h.folioMigrationV67===true&&Number(h.folioMigrationDetails?.skipped||0)===0;
-            const r70=h.domainRouterV70===true&&h.ordersSchemaV67===true&&h.scopedHistoricalFoliosV67===true&&h.cursorOrdersV67===true&&h.reconciliationRequiredForClosure===true&&h.legacyDateFoliosRetired===true&&h.readOnlyOrderQueriesV68===true&&h.durableMasterDraftV69===true&&h.draftSaveNoFolioLockV69===true&&h.crossDeviceMasterDraftV70===true&&h.masterDraftServerBackedV70===true&&h.bulkClearMasterQuantitiesV70===true&&migration;
-            process.stdout.write(storage&&runtime&&r70?'true':'false');
+            const legacy=h.ordersSchemaV67===true&&h.scopedHistoricalFoliosV67===true&&h.cursorOrdersV67===true&&h.reconciliationRequiredForClosure===true&&h.legacyDateFoliosRetired===true&&h.readOnlyOrderQueriesV68===true&&h.durableMasterDraftV69===true&&h.draftSaveNoFolioLockV69===true&&h.crossDeviceMasterDraftV70===true&&h.masterDraftServerBackedV70===true&&h.bulkClearMasterQuantitiesV70===true;
+            const r71=h.domainRouterV71===true&&h.canonicalMasterOrderV71===true&&h.masterEditParityV71===true&&h.documentFolioNamesLockedV71===true&&h.deterministicInvoicePricingV71===true&&h.reducedPrecacheV71===true&&h.nativeScrollV71===true&&h.configurablePaymentMethods===true&&h.chequeSchedule===true&&h.invoiceChequeExtraction===true&&h.authTouchCoalescedV71===true;
+            process.stdout.write(storage&&runtime&&legacy&&r71&&migration?'true':'false');
           } catch { process.stdout.write('false'); }
           NODE
             )
             if [ "$release" = "$expected" ] && [ "$ready" = "true" ]; then break; fi
-            if [ "$attempt" = "24" ]; then echo "::error::Cloudflare no activó el release/schema/migración esperado. release=${release:-none} runtime=$ready body=$body"; exit 1; fi
+            if [ "$attempt" = "24" ]; then echo "::error::Cloudflare no activó el release esperado. release=${release:-none} runtime=$ready body=$body"; exit 1; fi
             echo "Esperando despliegue ${attempt}/24 · release=${release:-none} · runtime=$ready"; sleep 10
           done
           stamp=$(date +%s)
-          curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/app.js?v=$stamp" > /tmp/app.js
-          curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/app-bootstrap.js?v=$stamp" > /tmp/app-bootstrap.js
-          curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/app-order-core.js?v=$stamp" > /tmp/app-order-core.js
-          curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/app-orders.js?v=$stamp" > /tmp/app-orders.js
-          curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/app-invoice-entry-v29.js?v=$stamp" > /tmp/app-invoice-entry.js
-          curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/app-mobile-runtime.js?v=$stamp" > /tmp/app-mobile-runtime.js
-          curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/sw.js?v=$stamp" > /tmp/sw.js
+          for asset in app.js app-bootstrap.js app-order-core.js app-master-order.js app-order-selection.js app-orders.js app-catalog.js app-documents.js app-payment-workflow.js app-invoice-v30.js native-performance.css sw.js; do
+            curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/$asset?v=$stamp" > "/tmp/$asset"
+          done
           grep -Fq "CLIENT_RELEASE='$expected'" /tmp/app.js || { echo '::error::app.js productivo no coincide con el release'; exit 1; }
-          grep -Fq "from './app-order-core.js'" /tmp/app-bootstrap.js || { echo '::error::bootstrap no usa el propietario canónico de Lista Maestra'; exit 1; }
+          grep -Fq "from './app-order-core.js'" /tmp/app-bootstrap.js || { echo '::error::bootstrap no usa la entrada canónica de Lista Maestra'; exit 1; }
+          grep -Fq "import('./app-master-order.js')" /tmp/app-order-core.js || { echo '::error::Lista Maestra no se carga desde su propietario canónico'; exit 1; }
           if grep -Fq 'app-order-core-v15.js' /tmp/app-bootstrap.js; then echo '::error::bootstrap todavía activa una versión antigua de Lista Maestra'; exit 1; fi
-          grep -Fq 'LOCAL_DRAFT_VERSION=70' /tmp/app-order-core.js || { echo '::error::protección local de borrador r70 no está en producción'; exit 1; }
-          grep -Fq 'SERVER_AUTOSAVE_DELAY=1200' /tmp/app-order-core.js || { echo '::error::sincronización de Lista Maestra no tiene la cadencia r70'; exit 1; }
-          grep -Fq 'id="clearMasterQuantities"' /tmp/app-order-core.js || { echo '::error::botón Eliminar todo no está en producción'; exit 1; }
-          grep -Fq 'Guardado en sistema · disponible en otros dispositivos' /tmp/app-order-core.js || { echo '::error::guardado de sistema multi-dispositivo no está en producción'; exit 1; }
-          grep -Fq 'serverSavePromise' /tmp/app-order-core.js || { echo '::error::autosaves de sistema no están serializados'; exit 1; }
-          grep -Fq "'Idempotency-Key':payload.idempotencyKey" /tmp/app-order-core.js || { echo '::error::Guardar archivo no tiene idempotencia estable'; exit 1; }
-          grep -Fq 'timeout:45000,persist:true' /tmp/app-order-core.js || { echo '::error::Guardar archivo no tiene timeout operacional'; exit 1; }
-          grep -Fq 'TRAZABILIDAD CERRADA' /tmp/app-orders.js || { echo '::error::app-orders.js productivo no tiene separación Pedidos/Historial'; exit 1; }
-          grep -Fq 'data-v67-order-actions' /tmp/app-orders.js || { echo '::error::menú nativo de pedidos no está en producción'; exit 1; }
-          grep -Fq "view:history?'history':'active'" /tmp/app-orders.js || { echo '::error::consulta canónica active/history no está en producción'; exit 1; }
-          if grep -Fq "app-orders-v30.js" /tmp/app-invoice-entry.js; then echo '::error::un renderer antiguo todavía compite por la ruta Orders'; exit 1; fi
-          grep -Fq 'r70-canonical-mobile' /tmp/app-mobile-runtime.js || { echo '::error::runtime móvil r70 no está en producción'; exit 1; }
-          grep -Fq 'keepQuantityVisible' /tmp/app-mobile-runtime.js || { echo '::error::scroll de flechas no está en producción'; exit 1; }
-          grep -Fq 'nuvasto-v70-offline-data' /tmp/sw.js || { echo '::error::service worker r70 no está en producción'; exit 1; }
-          grep -Fq "'./app-order-core.js'" /tmp/sw.js || { echo '::error::Lista Maestra canónica no está en precache'; exit 1; }
-          if grep -Fq "'./app-order-core-v15.js'" /tmp/sw.js; then echo '::error::Service Worker todavía precarga Lista Maestra versionada'; exit 1; fi
+          grep -Fq 'LOCAL_DRAFT_VERSION=71' /tmp/app-master-order.js || { echo '::error::protección local de borrador r71 no está en producción'; exit 1; }
+          grep -Fq 'SERVER_AUTOSAVE_DELAY=1200' /tmp/app-master-order.js || { echo '::error::sincronización de Lista Maestra no tiene la cadencia esperada'; exit 1; }
+          grep -Fq 'id="clearMasterQuantities"' /tmp/app-master-order.js || { echo '::error::botón Limpiar no está en producción'; exit 1; }
+          grep -Fq 'render({capture:false,persist:false})' /tmp/app-master-order.js || { echo '::error::Limpiar podría volver a capturar valores antiguos'; exit 1; }
+          grep -Fq 'Formato: <b>' /tmp/app-master-order.js || { echo '::error::formato de compra no está visible en Lista Maestra'; exit 1; }
+          grep -Fq 'openMasterOrder({order:' /tmp/app-master-order.js || { echo '::error::edición no reutiliza Lista Maestra'; exit 1; }
+          grep -Fq "'Idempotency-Key':payload.idempotencyKey" /tmp/app-master-order.js || { echo '::error::Guardar archivo no tiene idempotencia estable'; exit 1; }
+          grep -Fq 'data-v32-matrix-product' /tmp/app-catalog.js || { echo '::error::matriz multiproveedor no está operable'; exit 1; }
+          grep -Fq 'data-v32-image-key' /tmp/app-documents.js || { echo '::error::Documentos no expone vista previa de imágenes'; exit 1; }
+          grep -Fq 'minValue' /tmp/app-documents.js || { echo '::error::Documentos no expone filtros de valor'; exit 1; }
+          grep -Fq 'openPaymentForOrder' /tmp/app-payment-workflow.js || { echo '::error::pagos no son accesibles desde pedido'; exit 1; }
+          grep -Fq 'openPaymentMethodsManager' /tmp/app-payment-workflow.js || { echo '::error::no existe configuración de medios de pago'; exit 1; }
+          grep -Fq 'Cobros programados' /tmp/app-payment-workflow.js || { echo '::error::no existe panel de cobros programados'; exit 1; }
+          grep -Fq 'Medio de pago detectado por IA' /tmp/app-invoice-v30.js || { echo '::error::revisión de factura no presenta pago detectado por IA'; exit 1; }
+          grep -Fq 'chequeCollectionDate' /tmp/app-invoice-v30.js || { echo '::error::revisión de factura no captura fecha de cobro del cheque'; exit 1; }
+          grep -Fq 'Seleccionar todos' /tmp/app-order-selection.js || { echo '::error::Pedidos no tiene selección total'; exit 1; }
+          grep -Fq 'TRAZABILIDAD CERRADA' /tmp/app-orders.js || { echo '::error::Pedidos/Historial no están separados'; exit 1; }
+          grep -Fq 'overflow-y:auto' /tmp/native-performance.css || { echo '::error::contenido principal no tiene scroll nativo'; exit 1; }
+          grep -Fq 'nuvasto-v71-native-fast' /tmp/sw.js || { echo '::error::service worker r71 no está en producción'; exit 1; }
+          if grep -Fq "'./app-procurement.js'" /tmp/sw.js; then echo '::error::Service Worker aún precarga bundles no críticos'; exit 1; fi
           grep -Fq 'apiNetworkTimeout' /tmp/sw.js || { echo '::error::timeout API adaptable no está en producción'; exit 1; }
-          grep -Fq 'releaseAssetResponse' /tmp/sw.js || { echo '::error::assets release no están en network-first'; exit 1; }
-          echo "Nuvasto $release · backend, D1/R2, borrador multi-dispositivo, Eliminar todo y frontend r70 verificados."
+          grep -Fq 'const cached=await cache.match' /tmp/sw.js || { echo '::error::assets de release no usan cache-first'; exit 1; }
+          echo "Nuvasto $release · r71 native-fast + finanzas/cheques verificado en producción."
       - name: Production procurement journey
         id: synthetic
         if: steps.verify.outcome == 'success'
@@ -105,7 +107,7 @@ jobs:
           E2E_EMAIL: '${{ secrets.NUVASTO_E2E_EMAIL }}'
           E2E_PASSWORD: '${{ secrets.NUVASTO_E2E_PASSWORD }}'
         run: |
-          if [ -n "$E2E_EMAIL" ] && [ -n "$E2E_PASSWORD" ]; then echo 'authenticated=true' >> "$GITHUB_OUTPUT"; echo 'E2E autenticado configurado.'; else echo 'authenticated=false' >> "$GITHUB_OUTPUT"; echo '::warning::E2E autenticado no configurado; el smoke público r70 sí fue ejecutado.'; fi
+          if [ -n "$E2E_EMAIL" ] && [ -n "$E2E_PASSWORD" ]; then echo 'authenticated=true' >> "$GITHUB_OUTPUT"; echo 'E2E autenticado configurado.'; else echo 'authenticated=false' >> "$GITHUB_OUTPUT"; echo '::warning::E2E autenticado no configurado; el smoke público r71 sí fue ejecutado.'; fi
       - name: Publish production status on commit
         if: always() && !cancelled()
         shell: bash
@@ -113,6 +115,6 @@ jobs:
         run: |
           if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.synthetic.outcome }}" != "failure" ]; then
             state=success
-            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto r70 publicado; master multi-dispositivo y E2E autenticado OK'; else description='Nuvasto r70 publicado; master multi-dispositivo/frontend/backend OK'; fi
-          else state=failure; description='El despliegue de Nuvasto r70 no quedó verificado'; fi
+            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto r71 publicado; native-fast, finanzas/cheques y E2E autenticado OK'; else description='Nuvasto r71 publicado; frontend/backend/finanzas verificados'; fi
+          else state=failure; description='El despliegue de Nuvasto r71 no quedó verificado'; fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state="$state" -f context='nuvasto/production' -f description="$description" -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"

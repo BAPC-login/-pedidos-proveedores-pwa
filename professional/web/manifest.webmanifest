@@ -4,7 +4,7 @@
   "short_name": "Nuvasto",
   "description": "Compras claras, abastecimiento inteligente, proveedores, recepción y facturas con trazabilidad.",
   "lang": "es-CL",
-  "start_url": "/",
+  "start_url": "/#/dashboard",
   "scope": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
@@ -17,6 +17,9 @@
   ],
   "shortcuts": [
     {"name":"Nuevo pedido","short_name":"Pedido","url":"/?action=new-order","icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml"}]},
-    {"name":"Recepción","short_name":"Recepción","url":"/?view=orders&filter=sent","icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml"}]}
-  ]
+    {"name":"Recepción","short_name":"Recepción","url":"/#/receiving","icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml"}]},
+    {"name":"Pedidos","short_name":"Pedidos","url":"/#/orders","icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml"}]}
+  ],
+  "prefer_related_applications": false,
+  "launch_handler": {"client_mode":"navigate-existing"}
 }

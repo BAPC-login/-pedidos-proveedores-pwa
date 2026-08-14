@@ -219,14 +219,10 @@ function textSimilarity(source, product) {
   const sourceTokens = tokens(source), productTokens = tokens(product);
   if (!sourceTokens.length || !productTokens.length) return 0;
   let productCoverage = 0;
-  for (const productToken of productTokens) {
-    productCoverage += Math.max(0, ...sourceTokens.map(sourceToken => tokenSimilarity(sourceToken, productToken)));
-  }
+  for (const productToken of productTokens) productCoverage += Math.max(0, ...sourceTokens.map(sourceToken => tokenSimilarity(sourceToken, productToken)));
   productCoverage /= productTokens.length;
   let sourceCoverage = 0;
-  for (const sourceToken of sourceTokens) {
-    sourceCoverage += Math.max(0, ...productTokens.map(productToken => tokenSimilarity(sourceToken, productToken)));
-  }
+  for (const sourceToken of sourceTokens) sourceCoverage += Math.max(0, ...productTokens.map(productToken => tokenSimilarity(sourceToken, productToken)));
   sourceCoverage /= sourceTokens.length;
   return Math.min(1, productCoverage * .56 + sourceCoverage * .24 + trigramSimilarity(source, product) * .20);
 }
@@ -261,9 +257,7 @@ function chooseProduct(line, products) {
   const best = ranked[0] || {product: null, score: 0, reasons: []};
   const second = ranked[1]?.score || 0;
   const requested = ranked.find(entry => String(entry.product.productId) === requestedId);
-  if (requested && requested.score >= .34) {
-    return {product: requested.product, candidate: requested.product, score: requested.score, method: 'gemini+catalog-validation', reason: requested.reasons.join(', ')};
-  }
+  if (requested && requested.score >= .34) return {product: requested.product, candidate: requested.product, score: requested.score, method: 'gemini+catalog-validation', reason: requested.reasons.join(', ')};
   const unique = best.score >= .47 || (best.score >= .38 && best.score - second >= .08);
   return {product: unique ? best.product : null, candidate: best.product, score: best.score, method: unique ? 'catalog-resolver' : 'unmatched', reason: best.reasons.join(', ')};
 }
@@ -285,6 +279,18 @@ const responseSchema = {
       properties: {net: {type: 'NUMBER'}, freight: {type: 'NUMBER'}, additionalTax: {type: 'NUMBER'}, vat: {type: 'NUMBER'}, other: {type: 'NUMBER'}, total: {type: 'NUMBER'}},
       required: ['net','freight','additionalTax','vat','other','total']
     },
+    payment: {
+      type: 'OBJECT',
+      properties: {
+        detected: {type: 'BOOLEAN'}, methodKind: {type: 'STRING'}, methodLabel: {type: 'STRING'}, confidence: {type: 'NUMBER'}, reference: {type: 'STRING'}, paymentDate: {type: 'STRING'}, amount: {type: 'NUMBER'},
+        cheque: {
+          type: 'OBJECT',
+          properties: {serialNumber: {type: 'STRING'}, collectionDate: {type: 'STRING'}, payee: {type: 'STRING'}, amount: {type: 'NUMBER'}, bank: {type: 'STRING'}},
+          required: ['serialNumber','collectionDate','payee','amount','bank']
+        }
+      },
+      required: ['detected','methodKind','methodLabel','confidence','reference','paymentDate','amount','cheque']
+    },
     items: {
       type: 'ARRAY',
       items: {
@@ -302,7 +308,7 @@ const responseSchema = {
     },
     warnings: {type: 'ARRAY', items: {type: 'STRING'}}
   },
-  required: ['supplierName','invoiceNumber','documentType','documentTypeCode','totals','items','warnings']
+  required: ['supplierName','invoiceNumber','documentType','documentTypeCode','totals','payment','items','warnings']
 };
 
 function buildPrompt(context) {
@@ -319,6 +325,11 @@ function buildPrompt(context) {
 - matchedOrderProductId es un id exacto de CAT o vacío. Nunca inventes.
 - DISPLAY=24; 1.5L=6, salvo pack explícito.
 - Lee neto, descuento, flete, IVA, impuesto adicional, otros y total final por línea.
+- Revisa si el documento contiene información explícita de pago o un cheque. payment.detected=true solo si la evidencia es visible en DOCUMENTO A.
+- Para cheque: payment.methodKind='cheque' y extrae cheque.serialNumber, cheque.collectionDate/fecha de cobro o pago, cheque.payee/destinatario, cheque.amount y cheque.bank si está visible.
+- No confundas número de factura con serie del cheque ni total de factura con monto del cheque. El cheque puede cubrir un monto parcial.
+- Jamás inventes campos de pago. Si un dato no se ve con claridad usa cadena vacía o 0 y agrega un warning. Fechas de pago/cobro en formato YYYY-MM-DD cuando sean legibles.
+- Para transferencia, efectivo, tarjeta, depósito u otro medio visible, usa methodKind transfer/cash/card/deposit/other; reference solo si aparece explícitamente.
 - isFree=true solo si la línea tiene valor cero, descuento cercano a 100%, o texto SIN CARGO, BONIFICACION, BONIF, GRATIS, MUESTRA o PROMOCIONAL. freeReason explica la señal.
 - BOLETA es un tipo de documento y no significa por sí sola que el producto sea gratis. Una bonificación puede venir en factura o guía de despacho.
 - Números sin símbolos. Ilegible=0 y warning breve.
@@ -347,10 +358,7 @@ async function callGemini(env, model, invoiceMime, invoiceData, orderMime, order
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: 'POST', signal: controller.signal,
       headers: {'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY},
-      body: JSON.stringify({
-        contents: [{role: 'user', parts}],
-        generationConfig: {temperature: 0, responseMimeType: 'application/json', responseSchema, maxOutputTokens: 8192}
-      })
+      body: JSON.stringify({contents: [{role: 'user', parts}], generationConfig: {temperature: 0, responseMimeType: 'application/json', responseSchema, maxOutputTokens: 8192}})
     });
     return await parseGeminiResponse(response, model);
   } finally { clearTimeout(timeout); }
@@ -380,6 +388,23 @@ function documentTypeCode(raw = {}) {
   if (label.includes('BOLETA')) return '39';
   if (label.includes('EXENTA')) return '34';
   return label.includes('FACTURA') ? '33' : '0';
+}
+
+function cleanDate(value) {const text=String(value||'').trim();return /^\d{4}-\d{2}-\d{2}$/.test(text)?text:'';}
+function validatePayment(rawPayment, totals, warnings) {
+  const raw=rawPayment&&typeof rawPayment==='object'?rawPayment:{},chequeRaw=raw.cheque&&typeof raw.cheque==='object'?raw.cheque:{};
+  const detected=raw.detected===true,kind=['transfer','cheque','cash','card','deposit','other'].includes(String(raw.methodKind||'').toLowerCase())?String(raw.methodKind).toLowerCase():'other';
+  const cheque={serialNumber:String(chequeRaw.serialNumber||'').trim().slice(0,120),collectionDate:cleanDate(chequeRaw.collectionDate),payee:String(chequeRaw.payee||'').trim().slice(0,180),amount:Math.max(0,Math.round(numeric(chequeRaw.amount))),bank:String(chequeRaw.bank||'').trim().slice(0,120)};
+  const payment={detected,methodKind:detected?kind:'',methodLabel:detected?String(raw.methodLabel||'').trim().slice(0,100):'',confidence:detected?Math.max(0,Math.min(1,numeric(raw.confidence))):0,reference:detected?String(raw.reference||'').trim().slice(0,180):'',paymentDate:detected?cleanDate(raw.paymentDate):'',amount:detected?Math.max(0,Math.round(numeric(raw.amount))):0,cheque:detected&&kind==='cheque'?cheque:{serialNumber:'',collectionDate:'',payee:'',amount:0,bank:''}};
+  if(payment.detected&&payment.methodKind==='cheque'){
+    if(!cheque.serialNumber)warnings.push('Cheque detectado: número o serie no legible; confirma manualmente.');
+    if(!cheque.collectionDate)warnings.push('Cheque detectado: fecha de cobro/pago no legible; confirma manualmente.');
+    if(!cheque.payee)warnings.push('Cheque detectado: destinatario no legible; confirma manualmente.');
+    if(!cheque.amount)warnings.push('Cheque detectado: monto no legible; confirma manualmente.');
+    if(cheque.amount&&totals.total&&Math.abs(cheque.amount-totals.total)>1)warnings.push(`El cheque indica ${cheque.amount} y el total de la factura es ${Math.round(totals.total)}. Puede corresponder a un pago parcial; revisa antes de guardar.`);
+    payment.paymentDate=payment.paymentDate||cheque.collectionDate;payment.amount=payment.amount||cheque.amount;
+  }
+  return payment;
 }
 
 function freeLineSignal(line, sourceLine, invoiceQuantity) {
@@ -412,6 +437,7 @@ function validateInvoice(raw, context) {
     other: Math.max(0, numeric(raw.totals?.other)), total: Math.max(0, numeric(raw.totals?.total))
   };
   const warnings = [...(Array.isArray(raw.warnings) ? raw.warnings : [])];
+  const payment=validatePayment(raw.payment,totals,warnings);
   const sourceItems = Array.isArray(raw.items) ? raw.items : [];
   const productItems = sourceItems.filter(line => {
     const source = String(line.descriptionOriginal || '').trim();
@@ -440,9 +466,8 @@ function validateInvoice(raw, context) {
     let otherLineCharges = Math.max(0, Math.round(numeric(line.otherLineCharges)));
     const componentTotal = netLineTotal + freightLine + vatLine + additionalTaxLine + otherLineCharges;
     let grossLineTotal = Math.max(0, Math.round(numeric(line.grossLineTotal)));
-    if (isFree) {
-      netLineTotal = 0; freightLine = 0; vatLine = 0; additionalTaxLine = 0; otherLineCharges = 0; grossLineTotal = 0;
-    } else if (!grossLineTotal || Math.abs(grossLineTotal - componentTotal) > Math.max(3, componentTotal * .03)) grossLineTotal = componentTotal;
+    if (isFree) {netLineTotal = 0; freightLine = 0; vatLine = 0; additionalTaxLine = 0; otherLineCharges = 0; grossLineTotal = 0;}
+    else if (!grossLineTotal || Math.abs(grossLineTotal - componentTotal) > Math.max(3, componentTotal * .03)) grossLineTotal = componentTotal;
     const receivedOrderQty = product ? units / expectedOrderPack : 0;
     if (!product) warnings.push(`Sin coincidencia segura con el pedido: ${sourceLine || `línea ${index + 1}`}`);
     return {
@@ -471,7 +496,7 @@ function validateInvoice(raw, context) {
   const matched = lines.filter(line => line.productId).length;
   return {
     supplierName: String(raw.supplierName || ''), supplierRut: String(raw.supplierRut || ''), invoiceNumber: String(raw.invoiceNumber || ''),
-    invoiceDate: String(raw.invoiceDate || ''), currency: String(raw.currency || 'CLP'), documentType: String(raw.documentType || ''), documentTypeCode: documentTypeCode(raw), totals, lines,
+    invoiceDate: String(raw.invoiceDate || ''), currency: String(raw.currency || 'CLP'), documentType: String(raw.documentType || ''), documentTypeCode: documentTypeCode(raw), totals, payment, lines,
     matchSummary: {matched, unmatched: lines.length - matched, totalInvoiceLines: lines.length, freeLines: lines.filter(line => line.isFree).length},
     warnings: [...new Set(warnings.filter(Boolean))], rawText: JSON.stringify(raw)
   };
@@ -515,7 +540,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, {status: 204, headers: corsHeaders(origin)});
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === '/health') {
-      const base = {ok: true, service: 'pedidos-pro-ai', geminiConfigured: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL || DEFAULT_MODEL, resolver: 'catalog-v23-free-items'};
+      const base = {ok: true, service: 'pedidos-pro-ai', geminiConfigured: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL || DEFAULT_MODEL, resolver: 'catalog-v23-free-items-cheque-payment'};
       if (url.searchParams.get('probe') !== '1' || !env.GEMINI_API_KEY) return json(base, 200, origin);
       try { return json({...base, probe: await probeGemini(env)}, 200, origin); }
       catch (error) { return json({...base, ok: false, probe: {ok: false, error: String(error.message || error)}}, 502, origin); }

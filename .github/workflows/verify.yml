@@ -1,0 +1,61 @@
+name: Verify Nuvasto candidate
+on:
+  pull_request:
+    branches: [main]
+    paths: ['professional/**','worker/**','wrangler.jsonc','.github/workflows/**']
+  push:
+    branches: ['agent/**']
+    paths: ['professional/**','worker/**','wrangler.jsonc','.github/workflows/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: 'verify-nuvasto-${{ github.ref }}'
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: {node-version: '22'}
+      - name: Verify syntax and contracts
+        working-directory: professional
+        run: npm run verify
+      - name: Native-fast source contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "CLIENT_RELEASE='2026.08.13.71'" professional/web/app.js
+          grep -Fq "import('./app-master-order.js')" professional/web/app-order-core.js
+          grep -Fq 'LOCAL_DRAFT_VERSION=71' professional/web/app-master-order.js
+          grep -Fq 'SERVER_AUTOSAVE_DELAY=1200' professional/web/app-master-order.js
+          grep -Fq 'id="clearMasterQuantities"' professional/web/app-master-order.js
+          grep -Fq 'render({capture:false,persist:false})' professional/web/app-master-order.js
+          grep -Fq 'data-v32-matrix-product' professional/web/app-catalog.js
+          grep -Fq 'document_name_locked' professional/worker/src/index-v33.js
+          grep -Fq 'minValue' professional/web/app-documents.js
+          grep -Fq 'payment_methods' professional/worker/src/api/schema-v41.js
+          grep -Fq 'cheque_collection_date' professional/worker/src/api/schema-v41.js
+          grep -Fq 'listPaymentMethodsCanonical' professional/worker/src/api/payments.js
+          grep -Fq 'listChequeScheduleCanonical' professional/worker/src/api/payments.js
+          grep -Fq 'applyInvoicePaymentMetadata' professional/worker/src/api/payments.js
+          grep -Fq 'openPaymentForOrder' professional/web/app-payment-workflow.js
+          grep -Fq 'openPaymentMethodsManager' professional/web/app-payment-workflow.js
+          grep -Fq 'Cobros programados' professional/web/app-payment-workflow.js
+          if grep -Fq 'MutationObserver' professional/web/app-payment-workflow.js; then echo '::error::Payment workflow must not observe the whole DOM'; exit 1; fi
+          grep -Fq 'Medio de pago detectado por IA' professional/web/app-invoice-v30.js
+          grep -Fq 'chequeCollectionDate' professional/web/app-invoice-v30.js
+          grep -Fq "methodKind: {type: 'STRING'}" worker/src/index.js
+          grep -Fq "cheque.serialNumber" worker/src/index.js
+          grep -Fq 'Jamás inventes campos de pago' worker/src/index.js
+          grep -Fq 'SESSION_TOUCH_INTERVAL_MS=10*60*1000' professional/worker/src/auth.js
+          grep -Fq 'LEFT JOIN platform_owners po' professional/worker/src/auth.js
+          if grep -Fq "SELECT user_id FROM platform_owners WHERE user_id" professional/worker/src/auth.js; then echo '::error::Authentication still performs a second platform-owner query'; exit 1; fi
+          grep -Fq 'priceReconciliation' professional/worker/src/api/invoice-analysis-core-v39.js
+          grep -Fq 'priceVerified:true' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'nuvasto-v71-native-fast' professional/web/sw.js
+          if grep -Fq "'./app-procurement.js'" professional/web/sw.js; then echo '::error::Service worker precache still contains noncritical procurement bundle'; exit 1; fi
+          grep -Fq 'overflow-y:auto' professional/web/native-performance.css
+          grep -Fq 'initializeOrderSelection' professional/web/app-bootstrap.js

@@ -2,6 +2,7 @@ import './app-invoice-entry-v29.js';
 import {initializeScreenState} from './app-screen-state.js';
 import {initializeBrandingFeatures} from './app-branding.js';
 import {initializeOrderCore} from './app-order-core.js';
+import {initializeOrderSelection} from './app-order-selection.js';
 import {initializeCompanyLogoUploader} from './app-company-logo.js';
 import {initializeProcurementSettings} from './app-procurement-settings.js';
 import {initializeProcurementEntry} from './app-procurement-entry.js';
@@ -15,9 +16,8 @@ import {initializeProfessionalV20} from './app-professional-v20.js';
 import {initializeNuvastoV21} from './app-nuvasto-v21.js';
 import {initializeCheckoutInvoiceV29} from './app-checkout-invoice-v29.js';
 import {initializeLegalExperience} from './app-legal.js';
-import {initializeProfessional} from './app-professional.js';
 
-let initialized=false;
+let initialized=false,authenticatedRuntimePromise=null;
 export function initializePlatform(){
   if(initialized)return;
   initialized=true;
@@ -27,6 +27,7 @@ export function initializePlatform(){
   initializeProcurementSettings();
   initializeProcurementEntry();
   initializeOrderCore();
+  initializeOrderSelection();
   initializeCompanyLogoUploader();
   initializeFileActions();
   initializeSettingsPanelsV13();
@@ -37,5 +38,9 @@ export function initializePlatform(){
   initializeProfessionalV20();
   initializeCheckoutInvoiceV29();
   initializeLegalExperience();
-  initializeProfessional();
+}
+export function initializeAuthenticatedPlatform(){
+  if(authenticatedRuntimePromise)return authenticatedRuntimePromise;
+  authenticatedRuntimePromise=import('./app-professional.js').then(module=>{module.initializeProfessional();return true}).catch(error=>{authenticatedRuntimePromise=null;throw error});
+  return authenticatedRuntimePromise;
 }
