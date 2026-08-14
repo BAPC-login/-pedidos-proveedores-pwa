@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';import fs from 'node:fs';const read=path
 const app=read('web/app.js'),entry=read('web/app-professional.js'),runtime=read('web/app-runtime.js'),mobile=read('web/app-mobile-runtime.js'),bootstrap=read('web/app-bootstrap.js'),files=read('web/app-file-actions.js'),orders=read('web/app-orders.js'),catalog=read('web/app-catalog.js'),sw=read('web/sw.js'),orderCore=read('web/app-order-core.js'),master=read('web/app-master-order.js'),invoiceEntry=read('web/app-invoice-entry-v29.js'),telemetry=read('web/app-telemetry-v13.js'),documents=read('web/app-documents.js'),payments=read('web/app-payment-workflow.js');
 assert.equal((app.match(/window\.fetch\s*=/g)||[]).length,0,'app.js must not wrap global fetch');
 assert.ok(entry.includes("from './app-orders.js'")&&entry.includes("from './app-catalog.js'"),'professional bootstrap must use semantic modules');
+assert.ok(bootstrap.includes("import('./app-professional.js')")&&!bootstrap.includes("from './app-professional.js'")&&app.includes('await initializeAuthenticatedPlatform()'),'professional graph must be deferred until authentication succeeds');
 assert.ok(runtime.includes("from './app-operations-dashboard.js'")&&runtime.includes("registerRouteRenderer('dashboard'")&&runtime.includes("registerRouteRenderer('operations'"),'canonical runtime must own dashboard and operations through semantic modules');
 assert.ok(bootstrap.includes("from './app-order-core.js'")&&bootstrap.includes('initializeOrderCore()')&&!bootstrap.includes('app-order-core-v15.js'),'bootstrap must load one canonical master-list entry');
 assert.ok(orderCore.includes("import('./app-master-order.js')")&&!orderCore.includes('groupProductsByConfiguredOrder'),'master order implementation must load lazily behind its canonical entry');
@@ -28,7 +29,7 @@ assert.ok(sw.includes('nuvasto-v71-native-fast')&&sw.includes('sessionCacheKey')
 assert.ok(!sw.includes("'./app-procurement.js'")&&!sw.includes("'./app-enterprise.js'"),'service worker critical precache must exclude noncritical feature bundles');
 assert.ok(sw.includes('RELEASE_ASSET')&&sw.includes('releaseAssetResponse')&&sw.includes('const cached=await cache.match'),'release JS/CSS must be cache-first inside a release-scoped cache');
 assert.ok(documents.includes('minValue')&&documents.includes('meta.suppliers')&&documents.includes('data-v32-image-key'),'documents must expose preview and operational filters');
-assert.ok(payments.includes('openPaymentForOrder')&&bootstrap.includes('initializePaymentWorkflow()'),'orders and history must reach canonical payment workflow');
+assert.ok(payments.includes('openPaymentForOrder')&&payments.includes('openPaymentMethodsManager')&&entry.includes('initializePaymentWorkflow()'),'orders, history and finance must converge on one semantic payment workflow');
 assert.ok(app.includes('controllerchange')&&app.includes("registration?.waiting?.postMessage?.({type:'SKIP_WAITING'})"),'client must force a clean service-worker release cutover');
 assert.ok(telemetry.includes("window.addEventListener('nuvasto:api-metric'")&&telemetry.includes('requestBudget')&&telemetry.includes('DAY_LIMIT=100000'),'request budgets must be measured without adding per-request telemetry calls');
 console.log('canonical runtime regression gate: OK');
