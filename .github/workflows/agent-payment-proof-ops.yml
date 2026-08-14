@@ -16,7 +16,9 @@ jobs:
         with:
           node-version: '22'
       - name: Apply canonical consolidation
-        run: python .github/agent-patches/payment_proof_ops_consolidation.py
+        run: |
+          python .github/agent-patches/payment_proof_ops_consolidation.py
+          python .github/agent-patches/payment_proof_ops_fix.py
       - name: Verify candidate
         working-directory: professional
         run: npm run verify
