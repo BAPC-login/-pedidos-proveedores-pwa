@@ -7,6 +7,7 @@ import {getDashboardAnalyticsV41} from './api/analytics-v41.js';
 import {autoReconcileOrder} from './api/order-workflow.js';
 import {createPaymentMethodCanonical,listPaymentMethodsCanonical,listPaymentsCanonical,updatePaymentCanonical,updatePaymentMethodCanonical} from './api/payments.js';
 import {createPaymentDocumentCanonical,createPaymentDocumentFromInvoiceCanonical,getPaymentDocumentCanonical,listCollectiveChequeScheduleCanonical,listPaymentCandidatesCanonical,listPaymentDocumentsCanonical,updatePaymentDocumentCanonical} from './api/payment-documents.js';
+import {analyzePaymentProofCanonical} from './api/payment-proof-ai.js';
 import {
   addOrderCommentV41,
   assertBatchEmissionAllowedV41,
@@ -82,6 +83,7 @@ export default{async fetch(request,env,ctx){const url=new URL(request.url),metho
     if(method==='POST'&&path==='/api/finance/payment-methods'){const actor=await auth(request,env);return decorate(ok({method:await createPaymentMethodCanonical(request,env,actor)},request,env),request,env)}
     if(paymentMethod&&method==='PATCH'){const actor=await auth(request,env);return decorate(ok({method:await updatePaymentMethodCanonical(request,env,actor,paymentMethod.id)},request,env),request,env)}
     if(method==='GET'&&path==='/api/finance/payment-candidates'){const actor=await auth(request,env);return decorate(ok(await listPaymentCandidatesCanonical(env,actor,url),request,env),request,env)}
+    if(method==='POST'&&path==='/api/finance/payment-proof-analysis'){const actor=await auth(request,env),body=await request.json().catch(()=>({}));return decorate(ok({analysis:await analyzePaymentProofCanonical(env,actor,body.fileId)},request,env),request,env)}
     if(method==='GET'&&path==='/api/finance/payment-documents'){const actor=await auth(request,env);return decorate(ok({documents:await listPaymentDocumentsCanonical(env,actor,url)},request,env),request,env)}
     if(method==='POST'&&path==='/api/finance/payment-documents'){const actor=await auth(request,env);return decorate(ok({document:await createPaymentDocumentCanonical(request,env,actor)},request,env),request,env)}
     if(paymentDocument&&method==='GET'){const actor=await auth(request,env);return decorate(ok({document:await getPaymentDocumentCanonical(env,actor,paymentDocument.id)},request,env),request,env)}
