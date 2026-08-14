@@ -15,11 +15,9 @@ import {initializeSsoV20} from './app-sso-v20.js';
 import {initializeProfessionalV20} from './app-professional-v20.js';
 import {initializeNuvastoV21} from './app-nuvasto-v21.js';
 import {initializeCheckoutInvoiceV29} from './app-checkout-invoice-v29.js';
-import {initializePaymentWorkflow} from './app-payment-workflow.js';
 import {initializeLegalExperience} from './app-legal.js';
-import {initializeProfessional} from './app-professional.js';
 
-let initialized=false;
+let initialized=false,authenticatedRuntimePromise=null;
 export function initializePlatform(){
   if(initialized)return;
   initialized=true;
@@ -39,7 +37,10 @@ export function initializePlatform(){
   initializeSsoV20();
   initializeProfessionalV20();
   initializeCheckoutInvoiceV29();
-  initializePaymentWorkflow();
   initializeLegalExperience();
-  initializeProfessional();
+}
+export function initializeAuthenticatedPlatform(){
+  if(authenticatedRuntimePromise)return authenticatedRuntimePromise;
+  authenticatedRuntimePromise=import('./app-professional.js').then(module=>{module.initializeProfessional();return true}).catch(error=>{authenticatedRuntimePromise=null;throw error});
+  return authenticatedRuntimePromise;
 }
