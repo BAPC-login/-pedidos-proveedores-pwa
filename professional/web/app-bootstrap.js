@@ -2,6 +2,7 @@ import './app-invoice-entry-v29.js';
 import {initializeScreenState} from './app-screen-state.js';
 import {initializeBrandingFeatures} from './app-branding.js';
 import {initializeOrderCore} from './app-order-core.js';
+import {initializeOrderSelection} from './app-order-selection.js';
 import {initializeCompanyLogoUploader} from './app-company-logo.js';
 import {initializeProcurementSettings} from './app-procurement-settings.js';
 import {initializeProcurementEntry} from './app-procurement-entry.js';
@@ -28,6 +29,7 @@ export function initializePlatform(){
   initializeProcurementSettings();
   initializeProcurementEntry();
   initializeOrderCore();
+  initializeOrderSelection();
   initializeCompanyLogoUploader();
   initializeFileActions();
   initializeSettingsPanelsV13();
