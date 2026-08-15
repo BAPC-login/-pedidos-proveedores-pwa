@@ -27,15 +27,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -Fq "CLIENT_RELEASE='2026.08.14.77'" professional/web/app.js
-          grep -Fq "PLATFORM_RELEASE='2026.08.14.77'" worker/src/combined.js
+          grep -Fq "CLIENT_RELEASE='2026.08.15.78'" professional/web/app.js
+          grep -Fq "PLATFORM_RELEASE='2026.08.15.78'" worker/src/combined.js
           grep -Fq "import './app-session-bootstrap.js'" professional/web/app.js
           grep -Fq 'nuvasto:ephemeral-token' professional/web/app-session-bootstrap.js
           grep -Fq 'isUserVerifyingPlatformAuthenticatorAvailable' professional/web/app-auth-experience.js
           grep -Fq '/api/auth/passkeys/login/options' professional/web/app-auth-experience.js
           grep -Fq 'navigator.credentials.create' professional/web/app-auth-experience.js
+          grep -Fq 'offerPasskeyEnrollmentAfterPassword' professional/web/app-auth-experience.js
+          grep -Fq 'Activar Face ID / biometría' professional/web/app-auth-experience.js
           grep -Fq 'passkey_credentials' professional/worker/src/api/passkeys.js
           grep -Fq 'passkey_user_verification_required' professional/worker/src/api/passkeys.js
+          grep -Fq "residentKey:'required'" professional/worker/src/api/passkeys.js
+          grep -Fq 'requireResidentKey:true' professional/worker/src/api/passkeys.js
           grep -Fq 'passkeyAuthV72:true' professional/worker/src/router.js
           grep -Fq 'optionalRememberDeviceV72:true' professional/worker/src/router.js
           grep -Fq 'Versión 2.0 · agosto de 2026' professional/web/app-legal.js
@@ -66,10 +70,15 @@ jobs:
           grep -Fq 'unallocatedAmount' professional/worker/src/api/payment-documents.js
           grep -Fq 'createPaymentDocumentFromInvoiceCanonical' professional/worker/src/api/payment-documents.js
           grep -Fq 'openPaymentDocumentComposer' professional/web/app-payment-workflow.js
+          grep -Fq 'openOrderPaymentHub' professional/web/app-payment-workflow.js
+          grep -Fq 'openPaymentDocumentDetails' professional/web/app-payment-workflow.js
+          grep -Fq 'PAGOS DEL PEDIDO' professional/web/app-payment-workflow.js
+          grep -Fq 'Aplicación del documento' professional/web/app-payment-workflow.js
           grep -Fq 'paymentProofFile' professional/web/app-payment-workflow.js
           grep -Fq '/api/finance/payment-proof-analysis' professional/web/app-payment-workflow.js
           grep -Fq 'Gemini extrajo los verificadores' professional/web/app-payment-workflow.js
           grep -Fq 'id="v30Payment"' professional/web/app-order-detail-v30.js
+          grep -Fq '>Pagos</button>' professional/web/app-order-detail-v30.js
           grep -Fq "import('./app-payment-workflow.js')" professional/web/app-order-detail-v30.js
           grep -Fq 'openCollectivePayment' professional/web/app-payment-workflow.js
           grep -Fq '/api/finance/payment-documents' professional/web/app-payment-workflow.js
@@ -86,19 +95,27 @@ jobs:
           if grep -Fq "upload.append('orderFile'" professional/web/app-invoice-v30.js; then echo '::error::Invoice analysis still duplicates structured order as PDF'; exit 1; fi
           grep -Fq 'context.aliases' professional/worker/src/invoice-normalizer.js
           grep -Fq 'supplier-alias' professional/worker/src/invoice-normalizer.js
-          grep -Fq 'normalizationVersion:76' professional/worker/src/invoice-normalizer.js
-          grep -Fq 'allocateInvoicePricing' professional/worker/src/invoice-normalizer.js
-          grep -Fq 'printed-final-unit-column' professional/worker/src/invoice-normalizer.js
-          grep -Fq "priceSource:'printed-final-unit'" professional/worker/src/invoice-normalizer.js
-          grep -Fq 'supplier-total-x-unidad' professional/worker/src/invoice-normalizer.js
-          grep -Fq 'documentTotalComputed' professional/worker/src/invoice-normalizer.js
-          grep -Fq 'checksumDelta' professional/worker/src/invoice-normalizer.js
-          grep -Fq 'finalUnitPrice' worker/src/index.js
+          grep -Fq 'normalizationVersion:78' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'reconcileInvoicePricing' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'adaptive-price-matrix-v78' professional/worker/src/invoice-normalizer.js
+          grep -Fq 'export function reconcileInvoicePricing' professional/worker/src/invoice-pricing-matrix.js
+          grep -Fq 'printed-final-unit-column' professional/worker/src/invoice-pricing-matrix.js
+          grep -Fq "priceSource='printed-final-unit'" professional/worker/src/invoice-pricing-matrix.js
+          grep -Fq "taxAllocationMethod='supplier-total-x-unidad'" professional/worker/src/invoice-pricing-matrix.js
+          grep -Fq 'column-total-reconciliation' professional/worker/src/invoice-pricing-matrix.js
+          grep -Fq 'invoice-line-component-matrix' professional/worker/src/invoice-pricing-matrix.js
+          grep -Fq 'document-line-fallback' professional/worker/src/invoice-pricing-matrix.js
+          grep -Fq 'documentTotalComputed' professional/worker/src/invoice-pricing-matrix.js
+          grep -Fq 'checksumDelta' professional/worker/src/invoice-pricing-matrix.js
+          grep -Fq 'adaptive-line-component-matrix-v2' worker/src/index.js
+          grep -Fq 'adaptive-final-unit-or-component-matrix-v2' worker/src/index.js
+          grep -Fq 'Neto Total' worker/src/index.js
+          grep -Fq 'Flete Total' worker/src/index.js
           grep -Fq 'Total x Unidad' worker/src/index.js
-          grep -Fq 'PISQUERA DE CHILE' worker/src/index.js
-          grep -Fq 'VINA SAN PEDRO' worker/src/index.js
           grep -Fq 'orderId:queue.orderId' professional/web/app-multi-invoice.js
           grep -Fq 'Precio final impreso · Total x Unidad' professional/web/app-multi-invoice.js
+          grep -Fq 'Matriz de precio cerrada' professional/web/app-multi-invoice.js
+          grep -Fq 'Cierre matemático verificado' professional/web/app-multi-invoice.js
           grep -Fq 'data-printed-final-unit' professional/web/app-multi-invoice.js
           grep -Fq 'supplierFinalUnitReadersV76:true' professional/worker/src/router.js
           grep -Fq 'printedFinalUnitPricingV76:true' professional/worker/src/router.js
@@ -106,6 +123,9 @@ jobs:
           grep -Fq 'paymentProofGeminiV77:true' professional/worker/src/router.js
           grep -Fq 'orderDetailPaymentsV77:true' professional/worker/src/router.js
           grep -Fq 'catalogFlowConsolidationV77:true' professional/worker/src/router.js
+          grep -Fq 'adaptiveInvoicePriceMatrixV78:true' professional/worker/src/router.js
+          grep -Fq 'passkeyEnrollmentV78:true' professional/worker/src/router.js
+          grep -Fq 'paymentLedgerV78:true' professional/worker/src/router.js
           grep -Fq 'Catálogo y recorrido' professional/web/app-experience-admin.js
           grep -Fq "catalogNav('centers')" professional/web/app-experience-admin.js
           if grep -Fq "upload.append('orderFile'" professional/web/app-multi-invoice.js; then echo '::error::Multi-invoice flow still duplicates the canonical order PDF'; exit 1; fi
@@ -123,7 +143,6 @@ jobs:
           grep -Fq 'LEFT JOIN platform_owners po' professional/worker/src/auth.js
           if grep -Fq "SELECT user_id FROM platform_owners WHERE user_id" professional/worker/src/auth.js; then echo '::error::Authentication still performs a second platform-owner query'; exit 1; fi
           grep -Fq 'priceReconciliation' professional/worker/src/api/invoice-analysis-core-v39.js
-          grep -Fq 'priceVerified:true' professional/worker/src/invoice-normalizer.js
           grep -Fq 'domainRouterV73:true' professional/worker/src/router.js
           grep -Fq 'financeRoutingV73:true' professional/worker/src/router.js
           grep -Fq 'reconciliationAliasResolverV73:true' professional/worker/src/router.js
@@ -133,7 +152,7 @@ jobs:
           grep -Fq 'sameSupplierPaymentV74:true' professional/worker/src/router.js
           grep -Fq 'multiInvoicePaymentV74:true' professional/worker/src/router.js
           grep -Fq 'multiOrderPaymentV74:true' professional/worker/src/router.js
-          grep -Fq 'nuvasto-v77-payment-proof-ops' professional/web/sw.js
+          grep -Fq 'nuvasto-v78-invoice-matrix-passkey-ledger' professional/web/sw.js
           if grep -Fq "'./app-procurement.js'" professional/web/sw.js; then echo '::error::Service worker precache still contains noncritical procurement bundle'; exit 1; fi
           grep -Fq 'overflow-y:auto' professional/web/native-performance.css
           grep -Fq 'initializeOrderSelection' professional/web/app-bootstrap.js
