@@ -7,3 +7,8 @@ assert needle in s
 p.write_text(s.replace(needle,replacement))
 for name in ['professional/tests/canonical-runtime.test.mjs','professional/tests/bootstrap.test.mjs']:
     p=Path(name); text=p.read_text().replace('nuvasto-v77-payment-proof-ops','nuvasto-v78-invoice-matrix-passkey-ledger'); p.write_text(text)
+p=Path('professional/tests/functional-contracts.test.mjs'); text=p.read_text()
+text=text.replace("normalizer=read('worker/src/invoice-normalizer.js'),analysisCore", "normalizer=read('worker/src/invoice-normalizer.js'),pricingMatrix=read('worker/src/invoice-pricing-matrix.js'),analysisCore")
+text=text.replace("normalizer.includes('printed-final-unit-column')", "pricingMatrix.includes('printed-final-unit-column')")
+text=text.replace('nuvasto-v77-payment-proof-ops','nuvasto-v78-invoice-matrix-passkey-ledger')
+p.write_text(text)
