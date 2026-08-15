@@ -1,3 +1,4 @@
+import {reconcileInvoicePricing} from './invoice-pricing-matrix.js';
 const round3=value=>Math.round((Number(value)||0)*1000)/1000;
 const roundPeso=value=>Math.round(Number(value)||0);
 const numeric=value=>{if(typeof value==='number')return Number.isFinite(value)?value:0;let raw=String(value??'').trim().replace(/\s|\$/g,'');if(!raw)return 0;if(raw.includes(',')&&raw.includes('.'))raw=raw.lastIndexOf(',')>raw.lastIndexOf('.')?raw.replace(/\./g,'').replace(',','.'):raw.replace(/,/g,'');else if(raw.includes(','))raw=raw.replace(',','.');else if(/^\d{1,3}(?:\.\d{3})+$/.test(raw))raw=raw.replace(/\./g,'');const result=Number(raw);return Number.isFinite(result)?result:0};
@@ -88,40 +89,7 @@ function allocateIntegerPool(total,weights){
 
 function invoiceTotals(raw={}){return{net:Math.max(0,roundPeso(raw.net)),freight:Math.max(0,roundPeso(raw.freight)),vat:Math.max(0,roundPeso(raw.vat??raw.tax)),additionalTax:Math.max(0,roundPeso(raw.additionalTax)),other:Math.max(0,roundPeso(raw.other)),total:Math.max(0,roundPeso(raw.total))}}
 
-function allocateInvoicePricing(lines,rawTotals,warnings){
-  const totals=invoiceTotals(rawTotals),chargeable=lines.filter(line=>!line.isFree&&line.netLineTotal>0),merchandiseNet=chargeable.reduce((sum,line)=>sum+line.netLineTotal,0),printed=chargeable.filter(line=>line.priceSource==='printed-final-unit'&&line.printedFinalUnitPrice>0);
-  if(printed.length){const productGross=printed.reduce((sum,line)=>sum+line.grossLineTotal,0),extendedExact=round3(printed.reduce((sum,line)=>sum+line.printedFinalUnitPrice*line.totalUnits,0)),checksumDelta=totals.total?round3(totals.total-extendedExact):0,complete=printed.length===chargeable.length,verified=complete&&(!totals.total||Math.abs(checksumDelta)<=Math.max(2,totals.total*.0001));for(const line of printed)line.priceVerified=verified;for(const line of chargeable.filter(line=>line.priceSource!=='printed-final-unit'))line.priceVerified=false;if(!complete)warnings.push(`La columna Total x Unidad se leyó en ${printed.length} de ${chargeable.length} productos; las líneas faltantes requieren revisión.`);else if(!verified)warnings.push(`La columna Total x Unidad no cierra contra el total impreso: ${extendedExact} vs ${totals.total}.`);return{verified,method:'printed-final-unit-column',totals,merchandiseNet,productGross,documentTotalComputed:roundPeso(extendedExact),extendedExact,checksumDelta,printedCoverage:printed.length,printedTotal:chargeable.length,includesAllocatedCharges:true};}
-  if(!chargeable.length||!merchandiseNet){warnings.push('No fue posible verificar el precio bruto por producto porque faltan valores netos de línea legibles.');return{verified:false,method:'line-fallback',totals,merchandiseNet,nonMerchandiseNet:0,documentTotalComputed:0,checksumDelta:totals.total||0}}
-
-  const includedCandidate=totals.net+totals.vat+totals.additionalTax+totals.other,separateFreightCandidate=totals.net+totals.freight+totals.vat+totals.additionalTax+totals.other,freightSeparate=Boolean(totals.freight&&totals.total&&Math.abs(totals.total-separateFreightCandidate)+1<Math.abs(totals.total-includedCandidate));
-  const taxableNetBase=totals.net+(freightSeparate?totals.freight:0),netTolerance=Math.max(2,Math.round(Math.max(1,taxableNetBase)*.005));
-  if(!taxableNetBase||merchandiseNet>taxableNetBase+netTolerance){warnings.push(`Los netos de producto (${merchandiseNet}) no cuadran con el neto del documento (${taxableNetBase||0}); el bruto por producto queda pendiente de revisión.`);return{verified:false,method:'line-fallback',totals,merchandiseNet,nonMerchandiseNet:0,documentTotalComputed:0,checksumDelta:totals.total||0}}
-
-  const nonMerchandiseNet=Math.max(0,taxableNetBase-merchandiseNet),weights=chargeable.map(line=>line.netLineTotal),vatShares=allocateIntegerPool(totals.vat,[...weights,nonMerchandiseNet]),additionalShares=allocateIntegerPool(totals.additionalTax,weights),otherShares=allocateIntegerPool(totals.other,weights);
-  const chargeVat=vatShares[weights.length]||0;
-  chargeable.forEach((line,index)=>{
-    const readGross=line.readGrossLineTotal||roundPeso(numeric(line.grossLineTotal)),readUnit=line.readGrossUnitPrice||roundPeso(numeric(line.grossUnitPrice));
-    line.allocatedVat=vatShares[index]||0;
-    line.allocatedAdditionalTax=additionalShares[index]||0;
-    line.allocatedOtherCharges=otherShares[index]||0;
-    line.grossLineTotal=line.netLineTotal+line.allocatedVat+line.allocatedAdditionalTax+line.allocatedOtherCharges;
-    line.grossUnitPrice=line.totalUnits?roundPeso(line.grossLineTotal/line.totalUnits):0;
-    line.grossPackPrice=line.invoiceQuantity?roundPeso(line.grossLineTotal/line.invoiceQuantity):0;
-    line.readGrossLineTotal=readGross;
-    line.readGrossUnitPrice=readUnit;
-    line.priceDifference=readUnit?roundPeso(readUnit-line.grossUnitPrice):0;
-    line.priceDifferencePct=readUnit&&line.grossUnitPrice?round3(Math.abs(readUnit-line.grossUnitPrice)/line.grossUnitPrice*100):0;
-    line.priceSource='invoice-total-tax-allocation';
-    line.taxAllocationMethod='invoice-totals-proportional';
-    line.priceBreakdown={net:line.netLineTotal,vat:line.allocatedVat,additionalTax:line.allocatedAdditionalTax,other:line.allocatedOtherCharges,gross:line.grossLineTotal};
-  });
-
-  const productGross=chargeable.reduce((sum,line)=>sum+line.grossLineTotal,0),nonMerchandiseGross=nonMerchandiseNet+chargeVat,documentTotalComputed=productGross+nonMerchandiseGross,expectedByComponents=taxableNetBase+totals.vat+totals.additionalTax+totals.other,checksumDelta=totals.total?totals.total-documentTotalComputed:0,componentDelta=totals.total?totals.total-expectedByComponents:0,verified=totals.total?Math.abs(checksumDelta)<=2&&Math.abs(componentDelta)<=2:true;
-  for(const line of chargeable)line.priceVerified=verified;
-  if(!verified)warnings.push(`El documento no cierra matemáticamente: total impreso ${totals.total}, total reconstruido ${documentTotalComputed}. Revisa impuestos o cargos antes de guardar.`);
-  else if(chargeable.some(line=>line.readGrossLineTotal&&Math.abs(line.readGrossLineTotal-line.grossLineTotal)>2))warnings.push('Nuvasto descartó valores brutos de línea inferidos por IA y recalculó los precios desde los netos e impuestos impresos del documento.');
-  return{verified,method:'invoice-totals-proportional',totals,freightSeparate,merchandiseNet,nonMerchandiseNet,nonMerchandiseGross,productGross,documentTotalComputed,checksumDelta,componentDelta};
-}
+function allocateInvoicePricing(lines,rawTotals,warnings){return reconcileInvoicePricing(lines,rawTotals,warnings)}
 
 function normalizeLine(line,products,aliasMap,warnings,index){
   const source=lineSource(line)||`Línea ${index+1}`,match=findProduct(line,products,aliasMap),product=match.product,orderPack=Math.max(1,numeric(product?.unitsPerOrderUnit)||packFromUnit(product?.unit)),invoiceQuantity=Math.max(0,numeric(line.invoiceQuantity??line.packageQty??line.quantity)),detectedPack=explicitPack(source);
@@ -134,7 +102,7 @@ function normalizeLine(line,products,aliasMap,warnings,index){
   const conversionSummary=product?conversionText({invoiceQuantity,invoicePack,totalUnits,orderPack,equivalent,product,orderedQty}):`${round3(invoiceQuantity)} × ${invoicePack} = ${totalUnits} unidades`;
   if(product&&orderedQty>0&&quantityStatus!=='exact')warnings.push(`${product.description}: la factura equivale a ${equivalent} ${unitLabel(product,orderPack)}, pero el pedido indica ${orderedQty}.`);
   const baseConfidence=Math.max(0,Math.min(1,Math.max(numeric(line.confidence??line.matchConfidence),match.score||0))),confidence=quantityStatus==='exact'?Math.max(baseConfidence,.88):quantityStatus==='unverified'?baseConfidence:Math.min(baseConfidence,.74),reason=[match.reason,line.matchReason,conversionSummary].filter(Boolean).join(' · '),description=product?.description||line.description||source,isFree=line.isFree===true,pricing=isFree?{netLineTotal:0,allocatedVat:0,allocatedAdditionalTax:0,allocatedOtherCharges:0,grossLineTotal:0,grossUnitPrice:0,grossPackPrice:0,readGrossLineTotal:roundPeso(numeric(line.grossLineTotal)),readGrossUnitPrice:roundPeso(numeric(line.grossUnitPrice)),priceDifference:0,priceDifferencePct:0,priceSource:'free',priceVerified:true,taxAllocationMethod:'free'}:fallbackPricing(line,totalUnits,invoiceQuantity);
-  return{...line,...pricing,productId:product?.productId||'',matchedOrderProductId:product?.productId||'',suggestedProductId:product?.productId||line.suggestedProductId||'',description,packageQty:invoiceQuantity,invoiceQuantity,packSize:invoicePack,units:totalUnits,totalUnits,orderPackSize:orderPack,orderedFormatQty:equivalent,receivedOrderQty:equivalent,orderedQty,quantityDifference:difference,quantityStatus,conversionSummary,confidence,matchConfidence:confidence,matchMethod:product?match.method:(line.matchMethod||'unmatched'),matchReason:reason,matchCandidateScore:round3(match.score||0),matchSecondScore:round3(match.secondScore||0),matchEvidence:match.evidence||'',unitInterpretation:invoicePack===1?'base-units':'packaged-units',normalizationVersion:76,reconciliationEngine:'supplier-final-unit-v76'};
+  return{...line,...pricing,productId:product?.productId||'',matchedOrderProductId:product?.productId||'',suggestedProductId:product?.productId||line.suggestedProductId||'',description,packageQty:invoiceQuantity,invoiceQuantity,packSize:invoicePack,units:totalUnits,totalUnits,orderPackSize:orderPack,orderedFormatQty:equivalent,receivedOrderQty:equivalent,orderedQty,quantityDifference:difference,quantityStatus,conversionSummary,confidence,matchConfidence:confidence,matchMethod:product?match.method:(line.matchMethod||'unmatched'),matchReason:reason,matchCandidateScore:round3(match.score||0),matchSecondScore:round3(match.secondScore||0),matchEvidence:match.evidence||'',unitInterpretation:invoicePack===1?'base-units':'packaged-units',normalizationVersion:78,reconciliationEngine:'adaptive-price-matrix-v78'};
 }
 
 export function normalizeInvoiceAnalysis(analysis,context={}){
@@ -144,5 +112,5 @@ export function normalizeInvoiceAnalysis(analysis,context={}){
   const products=Array.isArray(context.products)?context.products.map(product=>({...product,description:String(product.description||product.catalogName||product.supplierProductName||''),unitsPerOrderUnit:Math.max(1,numeric(product.unitsPerOrderUnit)||packFromUnit(product.unit)),orderedQty:Math.max(0,numeric(product.orderedQty))})):[],aliasMap=new Map();
   for(const raw of Array.isArray(context.aliases)?context.aliases:[]){const productId=String(raw.productId||'');if(!productId||!raw.alias)continue;if(!aliasMap.has(productId))aliasMap.set(productId,[]);aliasMap.get(productId).push({alias:String(raw.alias),confidence:numeric(raw.confidence),usageCount:numeric(raw.usageCount)})}
   const warnings=[...(Array.isArray(invoice.warnings)?invoice.warnings:[]),...(Array.isArray(analysis.warnings)?analysis.warnings:[])],lines=sourceLines.map((line,index)=>normalizeLine(line,products,aliasMap,warnings,index)),pricingSummary=allocateInvoicePricing(lines,invoice.totals||{},warnings),uniqueWarnings=[...new Set(warnings.map(value=>String(value||'').trim()).filter(Boolean))],matched=lines.filter(line=>line.productId).length,exact=lines.filter(line=>line.quantityStatus==='exact').length,review=lines.filter(line=>['partial','excess'].includes(line.quantityStatus)).length,priceVerified=lines.filter(line=>line.priceVerified).length;
-  return{...analysis,normalizationVersion:76,reconciliationEngine:'supplier-final-unit-v76',priceReconciliation:pricingSummary.method,invoice:{...invoice,lines,items:lines,warnings:uniqueWarnings,pricingSummary,matchSummary:{...(invoice.matchSummary||{}),matched,unmatched:lines.length-matched,exactQuantities:exact,quantityReview:review,priceVerified,total:lines.length,engine:'supplier-final-unit-v76'}},warnings:uniqueWarnings};
+  return{...analysis,normalizationVersion:78,reconciliationEngine:'adaptive-price-matrix-v78',priceReconciliation:pricingSummary.method,invoice:{...invoice,lines,items:lines,warnings:uniqueWarnings,pricingSummary,matchSummary:{...(invoice.matchSummary||{}),matched,unmatched:lines.length-matched,exactQuantities:exact,quantityReview:review,priceVerified,total:lines.length,engine:'adaptive-price-matrix-v78'}},warnings:uniqueWarnings};
 }
