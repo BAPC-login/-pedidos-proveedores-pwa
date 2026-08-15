@@ -1,0 +1,159 @@
+name: Agent r78 implementation
+on:
+  push:
+    branches: [agent/r78-invoice-matrix-passkeys-payment-ledger]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: {ref: agent/r78-invoice-matrix-passkeys-payment-ledger}
+      - uses: actions/setup-node@v5
+        with: {node-version: '22'}
+      - name: Apply canonical r78 changes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import re, json
+
+          matrix = r'''const num=value=>{if(typeof value==='number')return Number.isFinite(value)?value:0;let raw=String(value??'').trim().replace(/\s|\$/g,'');if(!raw)return 0;if(raw.includes(',')&&raw.includes('.'))raw=raw.lastIndexOf(',')>raw.lastIndexOf('.')?raw.replace(/\./g,'').replace(',','.'):raw.replace(/,/g,'');else if(raw.includes(','))raw=raw.replace(',','.');else if(/^\d{1,3}(?:\.\d{3})+$/.test(raw))raw=raw.replace(/\./g,'');const parsed=Number(raw);return Number.isFinite(parsed)?parsed:0};
+          const peso=value=>Math.round(num(value));
+          const round3=value=>Math.round(num(value)*1000)/1000;
+          const totalsOf=raw=>({net:Math.max(0,peso(raw?.net)),freight:Math.max(0,peso(raw?.freight)),vat:Math.max(0,peso(raw?.vat??raw?.tax)),additionalTax:Math.max(0,peso(raw?.additionalTax)),other:Math.max(0,peso(raw?.other)),total:Math.max(0,peso(raw?.total))});
+          const sum=(items,key)=>items.reduce((total,item)=>total+Math.max(0,peso(item[key])),0);
+          function integerShares(total,weights){const target=Math.max(0,peso(total)),safe=weights.map(v=>Math.max(0,num(v))),basis=safe.reduce((a,b)=>a+b,0);if(!target)return safe.map(()=>0);if(!basis){const base=Math.floor(target/Math.max(1,safe.length)),out=safe.map(()=>base);for(let i=0;i<target-base*out.length;i++)out[i%out.length]++;return out}const exact=safe.map(v=>target*v/basis),out=exact.map(Math.floor),left=target-out.reduce((a,b)=>a+b,0),rank=exact.map((v,i)=>({i,f:v-out[i]})).sort((a,b)=>b.f-a.f||a.i-b.i);for(let i=0;i<left;i++)out[rank[i%rank.length].i]++;return out}
+          function rebalance(lines,key,target,weights,adjustments){target=Math.max(0,peso(target));const before=lines.map(line=>Math.max(0,peso(line[key]))),current=before.reduce((a,b)=>a+b,0);if(current===target)return before;if(!lines.length)return before;let next;if(current>target&&current>0)next=integerShares(target,before);else{next=[...before];let residual=target-current;if(residual>0){const missing=before.map((v,i)=>({v,i})).filter(x=>x.v===0).map(x=>x.i),indexes=missing.length?missing:before.map((_,i)=>i),shares=integerShares(residual,indexes.map(i=>weights[i]||1));indexes.forEach((idx,j)=>next[idx]+=shares[j])}else if(residual<0)next=integerShares(target,before)}if(next.some((v,i)=>v!==before[i]))adjustments.push({column:key,before:current,target,delta:target-current});lines.forEach((line,i)=>line[key]=next[i]);return next}
+          function deriveNet(line){const explicit=Math.max(0,peso(line.netLineTotal));if(explicit)return explicit;const unit=Math.max(0,num(line.unitPriceNet)),qty=Math.max(0,num(line.invoiceQuantity??line.packageQty)),discount=Math.max(0,Math.min(100,num(line.discountPct)));return unit&&qty?Math.max(0,peso(unit*qty*(1-discount/100))):0}
+          export function reconcileInvoicePricing(lines,rawTotals,warnings=[]){
+            const totals=totalsOf(rawTotals),priced=lines.filter(line=>!line.isFree&&Math.max(0,num(line.totalUnits??line.units))>0),printed=priced.filter(line=>Math.max(0,num(line.printedFinalUnitPrice??line.finalUnitPrice))>0&&String(line.priceSource||'')==='printed-final-unit'),tol=Math.max(2,Math.round(Math.max(1,totals.total)*.0001));
+            if(printed.length===priced.length&&printed.length){const exact=printed.reduce((s,line)=>s+num(line.printedFinalUnitPrice??line.finalUnitPrice)*num(line.totalUnits??line.units),0),delta=totals.total?round3(totals.total-exact):0,verified=!totals.total||Math.abs(delta)<=tol;printed.forEach(line=>{const units=num(line.totalUnits??line.units),qty=num(line.invoiceQuantity??line.packageQty),gross=peso(num(line.printedFinalUnitPrice??line.finalUnitPrice)*units);line.grossLineTotal=gross;line.grossUnitPrice=round3(gross/Math.max(1,units));line.grossPackPrice=qty?round3(gross/qty):0;line.priceVerified=verified;line.priceSource='printed-final-unit';line.taxAllocationMethod='supplier-printed-final-unit';line.priceBreakdown={gross,printedUnit:num(line.printedFinalUnitPrice??line.finalUnitPrice)}});if(verified)return{verified:true,method:'printed-final-unit-column',totals,documentTotalComputed:peso(exact),checksumDelta:delta,matrix:{source:'printed-final-unit',rows:printed.length}};warnings.push(`El precio final impreso no cierra contra el total del documento (${Math.round(exact)} vs ${totals.total}); Nuvasto usará la matriz de cargos de la factura.`)}
+            if(!priced.length)return{verified:false,method:'no-priced-lines',totals,documentTotalComputed:0,checksumDelta:totals.total};
+            for(const line of priced){line.netLineTotal=deriveNet(line);line.freightLine=Math.max(0,peso(line.freightLine??line.freightLineTotal));line.vatLine=Math.max(0,peso(line.vatLine??line.taxLineTotal));line.additionalTaxLine=Math.max(0,peso(line.additionalTaxLine??line.additionalTaxLineTotal));line.otherLineCharges=Math.max(0,peso(line.otherLineCharges));}
+            const weights=priced.map(line=>Math.max(1,line.netLineTotal||num(line.invoiceQuantity)||1)),initial={net:sum(priced,'netLineTotal'),freight:sum(priced,'freightLine'),vat:sum(priced,'vatLine'),additionalTax:sum(priced,'additionalTaxLine'),other:sum(priced,'otherLineCharges')},adjustments=[];
+            let targetNet=totals.total?Math.max(0,totals.total-totals.freight-totals.vat-totals.additionalTax-totals.other):totals.net;
+            if(!targetNet&&totals.net)targetNet=Math.max(0,totals.net-(totals.freight&&totals.net>=totals.freight?totals.freight:0));
+            if(totals.net&&Math.abs(totals.net-initial.net)<=Math.abs(targetNet-initial.net))targetNet=totals.net;
+            rebalance(priced,'netLineTotal',targetNet,weights,adjustments);rebalance(priced,'freightLine',totals.freight,weights,adjustments);rebalance(priced,'vatLine',totals.vat,priced.map(line=>Math.max(1,line.netLineTotal+line.freightLine)),adjustments);rebalance(priced,'additionalTaxLine',totals.additionalTax,priced.map(line=>Math.max(1,line.netLineTotal)),adjustments);rebalance(priced,'otherLineCharges',totals.other,weights,adjustments);
+            for(const line of priced){const units=Math.max(0,num(line.totalUnits??line.units)),qty=Math.max(0,num(line.invoiceQuantity??line.packageQty));line.allocatedFreight=line.freightLine;line.allocatedVat=line.vatLine;line.allocatedAdditionalTax=line.additionalTaxLine;line.allocatedOtherCharges=line.otherLineCharges;line.grossLineTotal=line.netLineTotal+line.freightLine+line.vatLine+line.additionalTaxLine+line.otherLineCharges;line.grossUnitPrice=units?round3(line.grossLineTotal/units):0;line.grossPackPrice=qty?round3(line.grossLineTotal/qty):0;line.priceSource=adjustments.length?'invoice-matrix-reconciled':'invoice-line-matrix';line.taxAllocationMethod=adjustments.length?'column-total-reconciliation':'printed-line-components';line.priceBreakdown={net:line.netLineTotal,freight:line.freightLine,vat:line.vatLine,additionalTax:line.additionalTaxLine,other:line.otherLineCharges,gross:line.grossLineTotal};}
+            const computed=priced.reduce((s,line)=>s+line.grossLineTotal,0),delta=totals.total?totals.total-computed:0,verified=!totals.total||Math.abs(delta)<=1;priced.forEach(line=>line.priceVerified=verified);if(adjustments.length)warnings.push(`Nuvasto cerró la matriz del documento contra sus totales impresos ajustando únicamente las columnas con diferencia: ${adjustments.map(item=>item.column).join(', ')}.`);if(!verified)warnings.push(`La matriz de precios no cierra: total impreso ${totals.total}, reconstruido ${computed}.`);return{verified,method:adjustments.length?'invoice-column-matrix-reconciled':'invoice-line-component-matrix',totals,documentTotalComputed:computed,checksumDelta:delta,matrix:{initial,targets:{net:targetNet,freight:totals.freight,vat:totals.vat,additionalTax:totals.additionalTax,other:totals.other},adjustments}};
+          }
+          '''
+          Path('professional/worker/src/invoice-pricing-matrix.js').write_text(matrix)
+
+          p=Path('professional/worker/src/invoice-normalizer.js'); s=p.read_text()
+          if "invoice-pricing-matrix.js" not in s: s="import {reconcileInvoicePricing} from './invoice-pricing-matrix.js';\n"+s
+          s,n=re.subn(r"function allocateInvoicePricing\(lines,rawTotals,warnings\)\{.*?\n\}\n\nfunction normalizeLine", "function allocateInvoicePricing(lines,rawTotals,warnings){return reconcileInvoicePricing(lines,rawTotals,warnings)}\n\nfunction normalizeLine", s, flags=re.S)
+          assert n==1, f'allocateInvoicePricing replace {n}'
+          s=s.replace('normalizationVersion:76','normalizationVersion:78').replace("reconciliationEngine:'supplier-final-unit-v76'","reconciliationEngine:'adaptive-price-matrix-v78'").replace("engine:'supplier-final-unit-v76'","engine:'adaptive-price-matrix-v78'")
+          p.write_text(s)
+
+          p=Path('worker/src/index.js'); s=p.read_text()
+          s,n=re.subn(r"function supplierReaderProfile\(raw = \{\}, context = \{\}\) \{.*?\n\}", """function supplierReaderProfile(raw = {}, context = {}) {\n  const label = normalize(`${context.providerName || ''} ${raw.supplierName || ''}`);\n  if (/COCA COLA EMBONOR|EMBONOR|CCU|COMPANIA CERVECERIAS UNIDAS|CERVECERIAS UNIDAS/.test(label)) return 'adaptive-line-component-matrix-v2';\n  if (/PISQUERA DE CHILE|VINA SAN PEDRO|SAN PEDRO TARAPACA|VSPT/.test(label)) return 'adaptive-final-unit-or-component-matrix-v2';\n  return 'adaptive-document-matrix-v2';\n}""", s, flags=re.S); assert n==1
+          old="- Lee neto, descuento, flete, IVA, impuesto adicional, otros y total final por línea."
+          new="- Lee TODAS las columnas monetarias visibles por línea por separado: Precio Unitario, %Desc, Neto Total/Valor, Flete Total, IVA, Adicional/IABA/ILA, otros cargos, bruto de línea y cualquier precio final unitario explícito. Copia las celdas; no fuerces el cierre ni inventes residuos.\n- El método de cálculo NO se decide solo por proveedor. Debes reconocer la estructura real de cada factura. Si trae Neto Total + Flete Total + IVA + Adicional, rellena esos cuatro componentes de cada línea: Nuvasto calculará el bruto como suma matricial.\n- En facturas Coca-Cola Embonor/CCU es frecuente que NETO del pie ya incluya fletes; conserva totals.net y totals.freight tal como están impresos y deja que Nuvasto determine su relación matemáticamente."
+          assert old in s; s=s.replace(old,new)
+          s=s.replace("- En documentos CCU, Compañía Pisquera de Chile/Pisquera de Chile y Viña San Pedro Tarapacá/VSPT, la columna extrema derecha 'Total x Unidad' representa el costo final por unidad base e incluye descuentos, impuestos y cargos prorrateados, incluido flete. Es la fuente prioritaria del precio final.","- Solo cuando el documento REALMENTE tenga una columna explícita 'Total x Unidad' o equivalente, úsala como precio final autoritativo. No asumas esa columna por el nombre del proveedor: otras facturas del mismo proveedor pueden usar una matriz Neto/Flete/IVA/Adicional.")
+          s=s.replace('  distributeResidual(lines, totals.total);','  // r78: nunca alterar el bruto con un residuo global; el reconciliador matricial del API canónico usa las columnas reales del documento.')
+          s=s.replace("resolver: 'catalog-v24-supplier-final-unit'","resolver: 'catalog-v24-adaptive-price-matrix'")
+          p.write_text(s)
+
+          p=Path('professional/web/app-multi-invoice.js'); s=p.read_text()
+          old="warnings=[...(analysis.warnings||[]),...(invoice.warnings||[])]"
+          assert old in s; s=s.replace(old,"warnings=[...new Set([...(analysis.warnings||[]),...(invoice.warnings||[])].map(value=>String(value||'').trim()).filter(Boolean))]")
+          s,n=re.subn(r"function priceBreakdown\(line,forced=false\)\{.*?\}\n\nfunction reviewBody", r'''function priceBreakdown(line,forced=false){if(forced)return'';const printed=decimal(line.printedFinalUnitPrice??line.finalUnitPrice);if(printed>0&&String(line.priceSource||'')==='printed-final-unit')return`<div class="v38-price-breakdown ${line.priceVerified?'':'review'}"><strong>Precio final impreso · Total x Unidad</strong><p>La factura informa ${esc(unitMoney(printed))} por unidad. Nuvasto usa ese valor solo porque la columna existe y el documento cierra matemáticamente.</p></div>`;const net=integer(line.netLineTotal),freight=integer(line.allocatedFreight??line.freightLine),vat=integer(line.allocatedVat??line.vatLine),additional=integer(line.allocatedAdditionalTax??line.additionalTaxLine),other=integer(line.allocatedOtherCharges??line.otherLineCharges),parts=[];if(net)parts.push(`Neto ${money(net)}`);if(freight)parts.push(`Flete ${money(freight)}`);if(vat)parts.push(`IVA ${money(vat)}`);if(additional)parts.push(`Adicional ${money(additional)}`);if(other)parts.push(`Otros ${money(other)}`);if(!parts.length)return`<div class="v38-price-breakdown review"><strong>Precio pendiente de verificación</strong><p>No hay suficientes componentes impresos para cerrar esta línea.</p></div>`;return`<div class="v38-price-breakdown ${line.priceVerified?'':'review'}"><strong>${line.priceVerified?'Matriz de precio cerrada':'Matriz con revisión pendiente'}</strong><p>${esc(parts.join(' + '))} = ${money(integer(line.grossLineTotal))}. Método: ${esc(String(line.taxAllocationMethod||line.priceSource||'matriz de factura').replaceAll('-',' '))}.</p></div>`}
+function pricingAudit(invoice){const summary=invoice.pricingSummary||{},matrix=summary.matrix||{},delta=Number(summary.checksumDelta||0),verified=summary.verified===true;return`<section class="v38-batch-note"><strong>${verified?'Cierre matemático verificado':'Cierre matemático por revisar'}</strong><p>Método: ${esc(String(summary.method||'sin determinar').replaceAll('-',' '))}. Total impreso ${money(Number(invoice.totals?.total||0))} · total reconstruido ${money(Number(summary.documentTotalComputed||0))} · diferencia ${money(Math.abs(delta))}.${matrix.adjustments?.length?` Se reconciliaron ${matrix.adjustments.length} columna${matrix.adjustments.length===1?'':'s'} contra los totales impresos.`:''}</p></section>`}
+
+function reviewBody''', s, flags=re.S); assert n==1, n
+          s=s.replace("${warnings.length?`<section class=\"v30-inline-notice\"><strong>Observaciones de lectura</strong><p>${warnings.map(esc).join(' · ')}</p></section>`:''}<section class=\"v38-summary\">","${warnings.length?`<section class=\"v30-inline-notice\"><strong>Observaciones de lectura</strong><p>${warnings.map(esc).join(' · ')}</p></section>`:''}${pricingAudit(invoice)}<section class=\"v38-summary\">")
+          p.write_text(s)
+
+          p=Path('professional/web/app-auth-experience.js'); s=p.read_text()
+          if "from './app-modal.js'" not in s:s=s.replace("import {$,state,api,toast,setBusy,esc} from './app-core.js';","import {$,state,api,toast,setBusy,esc} from './app-core.js';\nimport {openModal,closeModal} from './app-modal.js';")
+          s=s.replace("if(error?.name==='NotAllowedError')return 'Operación biométrica cancelada.';","if(error?.code==='passkey_not_configured')return 'Face ID/biometría está disponible, pero aún no está vinculada a esta cuenta. Inicia con contraseña una vez y Nuvasto te permitirá activarla.';if(error?.name==='NotAllowedError')return 'Operación biométrica cancelada.';")
+          s=s.replace("residentKey:'preferred',userVerification:'required'","residentKey:'required',userVerification:'required'") if False else s
+          insert=r'''
+const PASSKEY_DISMISS_KEY='nuvasto:passkey-enrollment-dismissed';
+export async function offerPasskeyEnrollmentAfterPassword(){
+  if(!state.token||localStorage.getItem(PASSKEY_DISMISS_KEY)==='1')return;platformAuthenticatorAvailable=await detectPlatformAuthenticator();if(!platformAuthenticatorAvailable)return;
+  try{const payload=await api('/api/auth/passkeys',{fresh:true,ttl:0,timeout:10000}),items=payload.passkeys||[];if(items.length){localStorage.setItem('nuvasto:passkey-configured','1');return}}
+  catch{return}
+  if($('#quickPasskeyEnrollment'))return;
+  openModal({eyebrow:'ACCESO RÁPIDO',title:'Activar Face ID / biometría',subtitle:'Este dispositivo puede iniciar Nuvasto sin volver a escribir tu contraseña.',hideSubmit:true,body:`<section id="quickPasskeyEnrollment" class="auth-security-card" style="margin:0"><div><strong>${esc(deviceLabel())}</strong><p>La huella o rostro nunca sale del dispositivo. Nuvasto registra únicamente una credencial criptográfica.</p></div><button class="btn primary" id="quickPasskeyEnable" type="button">Activar biometría ahora</button><button class="btn" id="quickPasskeyLater" type="button">Ahora no</button></section>`});
+  $('#quickPasskeyEnable')?.addEventListener('click',()=>registerPasskey($('#quickPasskeyEnable')));$('#quickPasskeyLater')?.addEventListener('click',()=>{localStorage.setItem(PASSKEY_DISMISS_KEY,'1');closeModal('passkey-later')});
+}
+'''
+          marker='export function initializeAuthExperience()'
+          assert marker in s and 'offerPasskeyEnrollmentAfterPassword' not in s;s=s.replace(marker,insert+'\n'+marker)
+          s=s.replace("toast('Acceso biométrico activado');await renderSecurityPanel(true);","localStorage.removeItem(PASSKEY_DISMISS_KEY);toast('Acceso biométrico activado');closeModal('passkey-registered');await renderSecurityPanel(true);")
+          s=s.replace("'Ingresar con biometría</button>","'Ingresar con Face ID / biometría</button>")
+          p.write_text(s)
+
+          p=Path('professional/web/app.js'); s=p.read_text()
+          s=s.replace("{rememberedLoginEmail,persistLoginSession,clearLoginPersistence}","{rememberedLoginEmail,persistLoginSession,clearLoginPersistence,offerPasskeyEnrollmentAfterPassword}")
+          s=s.replace("await openRoute('dashboard','',{replace:true});toast('Sesión iniciada')","await openRoute('dashboard','',{replace:true});toast('Sesión iniciada');setTimeout(()=>offerPasskeyEnrollmentAfterPassword().catch(()=>{}),350)")
+          s=s.replace("try{await openInitialRouteV14()}catch(error)","try{await openInitialRouteV14();setTimeout(()=>offerPasskeyEnrollmentAfterPassword().catch(()=>{}),500)}catch(error)")
+          s=s.replace("const CLIENT_RELEASE='2026.08.14.77'","const CLIENT_RELEASE='2026.08.15.78'").replace("const OFFLINE_WARM_KEY='nuvasto:offline-warm-v76'","const OFFLINE_WARM_KEY='nuvasto:offline-warm-v78'")
+          p.write_text(s)
+
+          p=Path('professional/worker/src/api/passkeys.js'); s=p.read_text()
+          s=s.replace("residentKey:'preferred',userVerification:'required'","residentKey:'required',requireResidentKey:true,userVerification:'required'")
+          p.write_text(s)
+
+          p=Path('professional/web/app-payment-workflow.js'); s=p.read_text()
+          s=s.replace(".payment-ai-badge{white-space:nowrap", ".payment-ledger{display:grid;gap:10px}.payment-ledger-card{display:grid;gap:9px;padding:14px;border:1px solid var(--line);border-radius:15px;background:var(--card)}.payment-ledger-card header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.payment-ledger-card h4,.payment-ledger-card p{margin:0}.payment-ledger-card p{color:var(--muted);font-size:10px}.payment-ledger-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.payment-ledger-metrics div{padding:9px;border-radius:11px;background:var(--soft)}.payment-ledger-metrics strong,.payment-ledger-metrics small{display:block}.payment-ledger-metrics small{margin-top:3px;color:var(--muted);font-size:8px}.payment-proof-hero{display:grid;grid-template-columns:42px minmax(0,1fr);gap:11px;align-items:center}.payment-proof-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:color-mix(in srgb,var(--primary) 12%,var(--card));font-size:20px}.payment-ai-badge{white-space:nowrap")
+          add=r'''
+function paymentDocumentLabel(document){const kind=methodKind(document);return kinds.find(([value])=>value===kind)?.[1]||document.payment_method_name||'Pago'}
+export async function openPaymentDocumentDetails(documentId,{returnView=state.view,orderId=''}={}){const document=await paymentDocumentById(documentId);if(!document)throw new Error('No se encontró el documento de pago');const allocations=document.allocations||[],ai=document.metadata?.aiProof||{},reference=document.reference||document.cheque_number||'Sin referencia',effective=document.cheque_collection_date||document.payment_date||document.created_at;openModal({eyebrow:'DOCUMENTO DE PAGO',title:`${paymentDocumentLabel(document)} · ${document.supplier_name}`,subtitle:`${reference} · ${effective?date(effective):'sin fecha'}`,hideSubmit:true,size:'large',body:`<section class="payment-proof-hero"><span class="payment-proof-icon">${methodKind(document)==='cheque'?'▣':'↗'}</span><div><strong>${money(document.total_amount)}</strong><p>${esc(statusLabels[document.status]||document.status||'Registrado')} · ${allocations.length} factura${allocations.length===1?'':'s'} vinculada${allocations.length===1?'':'s'}</p></div></section><section class="payment-ledger-metrics"><div><strong>${money(document.allocated_amount)}</strong><small>ASIGNADO</small></div><div><strong>${money(document.unallocated_amount)}</strong><small>SIN ASIGNAR</small></div><div><strong>${esc(reference)}</strong><small>REFERENCIA</small></div></section>${methodKind(document)==='cheque'?`<section class="v30-section"><div><strong>Cheque</strong><p>Serie ${esc(document.cheque_number||'—')} · cobro ${document.cheque_collection_date?date(document.cheque_collection_date):'—'} · ${esc(document.cheque_bank||'banco no indicado')} · ${esc(document.cheque_payee||'destinatario no indicado')}</p></div></section>`:''}${ai?.source?`<section class="payment-ai-status ok"><strong>Verificadores leídos por Gemini · ${Math.round(Number(ai.confidence||0)*100)}%</strong><span>${esc(paymentAiSummary(ai))}</span></section>`:''}<section class="payment-ledger"><h3>Aplicación del documento</h3>${allocations.map(item=>`<article class="payment-ledger-card"><header><div><h4>Factura ${esc(item.invoice_number||'—')}</h4><p>${esc((item.orderFolios||[]).join(' · ')||'Sin pedido asociado')}</p></div><strong>${money(item.allocated_amount)}</strong></header><small>${item.invoice_date?date(item.invoice_date):'sin fecha'} · total factura ${money(item.invoice_amount)}</small></article>`).join('')||'<div class="payment-document-note">Este documento todavía no tiene asignaciones.</div>'}</section><div class="v30-action-grid">${document.proof_key?'<button class="btn" id="paymentDetailProof" type="button">Ver comprobante</button>':''}<button class="btn primary" id="paymentDetailEdit" type="button">Editar asignación</button></div>`});$('#paymentDetailProof')?.addEventListener('click',()=>openProof(document.proof_key,document.proof_name).catch(error=>toast(error.message,'error')));$('#paymentDetailEdit')?.addEventListener('click',()=>{closeModal('edit-payment-document');requestAnimationFrame(()=>openPaymentDocumentComposer({documentId:document.id,orderId,returnView}).catch(error=>toast(error.message,'error')))})}
+export async function openOrderPaymentHub(orderId,{returnView=state.view}={}){if(!canManagePayments())throw new Error('Tu rol no tiene acceso a pagos');const [docsPayload,candidatePayload]=await Promise.all([api(`/api/finance/payment-documents?orderId=${encodeURIComponent(orderId)}`,{fresh:true,timeout:20000}),paymentCandidates({orderId}).catch(()=>({invoices:[],supplier:null}))]),documents=docsPayload.documents||[],invoices=candidatePayload.invoices||[],outstanding=invoices.filter(item=>Number(item.outstandingAmount||0)>0),totalPaid=documents.reduce((sum,item)=>sum+Number(item.allocated_amount||0),0);openModal({eyebrow:'PAGOS DEL PEDIDO',title:candidatePayload.supplier?.name||'Pagos y comprobantes',subtitle:documents.length?'Consulta comprobantes existentes o registra otro pago.':'Todavía no hay documentos de pago asociados.',hideSubmit:true,size:'large',body:`<section class="payment-ledger-metrics"><div><strong>${documents.length}</strong><small>DOCUMENTOS</small></div><div><strong>${money(totalPaid)}</strong><small>ASIGNADO</small></div><div><strong>${outstanding.length}</strong><small>FACTURAS PENDIENTES</small></div></section><div class="payment-ledger">${documents.map(document=>`<button class="payment-ledger-card" type="button" data-order-payment-detail="${esc(document.id)}"><header><div><h4>${esc(paymentDocumentLabel(document))}</h4><p>${esc(document.reference||document.cheque_number||'Sin referencia')} · ${esc(statusLabels[document.status]||document.status)}</p></div><strong>${money(document.allocated_amount)}</strong></header><small>${document.effective_date?date(document.effective_date):'sin fecha'} · ${document.allocations?.length||0} factura${document.allocations?.length===1?'':'s'}</small></button>`).join('')||'<div class="payment-document-note">Aún no hay pagos registrados para este pedido.</div>'}</div>${outstanding.length?'<button class="btn primary" id="orderPaymentAdd" type="button">Registrar otro pago</button>':'<div class="payment-ai-status ok"><strong>Sin saldo disponible para asignar</strong><span>Puedes seguir consultando y editando los documentos ya registrados.</span></div>'}`});$$('[data-order-payment-detail]').forEach(button=>button.onclick=()=>{closeModal('payment-detail');requestAnimationFrame(()=>openPaymentDocumentDetails(button.dataset.orderPaymentDetail,{returnView,orderId}).catch(error=>toast(error.message,'error')))});$('#orderPaymentAdd')?.addEventListener('click',()=>{closeModal('new-order-payment');requestAnimationFrame(()=>openPaymentDocumentComposer({orderId,returnView}).catch(error=>toast(error.message,'error')))})}
+'''
+          marker='export async function openPaymentDocument(documentId,{returnView=state.view}={}){return openPaymentDocumentComposer({documentId,returnView})}'
+          assert marker in s and 'openOrderPaymentHub' not in s
+          s=s.replace(marker,add+'\nexport async function openPaymentDocument(documentId,{returnView=state.view}={}){return openPaymentDocumentDetails(documentId,{returnView})}')
+          s=s.replace("export async function openPaymentForOrder(orderId,{returnView=state.view}={}){return openPaymentDocumentComposer({orderId,returnView})}","export async function openPaymentForOrder(orderId,{returnView=state.view}={}){return openOrderPaymentHub(orderId,{returnView})}")
+          s=s.replace("window.NuvastoPayments={openPayment,openPaymentForOrder,openPaymentDocument,openPaymentDocumentComposer,openCollectivePayment,openPaymentMethodsManager}","window.NuvastoPayments={openPayment,openPaymentForOrder,openOrderPaymentHub,openPaymentDocument,openPaymentDocumentDetails,openPaymentDocumentComposer,openCollectivePayment,openPaymentMethodsManager}")
+          p.write_text(s)
+
+          p=Path('professional/web/app-order-detail-v30.js'); s=p.read_text()
+          s=s.replace("actions.push('<button class=\"btn primary\" id=\"v30Payment\">Registrar pago</button>')","actions.push('<button class=\"btn primary\" id=\"v30Payment\">Pagos</button>')")
+          s=s.replace("$('#v30Payment')?.addEventListener('click',()=>{if(!invoices.length)return toast('Primero vincula una factura para registrar el pago','error');closeModal('payment');setTimeout(()=>import('./app-payment-workflow.js').then(module=>module.openPaymentForOrder(order.id,{returnView:state.view==='history'?'history':'orders'})).catch(error=>toast(error.message,'error')),0)});","$('#v30Payment')?.addEventListener('click',()=>{closeModal('payment');setTimeout(()=>import('./app-payment-workflow.js').then(module=>module.openPaymentForOrder(order.id,{returnView:state.view==='history'?'history':'orders'})).catch(error=>toast(error.message,'error')),0)});")
+          p.write_text(s)
+
+          p=Path('professional/worker/src/router.js'); s=p.read_text().replace("const VERSION='77'","const VERSION='78'").replace("const RELEASE='2026.08.14.77'","const RELEASE='2026.08.15.78'")
+          s=s.replace("catalogFlowConsolidationV77:true,","catalogFlowConsolidationV77:true,adaptiveInvoicePriceMatrixV78:true,passkeyEnrollmentV78:true,paymentLedgerV78:true,")
+          p.write_text(s)
+          p=Path('worker/src/combined.js'); s=p.read_text().replace("PLATFORM_RELEASE='2026.08.14.77'","PLATFORM_RELEASE='2026.08.15.78'"); p.write_text(s)
+          p=Path('professional/web/sw.js'); s=p.read_text(); s=re.sub(r"nuvasto-v77-payment-proof-ops",'nuvasto-v78-invoice-matrix-passkey-ledger',s); p.write_text(s)
+
+          test=r'''import assert from 'node:assert/strict';
+          import {reconcileInvoicePricing} from '../worker/src/invoice-pricing-matrix.js';
+          const warnings=[];
+          const lines=[
+            {invoiceQuantity:2,totalUnits:6,netLineTotal:10068,freightLine:1642,vatLine:2225,additionalTaxLine:1812},
+            {invoiceQuantity:32,totalUnits:192,netLineTotal:84652,freightLine:21888,vatLine:20242,additionalTaxLine:15238},
+            {invoiceQuantity:20,totalUnits:120,netLineTotal:56182,freightLine:13680,vatLine:13274,additionalTaxLine:5618},
+            {invoiceQuantity:4,totalUnits:24,netLineTotal:11236,freightLine:2736,vatLine:2655,additionalTaxLine:1124}
+          ];
+          const result=reconcileInvoicePricing(lines,{net:202084,freight:39946,vat:38396,additionalTax:23792,other:0,total:264272},warnings);
+          assert.equal(result.verified,true);assert.equal(result.documentTotalComputed,264272);assert.equal(result.checksumDelta,0);assert.equal(lines[1].grossLineTotal,142020);assert.equal(lines[1].grossUnitPrice,739.688);
+          const printed=[{invoiceQuantity:1,totalUnits:6,netLineTotal:50000,printedFinalUnitPrice:14105.2,finalUnitPrice:14105.2,priceSource:'printed-final-unit'},{invoiceQuantity:1,totalUnits:6,netLineTotal:50000,printedFinalUnitPrice:11462.8,finalUnitPrice:11462.8,priceSource:'printed-final-unit'},{invoiceQuantity:1,totalUnits:12,netLineTotal:50000,printedFinalUnitPrice:6677.2,finalUnitPrice:6677.2,priceSource:'printed-final-unit'},{invoiceQuantity:3,totalUnits:18,netLineTotal:50000,printedFinalUnitPrice:8499.7,finalUnitPrice:8499.7,priceSource:'printed-final-unit'}];
+          const p=reconcileInvoicePricing(printed,{total:386528},[]);assert.equal(p.verified,true);assert.equal(p.method,'printed-final-unit-column');
+          console.log('r78 adaptive invoice price matrix: OK');
+          '''
+          Path('professional/tests/invoice-price-matrix-r78.test.mjs').write_text(test)
+          p=Path('professional/package.json'); pkg=json.loads(p.read_text());
+          if 'invoice-price-matrix-r78.test.mjs' not in pkg['scripts']['test']:pkg['scripts']['test'] += ' && node tests/invoice-price-matrix-r78.test.mjs'
+          p.write_text(json.dumps(pkg,separators=(',',':'))+'\n')
+          PY
+          cd professional
+          npm run verify
+          cd ..
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add professional worker
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Nuvasto r78: adaptive invoice matrix, passkey enrollment and payment ledger'
+          git push origin HEAD:agent/r78-invoice-matrix-passkeys-payment-ledger
