@@ -314,8 +314,9 @@ const responseSchema = {
 
 function supplierReaderProfile(raw = {}, context = {}) {
   const label = normalize(`${context.providerName || ''} ${raw.supplierName || ''}`);
-  if (/PISQUERA DE CHILE|CCU|COMPANIA CERVECERIAS UNIDAS|CERVECERIAS UNIDAS|VINA SAN PEDRO|SAN PEDRO TARAPACA|VSPT/.test(label)) return 'ccu-vspt-total-x-unidad-v1';
-  return 'generic-document-v1';
+  if (/COCA COLA EMBONOR|EMBONOR|CCU|COMPANIA CERVECERIAS UNIDAS|CERVECERIAS UNIDAS/.test(label)) return 'adaptive-line-component-matrix-v2';
+  if (/PISQUERA DE CHILE|VINA SAN PEDRO|SAN PEDRO TARAPACA|VSPT/.test(label)) return 'adaptive-final-unit-or-component-matrix-v2';
+  return 'adaptive-document-matrix-v2';
 }
 
 function buildPrompt(context) {
@@ -332,9 +333,11 @@ function buildPrompt(context) {
 - Match por marca, familia, variante y volumen. Volumen distinto invalida. ESP=ESPECIAL; TRANS=TRANSPARENTE; ZERO=SIN AZUCAR.
 - matchedOrderProductId es un id exacto de CAT o vacío. Nunca inventes.
 - DISPLAY=24; 1.5L=6, salvo pack explícito.
-- Lee neto, descuento, flete, IVA, impuesto adicional, otros y total final por línea.
+- Lee TODAS las columnas monetarias visibles por línea por separado: Precio Unitario, %Desc, Neto Total/Valor, Flete Total, IVA, Adicional/IABA/ILA, otros cargos, bruto de línea y cualquier precio final unitario explícito. Copia las celdas; no fuerces el cierre ni inventes residuos.
+- El método de cálculo NO se decide solo por proveedor. Debes reconocer la estructura real de cada factura. Si trae Neto Total + Flete Total + IVA + Adicional, rellena esos cuatro componentes de cada línea: Nuvasto calculará el bruto como suma matricial.
+- En facturas Coca-Cola Embonor/CCU es frecuente que NETO del pie ya incluya fletes; conserva totals.net y totals.freight tal como están impresos y deja que Nuvasto determine su relación matemáticamente.
 - REGLA DE PRECIO FINAL: si existe una columna explícita llamada 'Total x Unidad', 'Total Unidad' o equivalente, copia ESA celda en finalUnitPrice. finalUnitPriceRaw conserva el texto visible (ej. 14.105,2) y finalUnitPriceHeader conserva literalmente el encabezado leído. No derives ese valor.
-- En documentos CCU, Compañía Pisquera de Chile/Pisquera de Chile y Viña San Pedro Tarapacá/VSPT, la columna extrema derecha 'Total x Unidad' representa el costo final por unidad base e incluye descuentos, impuestos y cargos prorrateados, incluido flete. Es la fuente prioritaria del precio final.
+- Solo cuando el documento REALMENTE tenga una columna explícita 'Total x Unidad' o equivalente, úsala como precio final autoritativo. No asumas esa columna por el nombre del proveedor: otras facturas del mismo proveedor pueden usar una matriz Neto/Flete/IVA/Adicional.
 - No confundas la columna 'Valor' con 'Total x Unidad': 'Valor' normalmente es el neto de la línea después del descuento; NO es el precio final unitario.
 - Si no existe o no se puede leer claramente 'Total x Unidad', usa finalUnitPrice=0 y strings vacíos. Nunca inventes el precio final.
 - Revisa si el documento contiene información explícita de pago o un cheque. payment.detected=true solo si la evidencia es visible en DOCUMENTO A.
@@ -510,7 +513,7 @@ function validateInvoice(raw, context) {
     };
   }).filter(line => line.sourceLine || line.invoiceQuantity || line.netLineTotal || line.grossLineTotal || line.isFree);
 
-  distributeResidual(lines, totals.total);
+  // r78: no forzar residuos globales; la API canónica reconcilia columnas reales del documento.
   for (const line of lines) {
     line.grossUnitPrice = line.isFree ? 0 : (line.printedFinalUnitPrice > 0 ? line.printedFinalUnitPrice : (line.units ? Math.round(line.grossLineTotal / line.units) : 0));
     line.grossPackPrice = line.isFree ? 0 : (line.invoiceQuantity ? Math.round(line.grossLineTotal / line.invoiceQuantity) : 0);
@@ -570,7 +573,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, {status: 204, headers: corsHeaders(origin)});
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === '/health') {
-      const base = {ok: true, service: 'pedidos-pro-ai', geminiConfigured: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL || DEFAULT_MODEL, resolver: 'catalog-v24-supplier-final-unit'};
+      const base = {ok: true, service: 'pedidos-pro-ai', geminiConfigured: !!env.GEMINI_API_KEY, model: env.GEMINI_MODEL || DEFAULT_MODEL, resolver: 'catalog-v24-adaptive-price-matrix'};
       if (url.searchParams.get('probe') !== '1' || !env.GEMINI_API_KEY) return json(base, 200, origin);
       try { return json({...base, probe: await probeGemini(env)}, 200, origin); }
       catch (error) { return json({...base, ok: false, probe: {ok: false, error: String(error.message || error)}}, 502, origin); }

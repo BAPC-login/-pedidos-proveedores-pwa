@@ -33,7 +33,7 @@ jobs:
           workingDirectory: professional
           wranglerVersion: '4.114.0'
           command: deploy --config wrangler.toml --keep-vars
-      - name: Verify deployed release, schema, storage and invoice arithmetic
+      - name: Verify deployed release, storage, adaptive invoice matrix, passkeys and payment ledger
         id: verify
         shell: bash
         run: |
@@ -56,7 +56,8 @@ jobs:
             const r74=h.domainRouterV74===true&&h.paymentDocumentsV74===true&&h.collectivePaymentAllocationV74===true&&h.sameSupplierPaymentV74===true&&h.multiInvoicePaymentV74===true&&h.multiOrderPaymentV74===true;
             const r76=h.supplierFinalUnitReadersV76===true&&h.printedFinalUnitPricingV76===true&&h.supplierInvoiceProfilesV76===true;
             const r77=h.paymentProofGeminiV77===true&&h.orderDetailPaymentsV77===true&&h.catalogFlowConsolidationV77===true;
-            process.stdout.write(storage&&runtime&&legacy&&r71&&r72&&r73&&r74&&r76&&r77&&migration?'true':'false');
+            const r78=h.adaptiveInvoicePriceMatrixV78===true&&h.passkeyEnrollmentV78===true&&h.paymentLedgerV78===true;
+            process.stdout.write(storage&&runtime&&legacy&&r71&&r72&&r73&&r74&&r76&&r77&&r78&&migration?'true':'false');
           } catch { process.stdout.write('false'); }
           NODE
             )
@@ -73,6 +74,8 @@ jobs:
           grep -Fq 'nuvasto:ephemeral-token' /tmp/app-session-bootstrap.js || { echo '::error::sesión opcional no está en producción'; exit 1; }
           grep -Fq 'isUserVerifyingPlatformAuthenticatorAvailable' /tmp/app-auth-experience.js || { echo '::error::detección biométrica no está en producción'; exit 1; }
           grep -Fq '/api/auth/passkeys/login/options' /tmp/app-auth-experience.js || { echo '::error::login con passkey no está en producción'; exit 1; }
+          grep -Fq 'offerPasskeyEnrollmentAfterPassword' /tmp/app-auth-experience.js || { echo '::error::enrolamiento guiado de Face ID no está en producción'; exit 1; }
+          grep -Fq 'Activar Face ID / biometría' /tmp/app-auth-experience.js || { echo '::error::PWA no ofrece registrar biometría tras iniciar sesión'; exit 1; }
           grep -Fq 'Versión 2.0 · agosto de 2026' /tmp/app-legal.js || { echo '::error::términos actualizados no están en producción'; exit 1; }
           grep -Fq "from './app-order-core.js'" /tmp/app-bootstrap.js || { echo '::error::bootstrap no usa la entrada canónica de Lista Maestra'; exit 1; }
           if grep -Fq 'app-sso-v20.js' /tmp/app-bootstrap.js; then echo '::error::bootstrap todavía activa Cloudflare Access SSO'; exit 1; fi
@@ -84,14 +87,17 @@ jobs:
           grep -Fq 'data-v32-matrix-product' /tmp/app-catalog.js || { echo '::error::matriz multiproveedor no está operable'; exit 1; }
           grep -Fq 'data-v32-image-key' /tmp/app-documents.js || { echo '::error::Documentos no expone vista previa de imágenes'; exit 1; }
           grep -Fq 'openPaymentDocumentComposer' /tmp/app-payment-workflow.js || { echo '::error::no existe compositor canónico de documento de pago'; exit 1; }
+          grep -Fq 'openOrderPaymentHub' /tmp/app-payment-workflow.js || { echo '::error::pedido no conserva historial consultable de pagos'; exit 1; }
+          grep -Fq 'openPaymentDocumentDetails' /tmp/app-payment-workflow.js || { echo '::error::documento de pago no tiene detalle posterior'; exit 1; }
+          grep -Fq 'PAGOS DEL PEDIDO' /tmp/app-payment-workflow.js || { echo '::error::hub de pagos del pedido no está publicado'; exit 1; }
+          grep -Fq 'Aplicación del documento' /tmp/app-payment-workflow.js || { echo '::error::detalle de imputaciones de pago no está publicado'; exit 1; }
           grep -Fq 'paymentProofFile' /tmp/app-payment-workflow.js || { echo '::error::pagos no inicia por el comprobante'; exit 1; }
           grep -Fq '/api/finance/payment-proof-analysis' /tmp/app-payment-workflow.js || { echo '::error::pagos no usa análisis Gemini del comprobante'; exit 1; }
           grep -Fq 'Gemini extrajo los verificadores' /tmp/app-payment-workflow.js || { echo '::error::pagos no muestra verificadores extraídos por IA'; exit 1; }
-          grep -Fq 'id="v30Payment"' /tmp/app-order-detail-v30.js || { echo '::error::detalle de pedido no expone Registrar pago'; exit 1; }
+          grep -Fq 'id="v30Payment"' /tmp/app-order-detail-v30.js || { echo '::error::detalle de pedido no expone Pagos'; exit 1; }
+          grep -Fq '>Pagos</button>' /tmp/app-order-detail-v30.js || { echo '::error::acción de pagos no permanece visible en el detalle'; exit 1; }
           grep -Fq "import('./app-payment-workflow.js')" /tmp/app-order-detail-v30.js || { echo '::error::detalle de pedido no abre el flujo canónico de pagos'; exit 1; }
           grep -Fq 'openCollectivePayment' /tmp/app-payment-workflow.js || { echo '::error::no existe pago colectivo'; exit 1; }
-          grep -Fq '/api/finance/payment-documents' /tmp/app-payment-workflow.js || { echo '::error::frontend no usa documentos de pago'; exit 1; }
-          grep -Fq '/api/finance/payment-candidates' /tmp/app-payment-workflow.js || { echo '::error::frontend no carga candidatos de pago'; exit 1; }
           grep -Fq 'Solo este pedido' /tmp/app-payment-workflow.js || { echo '::error::pago unitario por pedido no está disponible'; exit 1; }
           grep -Fq 'Todo el proveedor' /tmp/app-payment-workflow.js || { echo '::error::pago colectivo por proveedor no está disponible'; exit 1; }
           grep -Fq 'openPaymentMethodsManager' /tmp/app-payment-workflow.js || { echo '::error::no existe configuración de medios de pago'; exit 1; }
@@ -101,7 +107,9 @@ jobs:
           grep -Fq 'nuvasto_supplier_alias' /tmp/app-invoice-v30.js || { echo '::error::cotejo local no usa alias del proveedor'; exit 1; }
           if grep -Fq "upload.append('orderFile'" /tmp/app-invoice-v30.js; then echo '::error::factura sigue enviando PDF duplicado del pedido al motor'; exit 1; fi
           grep -Fq 'orderId:queue.orderId' /tmp/app-multi-invoice.js || { echo '::error::carga de factura perdió el pedido de origen'; exit 1; }
-          grep -Fq 'Precio final impreso · Total x Unidad' /tmp/app-multi-invoice.js || { echo '::error::revisión no expone el precio final unitario impreso'; exit 1; }
+          grep -Fq 'Precio final impreso · Total x Unidad' /tmp/app-multi-invoice.js || { echo '::error::revisión no preserva el método de precio final impreso'; exit 1; }
+          grep -Fq 'Matriz de precio cerrada' /tmp/app-multi-invoice.js || { echo '::error::revisión no explica la suma de componentes por línea'; exit 1; }
+          grep -Fq 'Cierre matemático verificado' /tmp/app-multi-invoice.js || { echo '::error::revisión no muestra el checksum de la factura'; exit 1; }
           grep -Fq 'data-printed-final-unit' /tmp/app-multi-invoice.js || { echo '::error::revisión no preserva la columna Total x Unidad'; exit 1; }
           if grep -Fq "upload.append('orderFile'" /tmp/app-multi-invoice.js; then echo '::error::carga múltiple todavía duplica el PDF del pedido'; exit 1; fi
           grep -Fq 'v30-reconcile-row' /tmp/app-runtime-v30.js || { echo '::error::estilos de lista de cotejo no están en producción'; exit 1; }
@@ -114,11 +122,11 @@ jobs:
           grep -Fq 'duration:140' /tmp/app-router-v14.js || { echo '::error::transición rápida de rutas no está en producción'; exit 1; }
           grep -Fq 'nuvasto-modal-enter' /tmp/native-performance.css || { echo '::error::transición de modal no está en producción'; exit 1; }
           grep -Fq 'overflow-y:auto' /tmp/native-performance.css || { echo '::error::contenido principal no tiene scroll nativo'; exit 1; }
-          grep -Fq 'nuvasto-v77-payment-proof-ops' /tmp/sw.js || { echo '::error::service worker no activó el corte de caché del motor de facturas'; exit 1; }
+          grep -Fq 'nuvasto-v78-invoice-matrix-passkey-ledger' /tmp/sw.js || { echo '::error::service worker no activó el corte de caché r78'; exit 1; }
           if grep -Fq "'./app-procurement.js'" /tmp/sw.js; then echo '::error::Service Worker aún precarga bundles no críticos'; exit 1; fi
           grep -Fq 'apiNetworkTimeout' /tmp/sw.js || { echo '::error::timeout API adaptable no está en producción'; exit 1; }
           grep -Fq 'const cached=await cache.match' /tmp/sw.js || { echo '::error::assets de release no usan cache-first'; exit 1; }
-          echo "Nuvasto $release · lectores de factura, pagos Gemini y catálogo/recorrido verificados en producción."
+          echo "Nuvasto $release · matriz adaptativa de facturas, enrolamiento biométrico y ledger de pagos verificados en producción."
       - name: Production procurement journey
         id: synthetic
         if: steps.verify.outcome == 'success'
@@ -144,6 +152,6 @@ jobs:
         run: |
           if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.synthetic.outcome }}" != "failure" ]; then
             state=success
-            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto publicado; factura/contexto y E2E autenticado OK'; else description='Nuvasto publicado; factura y contexto verificados'; fi
-          else state=failure; description='El despliegue de Nuvasto no quedó verificado'; fi
+            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto r78 publicado y E2E autenticado OK'; else description='Nuvasto r78 publicado; smoke público verificado'; fi
+          else state=failure; description='El despliegue de Nuvasto r78 no quedó verificado'; fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state="$state" -f context='nuvasto/production' -f description="$description" -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
