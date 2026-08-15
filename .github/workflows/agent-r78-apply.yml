@@ -17,7 +17,9 @@ jobs:
         with:
           node-version: '22'
       - name: Apply r78
-        run: python3 professional/scripts/agent-r78.py
+        run: |
+          python3 professional/scripts/agent-r78.py
+          python3 professional/scripts/agent-r78-fix.py
       - name: Verify
         working-directory: professional
         run: npm run verify
