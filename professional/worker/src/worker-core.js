@@ -31,11 +31,11 @@ function invoiceUnits(lines=[]){const totals=new Map();for(const line of lines){
 async function receiveFromInvoice(request,env,actor,body){
   const orderIds=[...new Set((Array.isArray(body.orderIds)?body.orderIds:[]).map(String).filter(Boolean))];
   if(!orderIds.length)throw new HttpError(400,'La factura no tiene un pedido asociado para recepcionar','missing_order');
-  const sourceUnits=invoiceUnits(Array.isArray(body.lines)?body.lines:[]),receptions=[];
+  const available=invoiceUnits(Array.isArray(body.lines)?body.lines:[]),receptions=[];
   for(const orderId of orderIds){
     const order=await getOrder(env,actor,orderId);
     if(['closed','cancelled'].includes(String(order.status||'')))continue;
-    const available=new Map(sourceUnits),items=[];
+    const items=[];
     for(const item of order.items||[]){
       const productId=String(item.productId||''),remaining=Math.max(0,Number(item.quantityOrdered||0)-Number(item.quantityReceived||0)),pack=Math.max(.001,Number(item.unitsPerOrderUnit||1)),units=Number(available.get(productId)||0);
       if(!productId||remaining<=0||units<=0)continue;
