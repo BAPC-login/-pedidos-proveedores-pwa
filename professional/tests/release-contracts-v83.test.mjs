@@ -30,9 +30,10 @@ assert.match(invoice,/printed-final-unit-column/,'supplier printed final unit pr
 assert.match(invoice,/printed-line-sum-matrix/,'v83 invoice sum inference must remain active');
 assert.match(invoice,/invoice-line-component-matrix/,'component matrix fallback must remain active');
 assert.match(normalizer,/reconcileInvoicePricing/,'invoice normalization must use canonical pricing reconciliation');
-assert.match(sw,/nuvasto-v83-mobile-auth-invoice/,'v83 service worker cache must be active');
+assert.match(sw,/CACHE_VERSION='nuvasto-v84-professional-readiness'/,'current service worker cache must rotate for v84');
+assert.match(sw,/PREVIOUS_CACHE_VERSION='nuvasto-v83-mobile-auth-invoice'/,'v84 must identify prior v83 cache');
 assert.doesNotMatch(sw,/'\.\/app-procurement\.js'/,'noncritical procurement bundle must stay out of install precache');
 assert.match(payments,/openPaymentDocumentComposer/,'payment document workflow must remain available');
 assert.match(payments,/openCollectivePayment/,'collective payment workflow must remain available');
 assert.doesNotMatch(payments,/MutationObserver/,'payment workflow must not observe the whole DOM');
-console.log('v83 canonical release contracts: OK');
+console.log('v83/v84 canonical release contracts: OK');
