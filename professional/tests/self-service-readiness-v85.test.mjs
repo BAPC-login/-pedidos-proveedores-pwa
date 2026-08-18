@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
+const readiness=read('web/app-readiness-v85.js');
+const bootstrap=read('web/app-bootstrap.js');
+const sw=read('web/sw.js');
+assert.match(bootstrap,/initializeReadinessV85/,'canonical bootstrap must initialize self-service readiness');
+assert.match(readiness,/PUESTA EN MARCHA/,'settings must expose onboarding status');
+assert.match(readiness,/DIAGNÓSTICO/,'settings must expose user-facing diagnostics');
+assert.match(readiness,/Bodegas, formatos y recorrido configurados/,'onboarding must verify procurement traversal');
+assert.match(readiness,/api\('\/api\/operations-bootstrap-v45'/,'onboarding must reuse the canonical bootstrap instead of multiplying API calls');
+assert.match(readiness,/NuvastoTelemetry\?\.requestBudget/,'diagnostics must reuse telemetry SLO data');
+assert.match(readiness,/Latencia p95/,'diagnostics must show p95 in user language');
+assert.match(readiness,/Tasa de error/,'diagnostics must show error rate in user language');
+assert.match(readiness,/Copiar resumen/,'diagnostics must support a support-friendly summary');
+assert.doesNotMatch(readiness,/netLineTotal|taxAllocationMethod|worker_unavailable|HTTP 500/,'self-service UI must not expose implementation codes');
+assert.match(sw,/app-readiness-v85\.js/,'readiness module must be in the offline shell');
+console.log('v85 self-service readiness: OK');
