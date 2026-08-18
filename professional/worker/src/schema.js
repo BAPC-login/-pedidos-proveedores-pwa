@@ -9,40 +9,16 @@ const SCHEMA_VERSION='32';
 const MARKER_KEY='schema-core-v32-ready-v45';
 const MARKER_VERSION=Number(SCHEMA_VERSION);
 const PERFORMANCE_MARKER='performance-indexes-r52';
+const EXTRA_RECEPTION_MARKER='reception-extra-items-v88';
 let initializationPromise=null;
 
-async function markerReady(db){
-  try{const row=await db.prepare('SELECT item_count FROM data_seed_state WHERE seed_key = ?').bind(MARKER_KEY).first();return Number(row?.item_count||0)>=MARKER_VERSION}catch{return false}
-}
-async function persistMarker(db){
-  try{await db.prepare(`INSERT INTO data_seed_state(seed_key,item_count,completed_at) VALUES(?,?,?) ON CONFLICT(seed_key) DO UPDATE SET item_count=excluded.item_count,completed_at=excluded.completed_at`).bind(MARKER_KEY,MARKER_VERSION,new Date().toISOString()).run()}catch(error){console.warn('schema_marker_write_failed',error?.message||error)}
-}
-async function ensurePerformanceIndexes(db){
-  try{
-    await db.prepare(`CREATE TABLE IF NOT EXISTS data_seed_state(seed_key TEXT PRIMARY KEY,item_count INTEGER NOT NULL DEFAULT 0,completed_at TEXT NOT NULL)`).run();
-    const ready=await db.prepare('SELECT item_count FROM data_seed_state WHERE seed_key=?').bind(PERFORMANCE_MARKER).first();
-    if(Number(ready?.item_count||0)>=1)return false;
-    await db.batch([
-      db.prepare('CREATE INDEX IF NOT EXISTS idx_orders_org_status_updated ON orders(org_id,status,updated_at DESC)'),
-      db.prepare('CREATE INDEX IF NOT EXISTS idx_orders_org_delivery_updated ON orders(org_id,delivery_date,status,updated_at DESC)'),
-      db.prepare('CREATE INDEX IF NOT EXISTS idx_orders_org_supplier_updated ON orders(org_id,supplier_id,status,updated_at DESC)'),
-      db.prepare('CREATE INDEX IF NOT EXISTS idx_order_items_product_order ON order_items(product_id,order_id)'),
-      db.prepare('CREATE INDEX IF NOT EXISTS idx_invoices_org_status_date ON invoices(org_id,status,invoice_date DESC)'),
-      db.prepare('CREATE INDEX IF NOT EXISTS idx_invoice_links_org_order ON invoice_order_links(org_id,order_id,invoice_id)'),
-      db.prepare('CREATE INDEX IF NOT EXISTS idx_supplier_products_hotpath ON supplier_products(org_id,supplier_id,active,product_id)'),
-      db.prepare('CREATE INDEX IF NOT EXISTS idx_receptions_org_order_status ON receptions(org_id,order_id,status,received_at DESC)'),
-      db.prepare('CREATE INDEX IF NOT EXISTS idx_order_cost_centers_hotpath ON order_cost_centers(org_id,cost_center_id,order_id)'),
-      db.prepare(`INSERT INTO data_seed_state(seed_key,item_count,completed_at) VALUES(?,?,?) ON CONFLICT(seed_key) DO UPDATE SET item_count=excluded.item_count,completed_at=excluded.completed_at`).bind(PERFORMANCE_MARKER,1,new Date().toISOString())
-    ]);
-    return true;
-  }catch(error){console.warn('performance_indexes_r52_failed',error?.message||error);return false}
-}
-export async function ensureSchema(env){
-  if(!env.DB)throw new Error('D1 binding DB is not available');
-  if(initializationPromise)return initializationPromise;
-  initializationPromise=(async()=>{
-    if(await markerReady(env.DB)){const performanceIndexesAdded=await ensurePerformanceIndexes(env.DB);return{initialized:true,seeded:false,version:SCHEMA_VERSION,statements:0,fastPath:true,performanceIndexesAdded}}
-    const result=await ensureLegacySchema(env);await persistMarker(env.DB);const performanceIndexesAdded=await ensurePerformanceIndexes(env.DB);return{...result,fastPath:false,performanceIndexesAdded};
-  })().catch(error=>{initializationPromise=null;throw error});
-  return initializationPromise;
-}
+async function markerReady(db){try{const row=await db.prepare('SELECT item_count FROM data_seed_state WHERE seed_key = ?').bind(MARKER_KEY).first();return Number(row?.item_count||0)>=MARKER_VERSION}catch{return false}}
+async function persistMarker(db){try{await db.prepare(`INSERT INTO data_seed_state(seed_key,item_count,completed_at) VALUES(?,?,?) ON CONFLICT(seed_key) DO UPDATE SET item_count=excluded.item_count,completed_at=excluded.completed_at`).bind(MARKER_KEY,MARKER_VERSION,new Date().toISOString()).run()}catch(error){console.warn('schema_marker_write_failed',error?.message||error)}}
+async function ensurePerformanceIndexes(db){try{await db.prepare(`CREATE TABLE IF NOT EXISTS data_seed_state(seed_key TEXT PRIMARY KEY,item_count INTEGER NOT NULL DEFAULT 0,completed_at TEXT NOT NULL)`).run();const ready=await db.prepare('SELECT item_count FROM data_seed_state WHERE seed_key=?').bind(PERFORMANCE_MARKER).first();if(Number(ready?.item_count||0)>=1)return false;await db.batch([db.prepare('CREATE INDEX IF NOT EXISTS idx_orders_org_status_updated ON orders(org_id,status,updated_at DESC)'),db.prepare('CREATE INDEX IF NOT EXISTS idx_orders_org_delivery_updated ON orders(org_id,delivery_date,status,updated_at DESC)'),db.prepare('CREATE INDEX IF NOT EXISTS idx_orders_org_supplier_updated ON orders(org_id,supplier_id,status,updated_at DESC)'),db.prepare('CREATE INDEX IF NOT EXISTS idx_order_items_product_order ON order_items(product_id,order_id)'),db.prepare('CREATE INDEX IF NOT EXISTS idx_invoices_org_status_date ON invoices(org_id,status,invoice_date DESC)'),db.prepare('CREATE INDEX IF NOT EXISTS idx_invoice_links_org_order ON invoice_order_links(org_id,order_id,invoice_id)'),db.prepare('CREATE INDEX IF NOT EXISTS idx_supplier_products_hotpath ON supplier_products(org_id,supplier_id,active,product_id)'),db.prepare('CREATE INDEX IF NOT EXISTS idx_receptions_org_order_status ON receptions(org_id,order_id,status,received_at DESC)'),db.prepare('CREATE INDEX IF NOT EXISTS idx_order_cost_centers_hotpath ON order_cost_centers(org_id,cost_center_id,order_id)'),db.prepare(`INSERT INTO data_seed_state(seed_key,item_count,completed_at) VALUES(?,?,?) ON CONFLICT(seed_key) DO UPDATE SET item_count=excluded.item_count,completed_at=excluded.completed_at`).bind(PERFORMANCE_MARKER,1,new Date().toISOString())]);return true}catch(error){console.warn('performance_indexes_r52_failed',error?.message||error);return false}}
+async function ensureExtraReceptionV88(db){try{await db.prepare(`CREATE TABLE IF NOT EXISTS data_seed_state(seed_key TEXT PRIMARY KEY,item_count INTEGER NOT NULL DEFAULT 0,completed_at TEXT NOT NULL)`).run();const ready=await db.prepare('SELECT item_count FROM data_seed_state WHERE seed_key=?').bind(EXTRA_RECEPTION_MARKER).first();if(Number(ready?.item_count||0)>=1)return false;await db.batch([
+  db.prepare(`CREATE TABLE IF NOT EXISTS reception_extra_items(id TEXT PRIMARY KEY,reception_id TEXT NOT NULL REFERENCES receptions(id) ON DELETE CASCADE,order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE RESTRICT,org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,product_id TEXT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,supplier_product_id TEXT REFERENCES supplier_products(id) ON DELETE SET NULL,source_invoice_id TEXT REFERENCES invoices(id) ON DELETE SET NULL,source_description TEXT NOT NULL DEFAULT '',quantity_delivered REAL NOT NULL DEFAULT 0,quantity_accepted REAL NOT NULL DEFAULT 0,quantity_rejected REAL NOT NULL DEFAULT 0,unit TEXT NOT NULL DEFAULT 'UNIDAD',notes TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL)`),
+  db.prepare('CREATE INDEX IF NOT EXISTS idx_reception_extras_reception ON reception_extra_items(org_id,reception_id,created_at)'),
+  db.prepare('CREATE INDEX IF NOT EXISTS idx_reception_extras_order ON reception_extra_items(org_id,order_id,product_id,created_at DESC)'),
+  db.prepare(`INSERT INTO data_seed_state(seed_key,item_count,completed_at) VALUES(?,?,?) ON CONFLICT(seed_key) DO UPDATE SET item_count=excluded.item_count,completed_at=excluded.completed_at`).bind(EXTRA_RECEPTION_MARKER,1,new Date().toISOString())
+]);return true}catch(error){console.warn('reception_extra_items_v88_failed',error?.message||error);throw error}}
+export async function ensureSchema(env){if(!env.DB)throw new Error('D1 binding DB is not available');if(initializationPromise)return initializationPromise;initializationPromise=(async()=>{if(await markerReady(env.DB)){const[performanceIndexesAdded,extraReceptionReady]=await Promise.all([ensurePerformanceIndexes(env.DB),ensureExtraReceptionV88(env.DB)]);return{initialized:true,seeded:false,version:SCHEMA_VERSION,statements:0,fastPath:true,performanceIndexesAdded,extraReceptionV88:true,extraReceptionCreated:extraReceptionReady}}const result=await ensureLegacySchema(env);await persistMarker(env.DB);const[performanceIndexesAdded,extraReceptionReady]=await Promise.all([ensurePerformanceIndexes(env.DB),ensureExtraReceptionV88(env.DB)]);return{...result,fastPath:false,performanceIndexesAdded,extraReceptionV88:true,extraReceptionCreated:extraReceptionReady}})().catch(error=>{initializationPromise=null;throw error});return initializationPromise}
