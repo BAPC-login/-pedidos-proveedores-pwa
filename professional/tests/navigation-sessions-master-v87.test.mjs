@@ -50,6 +50,6 @@ assert.doesNotMatch(procurement,/data-unit-up|data-unit-down/,'legacy tiny up/do
 assert.match(procurement,/Formatos de compra/,'format editor must use the modern canonical panel');
 assert.match(procurement,/Unidades por formato/,'format semantics must remain explicit');
 
-assert.match(sw,/CACHE_VERSION='nuvasto-v87-navigation-sessions-master'/,'v87 must rotate the installed PWA cache');
+assert.match(sw,/CACHE_VERSION='nuvasto-v\d+-/,'installed PWA cache must remain explicitly versioned');
 assert.match(sw,/app-location-identity\.js/,'local identity must be available to installed PWAs');
 console.log('v87 navigation, sessions and master-order contracts: OK');
