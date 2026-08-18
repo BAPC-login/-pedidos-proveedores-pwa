@@ -1,9 +1,9 @@
 const VERSION='nuvasto-v80-native-orders-payments';
-const CACHE_VERSION='nuvasto-v81-catalog-finance-density';
+const CACHE_VERSION='nuvasto-v82-dashboard-reconciliation-dark';
 const PREVIOUS_VERSION='nuvasto-v78-invoice-matrix-passkey-ledger';
-const PREVIOUS_CACHE_VERSION=VERSION;
+const PREVIOUS_CACHE_VERSION='nuvasto-v81-catalog-finance-density';
 const DATA_CACHE=`${CACHE_VERSION}-data`;
-const PRECACHE=['./','./styles.css','./pro-ui.css','./experience.css','./design-system-v13.css','./design-system-v14.css','./brand-v21.css','./native-performance.css','./design-system-v79.css','./design-system-native-v80.css','./master-order.css','./app.js','./app-core.js','./app-bootstrap.js','./app-session-bootstrap.js','./app-auth-experience.js','./app-legal.js','./app-professional.js','./app-master-order.js','./app-procurement-settings.js','./manifest.webmanifest','./icon.svg','./nuvasto-mark.svg','./nuvasto-logo.svg'];
+const PRECACHE=['./','./styles.css','./pro-ui.css','./experience.css','./design-system-v13.css','./design-system-v14.css','./brand-v21.css','./native-performance.css','./design-system-v79.css','./design-system-native-v80.css','./design-system-native-v82.css','./master-order.css','./app.js','./app-core.js','./app-bootstrap.js','./app-session-bootstrap.js','./app-auth-experience.js','./app-legal.js','./app-professional.js','./app-dashboard-v82.js','./app-reconciliation-v82.js','./app-master-order.js','./app-procurement-settings.js','./manifest.webmanifest','./icon.svg','./nuvasto-mark.svg','./nuvasto-logo.svg'];
 const RELEASE_ASSET=/\.(?:js|css|webmanifest)$/i;
 const networkWithTimeout=(request,ms=7000)=>{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),ms);return fetch(request,{cache:'no-store',signal:controller.signal}).finally(()=>clearTimeout(timer))};
 function apiNetworkTimeout(request){const path=new URL(request.url).pathname;if(path==='/api/orders/advanced'||path.startsWith('/api/dashboard/analytics')||path==='/api/dashboard/finance-v81'||/\/api\/products\/[^/]+\/insights$/.test(path)||path.startsWith('/api/receptions/work-queue')||path.startsWith('/api/global-search'))return 32000;return 18000}
