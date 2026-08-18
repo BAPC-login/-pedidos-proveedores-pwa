@@ -27,7 +27,7 @@ async function enforceClosure(env,actor,request,orderId){
 }
 function requestWithBody(request,body){const headers=new Headers(request.headers);headers.set('Content-Type','application/json');return new Request(request.url,{method:'POST',headers,body:JSON.stringify(body)})}
 function responseWithPayload(response,payload){const headers=new Headers(response.headers);headers.set('Content-Type','application/json; charset=utf-8');return new Response(JSON.stringify(payload),{status:response.status,statusText:response.statusText,headers})}
-function invoiceUnits(lines=[]){const totals=new Map();for(const line of lines){const productId=String(line?.productId||'');if(!productId)continue;const quantity=Number(line?.units??line?.totalUnits??(Number(line?.packageQty??line?.invoiceQuantity||0)*Number(line?.packSize||1)))||0;if(quantity<=0)continue;totals.set(productId,(totals.get(productId)||0)+quantity)}return totals}
+function invoiceUnits(lines=[]){const totals=new Map();for(const line of lines){const productId=String(line?.productId||'');if(!productId)continue;const packageQuantity=Number(line?.packageQty??line?.invoiceQuantity??0),packSize=Number(line?.packSize??1),quantity=Number(line?.units??line?.totalUnits??(packageQuantity*packSize))||0;if(quantity<=0)continue;totals.set(productId,(totals.get(productId)||0)+quantity)}return totals}
 async function receiveFromInvoice(request,env,actor,body){
   const orderIds=[...new Set((Array.isArray(body.orderIds)?body.orderIds:[]).map(String).filter(Boolean))];
   if(!orderIds.length)throw new HttpError(400,'La factura no tiene un pedido asociado para recepcionar','missing_order');
