@@ -33,7 +33,7 @@ assert.match(professional,/loadProcurementSettings\(false\)/,'master ordering se
 assert.match(nativeCss,/--ios-blue:#007aff/,'native design tokens must use system semantic colors');
 assert.match(nativeCss,/backdrop-filter:saturate\(180%\) blur\(28px\)/,'navigation chrome must use restrained glass');
 assert.match(nativeCss,/prefers-reduced-motion:reduce/,'motion must respect system accessibility');
-assert.match(sw,/nuvasto-v80-native-orders-payments/,'service worker cache must rotate for v80');
+assert.match(sw,/nuvasto-v81-catalog-finance-density/,'service worker cache must rotate for v81');
 assert.match(sw,/design-system-native-v80\.css/,'native design assets must be precached');
 assert.match(sw,/app-master-order\.js/,'master order runtime must be precached');
 
