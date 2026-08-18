@@ -58,7 +58,7 @@ jobs:
           tables=$(sqlite3 /tmp/nuvasto-restore-check.sqlite "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
           if [ "${tables:-0}" -lt 1 ]; then echo '::error::El export no produjo un esquema restaurable'; exit 1; fi
           echo "Restore validation OK · $tables tables"
-      - name: Upload encrypted-at-rest Actions artifact
+      - name: Upload backup artifact
         uses: actions/upload-artifact@v7
         with:
           name: nuvasto-d1-backup-${{ github.run_id }}
