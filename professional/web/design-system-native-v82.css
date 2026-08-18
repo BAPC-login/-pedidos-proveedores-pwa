@@ -1,0 +1,53 @@
+/* Nuvasto native contrast pass v82
+   Dark mode uses iOS semantic colors and never reuses dark brand green as UI state text. */
+html[data-theme=dark]{
+  color-scheme:dark;
+  --ios-blue:#0a84ff!important;--ios-green:#30d158!important;--ios-orange:#ff9f0a!important;--ios-red:#ff453a!important;
+  --ios-bg:#000!important;--ios-secondary-bg:#1c1c1e!important;--ios-tertiary-bg:#2c2c2e!important;
+  --ios-label:#f5f5f7!important;--ios-secondary-label:#aeaeb2!important;--ios-separator:rgba(84,84,88,.68)!important;--ios-fill:rgba(118,118,128,.24)!important;--ios-glass:rgba(22,22,25,.82)!important;
+  --bg:#000!important;--card:#1c1c1e!important;--soft:rgba(118,118,128,.24)!important;--text:#f5f5f7!important;--muted:#aeaeb2!important;--line:rgba(84,84,88,.68)!important;
+  --primary:#0a84ff!important;--primary2:#64d2ff!important;--success:#30d158!important;--warning:#ff9f0a!important;--danger:#ff453a!important;
+}
+@media(prefers-color-scheme:dark){
+  html[data-theme=system]{
+    color-scheme:dark;
+    --ios-blue:#0a84ff!important;--ios-green:#30d158!important;--ios-orange:#ff9f0a!important;--ios-red:#ff453a!important;
+    --ios-bg:#000!important;--ios-secondary-bg:#1c1c1e!important;--ios-tertiary-bg:#2c2c2e!important;
+    --ios-label:#f5f5f7!important;--ios-secondary-label:#aeaeb2!important;--ios-separator:rgba(84,84,88,.68)!important;--ios-fill:rgba(118,118,128,.24)!important;--ios-glass:rgba(22,22,25,.82)!important;
+    --bg:#000!important;--card:#1c1c1e!important;--soft:rgba(118,118,128,.24)!important;--text:#f5f5f7!important;--muted:#aeaeb2!important;--line:rgba(84,84,88,.68)!important;
+    --primary:#0a84ff!important;--primary2:#64d2ff!important;--success:#30d158!important;--warning:#ff9f0a!important;--danger:#ff453a!important;
+  }
+}
+html[data-theme=dark] body,html[data-theme=dark] #appShell{background:#000!important;color:#f5f5f7!important}
+html[data-theme=dark] :is(.bottom-item.active,.nav-item.active){color:#0a84ff!important}
+html[data-theme=dark] .nav-item.active{background:rgba(10,132,255,.14)!important}
+html[data-theme=dark] :is(.btn.primary,#primaryAction){background:#0a84ff!important;color:#fff!important}
+html[data-theme=dark] :is(.v32-chip.ok,.v67-task.ok,.v41-badge.ok,.v30-reconcile-status.ok){color:#30d158!important;background:rgba(48,209,88,.15)!important}
+html[data-theme=dark] :is(.v32-chip.warn,.v67-task.pending,.v41-badge.warn,.v30-reconcile-status.review){color:#ffb340!important;background:rgba(255,159,10,.16)!important}
+html[data-theme=dark] :is(.v67-task.danger,.v41-badge.danger){color:#ff6961!important;background:rgba(255,69,58,.16)!important}
+html[data-theme=dark] :is(.v67-task.ready,.v67-task.optional,.v32-chip.info){color:#c7c7cc!important;background:rgba(118,118,128,.22)!important}
+html[data-theme=dark] :is(.eyebrow,.v32-card-head .eyebrow,.v30-item-card small,.v30-metric small){color:#aeaeb2!important}
+html[data-theme=dark] :is(.v40-chart-line,.v82-chart-line){stroke:#0a84ff!important}
+html[data-theme=dark] :is(.v40-chart-dot,.v82-chart-dot){stroke:#0a84ff!important;fill:#1c1c1e!important}
+html[data-theme=dark] :is(.v40-chart-area,.v82-chart-area){fill:rgba(10,132,255,.12)!important}
+html[data-theme=dark] :is(.v40-bar-track i,.v82-bar-track i){background:#0a84ff!important;background-image:none!important}
+html[data-theme=dark] .v82-flow-track.transferred i{background:#30d158!important}
+html[data-theme=dark] .v82-flow-track.due i{background:#ff9f0a!important}
+html[data-theme=dark] :is(.v32-card,.v30-item-card,.v30-summary-card,.v30-section,.v82-panel,.v82-kpi,.v82-filters){color:#f5f5f7!important}
+html[data-theme=dark] :is(input,select,textarea){color:#f5f5f7!important}
+html[data-theme=dark] ::placeholder{color:#8e8e93!important;opacity:1}
+@media(prefers-color-scheme:dark){
+  html[data-theme=system] :is(.bottom-item.active,.nav-item.active){color:#0a84ff!important}
+  html[data-theme=system] .nav-item.active{background:rgba(10,132,255,.14)!important}
+  html[data-theme=system] :is(.btn.primary,#primaryAction){background:#0a84ff!important;color:#fff!important}
+  html[data-theme=system] :is(.v32-chip.ok,.v67-task.ok,.v41-badge.ok,.v30-reconcile-status.ok){color:#30d158!important;background:rgba(48,209,88,.15)!important}
+  html[data-theme=system] :is(.v32-chip.warn,.v67-task.pending,.v41-badge.warn,.v30-reconcile-status.review){color:#ffb340!important;background:rgba(255,159,10,.16)!important}
+  html[data-theme=system] :is(.v67-task.danger,.v41-badge.danger){color:#ff6961!important;background:rgba(255,69,58,.16)!important}
+  html[data-theme=system] :is(.v67-task.ready,.v67-task.optional,.v32-chip.info){color:#c7c7cc!important;background:rgba(118,118,128,.22)!important}
+  html[data-theme=system] :is(.v40-chart-line,.v82-chart-line){stroke:#0a84ff!important}
+  html[data-theme=system] :is(.v40-chart-dot,.v82-chart-dot){stroke:#0a84ff!important;fill:#1c1c1e!important}
+  html[data-theme=system] :is(.v40-chart-area,.v82-chart-area){fill:rgba(10,132,255,.12)!important}
+  html[data-theme=system] :is(.v40-bar-track i,.v82-bar-track i){background:#0a84ff!important;background-image:none!important}
+  html[data-theme=system] .v82-flow-track.transferred i{background:#30d158!important}
+  html[data-theme=system] .v82-flow-track.due i{background:#ff9f0a!important}
+}
