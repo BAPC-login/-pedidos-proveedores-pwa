@@ -14,7 +14,7 @@ assert.match(procurement,/api\('\/api\/locations'\)/,'procurement setup must loa
 assert.match(procurement,/api\('\/api\/cost-centers'\)/,'procurement setup must load cost centers');
 assert.match(procurement,/api\('\/api\/categories'\)/,'procurement setup must load categories');
 assert.match(procurement,/api\('\/api\/products'\)/,'procurement setup must load products');
-assert.match(procurement,/Guardar recorrido/,'procurement setup must persist warehouse/category/product traversal');
+assert.match(procurement,/Guardar configuración/,'procurement setup must persist warehouse/category/product traversal');
 assert.match(catalog,/supplier/i,'catalog must expose supplier relationships');
 assert.match(master,/Guardar archivo/,'master order must expose a persistent save action');
 console.log('v84 onboarding readiness gate: OK');
