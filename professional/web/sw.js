@@ -1,7 +1,7 @@
 const VERSION='nuvasto-v80-native-orders-payments';
-const CACHE_VERSION='nuvasto-v88-ai-reconciliation-extras';
+const CACHE_VERSION='nuvasto-v89-brand-launch';
 const PREVIOUS_VERSION='nuvasto-v78-invoice-matrix-passkey-ledger';
-const PREVIOUS_CACHE_VERSION='nuvasto-v87-navigation-sessions-master';
+const PREVIOUS_CACHE_VERSION='nuvasto-v88-ai-reconciliation-extras';
 const LEGACY_CACHE_VERSION_V85='nuvasto-v85-self-service-readiness';
 const LEGACY_CACHE_VERSION_V84='nuvasto-v84-professional-readiness';
 const LEGACY_CACHE_VERSION_V83='nuvasto-v83-mobile-auth-invoice';

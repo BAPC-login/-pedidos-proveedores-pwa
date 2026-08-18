@@ -2,17 +2,16 @@
   <title id="title">Nuvasto</title>
   <desc id="desc">Compras claras. Abastecimiento inteligente.</desc>
   <defs>
-    <linearGradient id="g" x1="22" y1="26" x2="270" y2="278" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#2BD6A0"/>
-      <stop offset="0.5" stop-color="#4C43D7"/>
-      <stop offset="1" stop-color="#27166F"/>
+    <linearGradient id="ribbon" x1="184" y1="136" x2="374" y2="370" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#334257"/>
+      <stop offset="1" stop-color="#718198"/>
     </linearGradient>
   </defs>
-  <g transform="translate(14 8) scale(.55)">
-    <path d="M256 42 430 142v228L256 470 82 370V142L256 42Z" fill="none" stroke="url(#g)" stroke-width="28" stroke-linejoin="round"/>
-    <path d="M158 350V166l196 184V166" fill="none" stroke="url(#g)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="m337 166 17-17 17 17-17 17-17-17Z" fill="#2BD6A0"/>
+  <g transform="translate(18 10) scale(.54)">
+    <rect width="512" height="512" rx="116" fill="#0B1220"/>
+    <rect x="142" y="126" width="72" height="260" rx="36" fill="#F5F7FA"/>
+    <path d="M178 126c10 0 19 4 26 11l169 169c7 7 11 16 11 26v54h-66L178 246Z" fill="url(#ribbon)"/>
   </g>
-  <text x="330" y="154" fill="#0B1424" font-family="Inter, SF Pro Display, Segoe UI, Arial, sans-serif" font-size="116" font-weight="800" letter-spacing="-5">Nuvasto</text>
-  <text x="337" y="215" fill="#667085" font-family="Inter, SF Pro Text, Segoe UI, Arial, sans-serif" font-size="27" font-weight="650" letter-spacing="1.2">COMPRAS CLARAS · ABASTECIMIENTO INTELIGENTE</text>
+  <text x="330" y="154" fill="#0B1220" font-family="Inter, SF Pro Display, Segoe UI, Arial, sans-serif" font-size="116" font-weight="800" letter-spacing="-5">Nuvasto</text>
+  <text x="337" y="215" fill="#68768A" font-family="Inter, SF Pro Text, Segoe UI, Arial, sans-serif" font-size="27" font-weight="650" letter-spacing="1.2">COMPRAS CLARAS · ABASTECIMIENTO INTELIGENTE</text>
 </svg>

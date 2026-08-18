@@ -1,7 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
   <title id="title">Nuvasto</title>
   <desc id="desc">Ícono minimalista Nuvasto</desc>
-  <rect width="512" height="512" rx="116" fill="#0B0B0F"/>
-  <path d="M154 350V162c0-13 11-24 24-24 8 0 15 4 20 10l116 151V162c0-13 11-24 24-24s24 11 24 24v188c0 13-11 24-24 24-8 0-15-4-20-10L202 213v137c0 13-11 24-24 24s-24-11-24-24Z" fill="#FFFFFF"/>
-  <circle cx="347" cy="151" r="13" fill="#0A84FF"/>
+  <defs>
+    <linearGradient id="ribbon" x1="184" y1="136" x2="374" y2="370" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#334257"/>
+      <stop offset="1" stop-color="#718198"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="#0B1220"/>
+  <rect x="142" y="126" width="72" height="260" rx="36" fill="#F5F7FA"/>
+  <path d="M178 126c10 0 19 4 26 11l169 169c7 7 11 16 11 26v54h-66L178 246Z" fill="url(#ribbon)"/>
 </svg>

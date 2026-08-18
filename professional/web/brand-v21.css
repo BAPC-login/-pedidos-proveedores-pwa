@@ -1,17 +1,17 @@
 :root{
-  --nuvasto-navy:#08111f;
-  --nuvasto-indigo:#4c43d7;
-  --nuvasto-deep:#27166f;
-  --nuvasto-mint:#2bd6a0;
-  --nuvasto-cloud:#f4f7fb;
-  --primary:#4031b8;
-  --primary2:#178f73;
-  --sidebar:#08111f;
+  --nuvasto-navy:#0b1220;
+  --nuvasto-indigo:#334257;
+  --nuvasto-deep:#172235;
+  --nuvasto-mint:#718198;
+  --nuvasto-cloud:#f5f7fa;
+  --primary:#24344b;
+  --primary2:#60728a;
+  --sidebar:#0b1220;
 }
-html[data-theme=dark]{--primary:#9187ff;--primary2:#35d7a5;--sidebar:#050b14}
-@media(prefers-color-scheme:dark){html[data-theme=system]{--primary:#9187ff;--primary2:#35d7a5;--sidebar:#050b14}}
-.ambient-a{background:radial-gradient(circle,rgba(76,67,215,.72),transparent 70%)}
-.ambient-b{background:radial-gradient(circle,rgba(43,214,160,.46),transparent 70%)}
+html[data-theme=dark]{--primary:#a9b6c9;--primary2:#7f90a8;--sidebar:#070c14}
+@media(prefers-color-scheme:dark){html[data-theme=system]{--primary:#a9b6c9;--primary2:#7f90a8;--sidebar:#070c14}}
+.ambient-a{background:radial-gradient(circle,rgba(73,91,116,.42),transparent 70%)}
+.ambient-b{background:radial-gradient(circle,rgba(124,140,162,.28),transparent 70%)}
 .brand-mark{overflow:visible;background:transparent!important;box-shadow:none!important;border-radius:0!important}
 .brand-mark img{display:block;width:100%;height:100%;object-fit:contain}
 .brand-mark.small img,.brand-mark.tiny img{width:100%;height:100%}
@@ -25,10 +25,63 @@ html[data-theme=dark]{--primary:#9187ff;--primary2:#35d7a5;--sidebar:#050b14}
 .nuvasto-wordmark-copy span{margin-top:2px;color:var(--muted);font-size:8px;font-weight:750;letter-spacing:.12em}
 .sidebar .nuvasto-wordmark-copy span{color:#77859d}
 .auth-copy .eyebrow{color:var(--nuvasto-indigo)}
-.btn.primary,.bottom-create{background:linear-gradient(135deg,var(--nuvasto-deep),var(--nuvasto-indigo) 58%,var(--nuvasto-mint));border-color:transparent}
-.status-dot,.sync-chip i{background:var(--nuvasto-mint)}
-.nuvasto-brand-panel{display:grid;grid-template-columns:96px minmax(0,1fr);gap:18px;align-items:center;padding:18px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,color-mix(in srgb,var(--nuvasto-mint) 8%,var(--card)),color-mix(in srgb,var(--nuvasto-indigo) 8%,var(--card)))}
+.btn.primary,.bottom-create{background:linear-gradient(135deg,var(--nuvasto-deep),var(--nuvasto-indigo) 60%,var(--nuvasto-mint));border-color:transparent}
+.status-dot,.sync-chip i{background:#8292a8}
+.nuvasto-brand-panel{display:grid;grid-template-columns:96px minmax(0,1fr);gap:18px;align-items:center;padding:18px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,color-mix(in srgb,var(--nuvasto-mint) 7%,var(--card)),color-mix(in srgb,var(--nuvasto-indigo) 7%,var(--card)))}
 .nuvasto-brand-panel img{width:96px;height:96px}
 .nuvasto-brand-panel h3{margin:0;font-size:24px;letter-spacing:-.045em}
 .nuvasto-brand-panel p{margin:6px 0 0;color:var(--muted);font-size:10px;line-height:1.55}
-@media(max-width:560px){.nuvasto-brand-panel{grid-template-columns:68px 1fr}.nuvasto-brand-panel img{width:68px;height:68px}.nuvasto-brand-panel h3{font-size:20px}}
+
+/* Launch: reutiliza el startupScreen canónico; no agrega una segunda capa de carga. */
+#startupScreen{
+  position:fixed;inset:0;z-index:10000;display:grid;place-items:center;min-height:100dvh;padding:0;
+  background:#070c14;overflow:hidden;isolation:isolate;
+}
+#startupScreen.hidden:not(.launch-complete){display:grid!important}
+#startupScreen .auth-copy,#startupScreen .auth-card{display:none!important}
+#startupScreen .auth-brand{
+  position:relative;margin:0!important;gap:0;transform:translate3d(0,0,0);
+  animation:nuvastoLaunchLockup 2.8s cubic-bezier(.22,.78,.18,1) both;
+}
+#startupScreen .brand-mark{
+  width:104px;height:104px;flex:0 0 104px;position:relative;z-index:2;transform-origin:center center;
+  filter:drop-shadow(0 18px 38px rgba(0,0,0,.24));
+  animation:nuvastoLaunchMark 2.8s cubic-bezier(.22,.78,.18,1) both;
+}
+#startupScreen .nuvasto-wordmark-copy{
+  width:0;max-width:none;overflow:hidden;opacity:0;white-space:nowrap;margin-left:0;
+  animation:nuvastoLaunchName 2.8s cubic-bezier(.22,.78,.18,1) both;
+}
+#startupScreen .nuvasto-wordmark-copy strong{font-size:0;line-height:1;color:#f5f7fa;letter-spacing:-.055em}
+#startupScreen .nuvasto-wordmark-copy strong::after{content:'uvasto';font-size:46px;font-weight:760;line-height:1;letter-spacing:-.055em}
+#startupScreen .nuvasto-wordmark-copy span{display:none!important}
+#startupScreen.launch-complete{pointer-events:none}
+
+@keyframes nuvastoLaunchLockup{
+  0%,24%{transform:translate3d(0,0,0)}
+  38%,76%{transform:translate3d(-76px,0,0)}
+  100%{transform:translate3d(-76px,0,0)}
+}
+@keyframes nuvastoLaunchMark{
+  0%{opacity:0;transform:scale(.78)}
+  11%{opacity:1;transform:scale(1.045)}
+  20%,76%{opacity:1;transform:scale(1)}
+  84%{opacity:1;transform:scale(1.08)}
+  100%{opacity:1;transform:scale(24)}
+}
+@keyframes nuvastoLaunchName{
+  0%,29%{width:0;margin-left:0;opacity:0;transform:translate3d(-12px,0,0)}
+  43%,72%{width:158px;margin-left:16px;opacity:1;transform:translate3d(0,0,0)}
+  82%{width:158px;margin-left:16px;opacity:0;transform:translate3d(0,0,0)}
+  100%{width:158px;margin-left:16px;opacity:0}
+}
+@media(max-width:560px){
+  .nuvasto-brand-panel{grid-template-columns:68px 1fr}.nuvasto-brand-panel img{width:68px;height:68px}.nuvasto-brand-panel h3{font-size:20px}
+  #startupScreen .brand-mark{width:92px;height:92px;flex-basis:92px}
+  #startupScreen .nuvasto-wordmark-copy strong::after{font-size:40px}
+  @keyframes nuvastoLaunchLockup{0%,24%{transform:translate3d(0,0,0)}38%,76%,100%{transform:translate3d(-67px,0,0)}}
+  @keyframes nuvastoLaunchName{0%,29%{width:0;margin-left:0;opacity:0;transform:translate3d(-10px,0,0)}43%,72%{width:138px;margin-left:14px;opacity:1;transform:translate3d(0,0,0)}82%,100%{width:138px;margin-left:14px;opacity:0;transform:translate3d(0,0,0)}}
+}
+@media(prefers-reduced-motion:reduce){
+  #startupScreen .auth-brand,#startupScreen .brand-mark,#startupScreen .nuvasto-wordmark-copy{animation-duration:.45s!important;animation-timing-function:ease-out!important}
+}

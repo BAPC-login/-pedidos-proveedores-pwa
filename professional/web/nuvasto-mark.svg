@@ -1,14 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
   <title id="title">Nuvasto</title>
-  <desc id="desc">Símbolo N de flujo y abastecimiento</desc>
+  <desc id="desc">Isotipo N minimalista de Nuvasto</desc>
   <defs>
-    <linearGradient id="nuvastoGradient" x1="72" y1="68" x2="442" y2="444" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#2BD6A0"/>
-      <stop offset="0.48" stop-color="#4C43D7"/>
-      <stop offset="1" stop-color="#27166F"/>
+    <linearGradient id="ribbon" x1="184" y1="136" x2="374" y2="370" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#334257"/>
+      <stop offset="1" stop-color="#718198"/>
     </linearGradient>
   </defs>
-  <path d="M256 42 430 142v228L256 470 82 370V142L256 42Z" fill="none" stroke="url(#nuvastoGradient)" stroke-width="28" stroke-linejoin="round"/>
-  <path d="M158 350V166l196 184V166" fill="none" stroke="url(#nuvastoGradient)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="m337 166 17-17 17 17-17 17-17-17Z" fill="#2BD6A0"/>
+  <rect width="512" height="512" rx="116" fill="#0B1220"/>
+  <rect x="142" y="126" width="72" height="260" rx="36" fill="#F5F7FA"/>
+  <path d="M178 126c10 0 19 4 26 11l169 169c7 7 11 16 11 26v54h-66L178 246Z" fill="url(#ribbon)"/>
 </svg>
