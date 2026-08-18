@@ -70,7 +70,11 @@ function normalizedLocationDetails(raw = {}, previous = {}) {
     city: text(raw.city ?? previous.city, 120),
     phone: text(raw.phone ?? previous.phone, 80),
     email: text(raw.email ?? previous.email, 180),
-    contactName: text(raw.contactName ?? previous.contactName, 160)
+    contactName: text(raw.contactName ?? previous.contactName, 160),
+    logoKey: text(raw.logoKey ?? previous.logoKey, 900),
+    logoName: text(raw.logoName ?? previous.logoName, 240),
+    logoWidth: Math.max(0, Math.min(10000, Number(raw.logoWidth ?? previous.logoWidth ?? 0) || 0)),
+    logoHeight: Math.max(0, Math.min(10000, Number(raw.logoHeight ?? previous.logoHeight ?? 0) || 0))
   };
 }
 
@@ -126,16 +130,24 @@ function normalizedProcurement(raw = {}, previous = {}) {
   return {costCenters};
 }
 
-async function verifyLogo(env, actor, logoKey) {
+async function verifyStoredLogo(env, actor, logoKey, purpose, label) {
   if (!logoKey) return;
   const record = await env.DB.prepare(`
     SELECT storage_key, content_type FROM files
-    WHERE org_id = ? AND storage_key = ? AND purpose = 'brand-logo'
-  `).bind(actor.orgId, logoKey).first();
-  if (!record) throw new HttpError(400, 'El logo seleccionado no pertenece a esta marca', 'invalid_logo');
+    WHERE org_id = ? AND storage_key = ? AND purpose = ?
+  `).bind(actor.orgId, logoKey, purpose).first();
+  if (!record) throw new HttpError(400, `El logo seleccionado no pertenece a ${label}`, 'invalid_logo');
   if (!String(record.content_type || '').startsWith('image/')) {
     throw new HttpError(400, 'El archivo seleccionado no es una imagen', 'invalid_logo_type');
   }
+}
+
+async function verifyLogo(env, actor, logoKey) {
+  return verifyStoredLogo(env, actor, logoKey, 'brand-logo', 'esta empresa');
+}
+
+async function verifyLocationLogo(env, actor, logoKey) {
+  return verifyStoredLogo(env, actor, logoKey, 'location-logo', 'este local');
 }
 
 export async function getSettings(env, actor) {
@@ -156,7 +168,7 @@ export async function getSettings(env, actor) {
       name: location.name,
       code: location.code,
       timezone: location.timezone,
-      details: safeJson(location.details_json, {})
+      details: normalizedLocationDetails(safeJson(location.details_json, {}))
     }));
   return {
     organization: {
@@ -206,6 +218,7 @@ export async function updateSettings(request, env, actor) {
       .bind(locationId, actor.orgId).first();
     if (!location) throw new HttpError(404, 'Local no encontrado', 'not_found');
     const details = normalizedLocationDetails(body.location.details || {}, safeJson(location.details_json, {}));
+    await verifyLocationLogo(env, actor, details.logoKey);
     statements.push(env.DB.prepare('UPDATE locations SET details_json = ?, updated_at = ? WHERE id = ? AND org_id = ?')
       .bind(JSON.stringify(details), timestamp, locationId, actor.orgId));
   }
@@ -214,6 +227,7 @@ export async function updateSettings(request, env, actor) {
   await writeAudit(env, actor, request, 'settings.update', 'organization', actor.orgId, {
     locationId: body.location?.id || null,
     logoConfigured: Boolean(branding.logoKey),
+    locationLogoConfigured: Boolean(body.location?.details?.logoKey),
     primaryColor: branding.primaryColor,
     procurementConfigured: Object.keys(procurement.costCenters || {}).length
   });

@@ -5,6 +5,7 @@ import {initializeBrandingFeatures} from './app-branding.js';
 import {initializeOrderCore} from './app-order-core.js';
 import {initializeOrderSelection} from './app-order-selection.js';
 import {initializeCompanyLogoUploader} from './app-company-logo.js';
+import {initializeLocationIdentity} from './app-location-identity.js';
 import {initializeProcurementSettings} from './app-procurement-settings.js';
 import {initializeProcurementEntry} from './app-procurement-entry.js';
 import {initializeFileActions} from './app-file-actions.js';
@@ -31,6 +32,7 @@ export function initializePlatform(){
   initializeOrderCore();
   initializeOrderSelection();
   initializeCompanyLogoUploader();
+  initializeLocationIdentity();
   initializeFileActions();
   initializeSettingsPanelsV13();
   initializeTelemetryV13();
