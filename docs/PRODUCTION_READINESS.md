@@ -59,6 +59,8 @@ SLO inicial:
 
 `window.NuvastoTelemetry.requestBudget()` expone p50, p95, tasa de error, consumo diario y estado SLO para diagnóstico.
 
+El workflow `.github/workflows/production-health.yml` revisa producción dos veces por hora y falla si el contrato público de salud deja de cumplir almacenamiento, runtime, biometría, matriz de factura, pagos o cierre, o si la consulta de salud supera 5 segundos.
+
 ## 5. Matriz de dispositivos obligatoria
 
 Los tests automáticos no reemplazan una prueba física. Antes de declarar una release comercial debe probarse como mínimo:
@@ -85,11 +87,14 @@ Resultado esperado: cero controles bajo barra de estado/home indicator, cero scr
 
 ## 7. Recuperación e incidentes
 
-Antes de vender con compromiso de continuidad deben existir y probarse:
+El workflow `.github/workflows/d1-backup.yml` deja preparado el backup remoto de D1, una validación de restauración sobre una base SQLite desechable y conservación del export como artifact durante 30 días. Para activar la ejecución diaria se debe configurar una única variable de repositorio: `NUVASTO_D1_DATABASE`, con el nombre exacto de la base D1 de producción. El token de Cloudflare ya es el mismo secreto utilizado por el deploy.
 
-- export/backup D1 programado;
+No se intenta restaurar automáticamente sobre producción: un restore real siempre debe ser una acción deliberada y revisada.
+
+Antes de vender con compromiso de continuidad deben existir y probarse además:
+
 - política de versionado/retención de R2;
-- ejercicio de restauración trimestral;
+- ejercicio de restauración trimestral usando un backup real;
 - registro de incidentes con hora de detección, alcance, mitigación y causa raíz;
 - severidad P1: datos cruzados, corrupción o indisponibilidad total;
 - severidad P2: módulo crítico inutilizable;
