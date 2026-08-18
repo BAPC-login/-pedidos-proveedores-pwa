@@ -12,6 +12,7 @@ const financeDashboard=read('worker/src/api/dashboard-finance-v81.js');
 const procurementWorker=read('worker/src/worker-procurement.js');
 const catalogRoutes=read('worker/src/routes/catalog.js');
 const procurementRoutes=read('worker/src/routes/procurement.js');
+const combined=read('../worker/src/combined.js');
 
 assert.match(catalog,/const LIST_PAGE=48,MOBILE_PAGE=28,MATRIX_PRODUCTS=32,MATRIX_SUPPLIERS=36/,'catalog must bound mounted products and supplier matrix size');
 assert.match(catalog,/IntersectionObserver/,'catalog images must hydrate on demand');
@@ -37,6 +38,9 @@ assert.match(financeDashboard,/next60Days/,'finance dashboard must expose upcomi
 assert.match(procurementRoutes,/dashboard-finance/,'finance dashboard must route through procurement domain');
 assert.match(procurementWorker,/manualPriceIntegrityV81:true/,'procurement health must expose price integrity contract');
 assert.match(procurementWorker,/catalogMemorySafetyV81:true/,'procurement health must expose catalog memory safety contract');
+assert.match(combined,/async function platformHealthResponse/,'top-level worker must own the public platform health normalization');
+assert.match(combined,/r2Configured=Boolean\(env\.FILES\)/,'public health must read the deployed R2 binding directly');
+assert.match(combined,/financeDashboardV81:true/,'public health must expose the v81 production feature contract');
 
 assert.match(professional,/applyDensityV81/,'canonical professional bootstrap must own compact headers');
 assert.match(professional,/\.v32-head,.v40-dashboard-head/,'compact header styling must cover catalog and dashboard');
