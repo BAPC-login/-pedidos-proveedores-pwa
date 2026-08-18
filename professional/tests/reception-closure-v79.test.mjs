@@ -17,7 +17,7 @@ assert.match(worker,/invoiceRequiredForClosure:false/,'invoice must not gate clo
 assert.match(worker,/paymentRequiredForClosure:false/,'payment must not gate closure');
 assert.match(worker,/FROM receptions WHERE order_id=\? AND org_id=\? AND status='completed'/,'closure must verify a persisted completed reception');
 assert.doesNotMatch(worker,/order\.status\s*!==\s*['"]reconciled['"]/,'closure must never require reconciled status');
-assert.match(worker,/body\.markReceived===true/,'invoice flow must support explicit reception creation');
+assert.match(worker,/body\.markReceived!==true/,'invoice flow must create reception only when explicitly requested');
 assert.match(worker,/createReceptionV13/,'invoice reception must use the canonical reception API');
 
 assert.match(orders,/partially_received:\[\['closed','Cerrar pedido'\]/,'partial reception must be explicitly closable');
@@ -36,7 +36,7 @@ assert.match(invoice,/name="markReceived"/,'invoice UI must keep the explicit re
 assert.match(invoice,/receptionDate/,'invoice UI must let the user choose reception date');
 assert.match(query,/deliveryOutcome.*not_presented/s,'canonical history query must expose no-show outcome');
 assert.match(fallback,/deliveryOutcome.*not_presented/s,'fallback history query must expose no-show outcome');
-assert.match(shell,/design-system-v79\.css/,'v79 presentation system must be loaded by the shell');
-assert.match(sw,/nuvasto-v79-reception-close-ios26/,'service worker cache must rotate for v79');
+assert.match(shell,/design-system-v79\.css/,'v79 presentation system must remain available under the v80 native layer');
+assert.match(sw,/nuvasto-v80-native-orders-payments/,'service worker cache must rotate to the v80 native/payment release');
 
 console.log('reception-closure-v79 contracts: ok');
