@@ -22,6 +22,7 @@ const STATE_REQUIRED={sent:'purchaser',confirmed:'purchaser',cancelled:'purchase
 const day=value=>value?date(value):'Sin fecha';
 const svg=name=>({
   share:'<svg class="v67-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m0 0-4 4m4-4 4 4M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8"/></svg>',
+  preview:'<svg class="v67-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.7 12s3.4-5.8 9.3-5.8 9.3 5.8 9.3 5.8-3.4 5.8-9.3 5.8S2.7 12 2.7 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>',
   more:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg>',
   plus:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
 }[name]||'');
@@ -45,6 +46,7 @@ function injectStyles(){
 .v67-task.optional{color:var(--muted);background:color-mix(in srgb,var(--text) 5%,var(--card))}.v67-task.ready{color:var(--primary);background:color-mix(in srgb,var(--primary) 10%,var(--card))}
 .v67-legacy{display:block;margin-top:4px;color:var(--muted);font-size:10px}.v32-actions .v67-icon-button{display:grid;place-items:center;min-width:44px;padding:0}
 .v32-actions .v67-icon-button svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}.v32-actions .v67-icon-button:disabled{opacity:.45;cursor:default}
+.v32-actions [data-v41-collaboration]{display:none!important}
 .v67-load-more{display:flex;justify-content:center;padding:10px 0 4px}.v67-load-more .btn{min-width:180px}.v32-card-head h3{font-size:17px!important}.v32-card-head p,.v32-metric small,.v32-chip{font-size:12px!important}.v32-metric strong{font-size:15px!important}
 @media(max-width:680px){.v67-bulkbar{grid-template-columns:1fr 1fr}.v67-bulkbar>div{grid-column:1/-1}.v32-metrics{grid-template-columns:1fr 1fr!important}.v32-chips{display:none!important}}
 `;
@@ -65,7 +67,7 @@ function taskMarkup(order){
   if(order.status==='draft')return'';
   if(order.status==='cancelled'&&order.deliveryOutcome==='not_presented')return'<div class="v67-taskline"><span class="v67-task danger">Proveedor no se presentó</span><span class="v67-task optional">Sin recepción</span></div>';
   const invoice=Number(order.invoiceCount||0)>0,reception=hasReception(order),paid=order.paymentState==='paid',overdue=order.paymentState==='overdue',reviewable=invoice&&reception;
-  return`<div class="v67-taskline"><span class="v67-task ${reception?'ok':'pending'}">${reception?'Recepción registrada':'Falta recepción'}</span><span class="v67-task ${invoice?'ok':'optional'}">${invoice?'Factura vinculada':'Factura opcional'}</span>${reviewable?'<span class="v67-task ready">Revisión de diferencias disponible</span>':'<span class="v67-task optional">Conciliación opcional</span>'}${invoice?`<span class="v67-task ${paid?'ok':overdue?'danger':'optional'}">${paid?'Factura pagada':overdue?'Pago vencido':'Pago independiente'}</span>`:''}</div>`;
+  return`<div class="v67-taskline"><span class="v67-task ${reception?'ok':'pending'}">${reception?'Recepción registrada':'Falta recepción'}</span><span class="v67-task ${invoice?'ok':'optional'}">${invoice?'Factura vinculada':'Factura opcional'}</span>${reviewable?'<span class="v67-task ready">Revisión de diferencias disponible</span>':'<span class="v67-task optional">Conciliación opcional</span>'}${invoice?`<span class="v67-task ${paid?'ok':overdue?'danger':'optional'}">${paid?'Factura pagada':overdue?'Pago vencido':'Pago pendiente'}</span>`:''}</div>`;
 }
 function fallbackMeta(orders){return{suppliers:uniq(orders.map(item=>item.supplierId?{id:item.supplierId,name:item.supplierName}:null)),locations:uniq(orders.map(item=>item.locationId?{id:item.locationId,name:item.locationName}:null)),costCenters:uniq(orders.map(item=>item.costCenterId?{id:item.costCenterId,name:item.costCenterName}:null)),brands:[...new Set(orders.flatMap(item=>item.productBrands||[]))].sort((a,b)=>a.localeCompare(b,'es')),categories:uniq(orders.flatMap(item=>item.categories||[]))}}
 function stringOptions(items,selected=''){return`<option value="">Todas</option>${(items||[]).map(item=>`<option value="${esc(item)}" ${item===selected?'selected':''}>${esc(item)}</option>`).join('')}`}
@@ -81,22 +83,37 @@ async function loadOrdersPage(history,filters,cursor=''){
 }
 function transitionOptions(order,cap){return(STATE_ACTIONS[order.status]||[]).filter(([to])=>canTransition(cap.role,to)).map(([to,label])=>[`state:${to}`,`Estado · ${label}`])}
 function actionOptions(order,{history=false,cap={}}={}){
-  if(history)return[['view','Ver detalle'],['documents','Documentos'],['share','Compartir PDF']];
-  if(order.status==='draft')return[['view','Ver pedido'],['edit','Editar'],['emit','Emitir'],['duplicate','Duplicar']];
-  const options=[['view','Ver detalle']];
+  if(history)return[['view','Ver detalle'],['preview','Vista previa PDF'],['documents','Documentos'],['share','Compartir PDF']];
+  if(order.status==='draft')return[['view','Ver pedido'],['edit','Editar'],['preview','Vista previa PDF'],['emit','Emitir'],['duplicate','Duplicar'],['collaboration','Colaboración interna'],['delete-draft','Eliminar borrador']];
+  const options=[['view','Ver detalle'],['preview','Vista previa PDF']];
   if(Number(order.invoiceCount||0)===0&&cap.invoices?.upload)options.push(['invoice','Subir factura']);
   if(!hasReception(order)&&cap.reception?.register)options.push(['receive','Registrar recepción']);
   if(!hasReception(order)&&['requested','approved','sent','confirmed'].includes(order.status)&&canTransition(cap.role,'cancelled'))options.push(['no-show','Proveedor no presentado']);
   if(Number(order.invoiceCount||0)>0&&hasReception(order)&&cap.invoices?.reconcile)options.push(['reconcile','Revisar diferencias']);
-  options.push(['documents','Documentos'],...transitionOptions(order,cap),['share','Compartir PDF']);
+  options.push(['collaboration','Colaboración interna'],['documents','Documentos'],...transitionOptions(order,cap),['share','Compartir PDF']);
   return options;
 }
 function card(order,{selectable=false,history=false,cap={}}={}){
   const info=stateInfo(order),select=selectable?`<label class="v67-order-select"><input type="checkbox" data-v67-select="${esc(order.id)}" aria-label="Seleccionar ${esc(order.supplierName)}"></label>`:'',native=`<label class="v67-order-actions" aria-label="Acciones"><span>${svg('more')}</span><select data-v67-order-actions="${esc(order.id)}" aria-label="Acciones de ${esc(order.supplierName)}"><option value="" selected>Acciones</option>${actionOptions(order,{history,cap}).map(([value,text])=>`<option value="${value}">${text}</option>`).join('')}</select></label>`,primary=history?'Ver detalle':order.status==='draft'?'Editar borrador':'Gestionar pedido',legacy=order.legacyFolio&&order.legacyFolio!==order.folio?`<small class="v67-legacy">Folio anterior: ${esc(order.legacyFolio)}</small>`:'';
-  return`<article class="v32-card ${selectable?'v67-selectable':''}" data-v32-order-card="${esc(order.id)}">${select}<header class="v32-card-head"><div><span class="eyebrow">${esc(order.status==='draft'?'BORRADOR':order.folio)}</span>${legacy}<h3>${esc(order.supplierName)}</h3><p>${esc(order.locationName)} · ${esc(order.costCenterName||'Sin centro')}</p></div><span class="v32-chip ${info.className}">${esc(info.label)}</span></header><div class="v32-metrics"><article class="v32-metric"><strong>${day(order.deliveryDate)}</strong><small>Entrega</small></article><article class="v32-metric"><strong>${Number(order.itemCount||0)}</strong><small>Productos</small></article><article class="v32-metric"><strong>${Number(order.grossTotal||0)>0?money(order.grossTotal):'—'}</strong><small>Estimado</small></article><article class="v32-metric"><strong>${Number(order.invoiceCount||0)>0?money(order.invoicedGrossTotal||0):'—'}</strong><small>Facturado</small></article></div>${taskMarkup(order)}<div class="v32-actions"><button class="btn primary primary-action" data-v32-order-primary="${esc(order.id)}">${primary}</button>${history?`<button class="btn v67-icon-button" data-v32-order-share="${esc(order.id)}" aria-label="Compartir PDF" title="Compartir PDF" disabled>${svg('share')}</button>`:''}${native}</div></article>`;
+  return`<article class="v32-card ${selectable?'v67-selectable':''}" data-v32-order-card="${esc(order.id)}">${select}<header class="v32-card-head"><div><span class="eyebrow">${esc(order.status==='draft'?'BORRADOR':order.folio)}</span>${legacy}<h3>${esc(order.supplierName)}</h3><p>${esc(order.locationName)} · ${esc(order.costCenterName||'Sin centro')}</p></div><span class="v32-chip ${info.className}">${esc(info.label)}</span></header><div class="v32-metrics"><article class="v32-metric"><strong>${day(order.deliveryDate)}</strong><small>Entrega</small></article><article class="v32-metric"><strong>${Number(order.itemCount||0)}</strong><small>Productos</small></article><article class="v32-metric"><strong>${Number(order.grossTotal||0)>0?money(order.grossTotal):'—'}</strong><small>Estimado</small></article><article class="v32-metric"><strong>${Number(order.invoiceCount||0)>0?money(order.invoicedGrossTotal||0):'—'}</strong><small>Facturado</small></article></div>${taskMarkup(order)}<div class="v32-actions"><button class="btn primary primary-action" data-v32-order-primary="${esc(order.id)}">${primary}</button><button class="btn v67-icon-button" data-v32-order-preview="${esc(order.id)}" aria-label="Vista previa PDF" title="Vista previa PDF">${svg('preview')}</button>${history?`<button class="btn v67-icon-button" data-v32-order-share="${esc(order.id)}" aria-label="Compartir PDF" title="Compartir PDF" disabled>${svg('share')}</button>`:''}${native}</div></article>`;
 }
 async function sharePreparedOrders(orders){const prepared=[];for(const order of orders)prepared.push(await prepareOrderShare(order));const files=prepared.map(item=>item.file).filter(Boolean);if(!files.length)throw new Error('No hay PDFs disponibles');if(navigator.share&&(!navigator.canShare||navigator.canShare({files}))){try{await navigator.share({title:`${files.length} pedido${files.length===1?'':'s'}`,files});return}catch(error){if(error?.name==='AbortError')return;throw error}}for(const item of prepared)await shareDocument(item.document.key,item.document.name)}
 function shareOrder(order){if(!order)return;try{const result=sharePreparedOrderNow(order);Promise.resolve(result).catch(error=>{if(error?.name!=='AbortError')toast(error.message,'error')})}catch(error){if(error?.code==='share_not_ready')prepareOrderShare(order).catch(()=>{});toast(error.message,'error')}}
+async function previewOrder(order){
+  if(!order)return;
+  const nativeWindow=window.open('about:blank','_blank');
+  if(nativeWindow){try{nativeWindow.document.title='Preparando pedido…';nativeWindow.document.body.innerHTML='<p style="font:17px -apple-system,BlinkMacSystemFont,sans-serif;padding:24px">Preparando documento…</p>'}catch{}}
+  try{
+    const prepared=await prepareOrderShare(order),url=URL.createObjectURL(prepared.blob);
+    if(nativeWindow)nativeWindow.location.replace(url);else{const link=document.createElement('a');link.href=url;link.target='_blank';link.rel='noopener';document.body.append(link);link.click();link.remove()}
+    setTimeout(()=>URL.revokeObjectURL(url),10*60*1000);
+  }catch(error){try{nativeWindow?.close()}catch{}throw error}
+}
+async function deleteDraft(order){
+  if(!order||order.status!=='draft')throw new Error('Solo los borradores pueden eliminarse. Los pedidos emitidos deben anularse.');
+  if(!confirm(`¿Eliminar el borrador de ${order.supplierName}? Esta acción solo está disponible antes de emitir.`))return;
+  await api(`/api/orders/${encodeURIComponent(order.id)}`,{method:'DELETE'});clearResponseCache();state.cache.orders=[];toast('Borrador eliminado');await openRoute('orders','',{replace:true});
+}
 async function detailAction(id,selector){await openOrderDetail(id);setTimeout(()=>document.querySelector(selector)?.click(),70)}
 async function transitionState(order,to){
   if(!order||!to)return;
@@ -111,7 +128,8 @@ async function markNotPresented(order){
   await api(`/api/orders/${encodeURIComponent(order.id)}/transition`,{method:'POST',json:{status:'cancelled',reason:'Proveedor no presentado · pedido archivado sin recepción'}});
   clearResponseCache();state.cache.orders=[];toast('Pedido archivado como no presentado');await openRoute('history','',{replace:true});
 }
-async function runNativeAction(order,action,{history=false}={}){if(!order||!action)return;if(action==='view')return openOrderDetail(order.id);if(action==='edit')return detailAction(order.id,'#v30EditOrder');if(action==='emit')return detailAction(order.id,'#v30EmitOrder');if(action==='duplicate')return detailAction(order.id,'#v30Duplicate');if(action==='invoice')return detailAction(order.id,'#v30AttachInvoice');if(action==='receive')return detailAction(order.id,'#v30Reception');if(action==='reconcile')return detailAction(order.id,'#v30Reconcile');if(action==='no-show')return markNotPresented(order);if(action==='documents'){if(window.NuvastoMultiInvoice?.open)return window.NuvastoMultiInvoice.open({orderId:order.id,returnToHistory:history});return openOrderDetail(order.id)}if(action==='share')return sharePreparedOrderNow(order);if(action.startsWith('state:'))return transitionState(order,action.slice(6))}
+async function collaboration(order){const button=document.querySelector(`[data-v41-collaboration="${CSS.escape(String(order?.id||''))}"]`);if(button)return button.click();return openOrderDetail(order.id)}
+async function runNativeAction(order,action,{history=false}={}){if(!order||!action)return;if(action==='view')return openOrderDetail(order.id);if(action==='edit')return detailAction(order.id,'#v30EditOrder');if(action==='preview')return previewOrder(order);if(action==='emit')return detailAction(order.id,'#v30EmitOrder');if(action==='duplicate')return detailAction(order.id,'#v30Duplicate');if(action==='delete-draft')return deleteDraft(order);if(action==='collaboration')return collaboration(order);if(action==='invoice')return detailAction(order.id,'#v30AttachInvoice');if(action==='receive')return detailAction(order.id,'#v30Reception');if(action==='reconcile')return detailAction(order.id,'#v30Reconcile');if(action==='no-show')return markNotPresented(order);if(action==='documents'){if(window.NuvastoMultiInvoice?.open)return window.NuvastoMultiInvoice.open({orderId:order.id,returnToHistory:history});return openOrderDetail(order.id)}if(action==='share')return sharePreparedOrderNow(order);if(action.startsWith('state:'))return transitionState(order,action.slice(6))}
 
 export async function renderOrdersHistoryV32(mode='orders'){
   injectStyles();const history=mode==='history';state.view=mode;$$('.nav-item[data-view],.bottom-item[data-view]').forEach(button=>button.classList.toggle('active',button.dataset.view===mode));if($('#pageEyebrow'))$('#pageEyebrow').textContent=history?'TRAZABILIDAD':'OPERACIÓN';if($('#pageTitle'))$('#pageTitle').textContent=history?'Historial':'Pedidos';$('#mainContent').innerHTML=`<section class="v32-page">${skeletonCards(4)}</section>`;
@@ -124,6 +142,7 @@ export async function renderOrdersHistoryV32(mode='orders'){
     const bindCards=()=>{
       shareObserver?.disconnect();shareObserver=null;const cards=$$('[data-v32-order-card]');if(cards.length){if('IntersectionObserver'in window){shareObserver=new IntersectionObserver(entries=>{for(const entry of entries){if(!entry.isIntersecting)continue;shareObserver?.unobserve(entry.target);primeOrderShare(orders.find(item=>item.id===entry.target.dataset.v32OrderCard))}},{rootMargin:'700px 0px'});cards.forEach(node=>shareObserver.observe(node))}else cards.slice(0,8).forEach(node=>primeOrderShare(orders.find(item=>item.id===node.dataset.v32OrderCard)))}
       $$('[data-v32-order-share]').forEach(button=>button.onclick=()=>shareOrder(orders.find(item=>item.id===button.dataset.v32OrderShare)));
+      $$('[data-v32-order-preview]').forEach(button=>button.onclick=()=>previewOrder(orders.find(item=>item.id===button.dataset.v32OrderPreview)).catch(error=>toast(error.message,'error')));
       $$('[data-v32-order-primary]').forEach(button=>button.onclick=()=>openOrderDetail(button.dataset.v32OrderPrimary).catch(error=>toast(error.message,'error')));
       $$('[data-v67-order-actions]').forEach(select=>select.onchange=async()=>{const action=select.value;select.value='';if(!action)return;select.disabled=true;try{await runNativeAction(orders.find(item=>item.id===select.dataset.v67OrderActions),action,{history})}catch(error){if(error?.code==='share_not_ready'){const order=orders.find(item=>item.id===select.dataset.v67OrderActions);prepareOrderShare(order).catch(()=>{})}if(error?.name!=='AbortError')toast(error.message,'error')}finally{select.disabled=false}});
       $$('[data-v67-select]').forEach(input=>{input.checked=selected.has(input.dataset.v67Select);input.onchange=()=>{input.checked?selected.add(input.dataset.v67Select):selected.delete(input.dataset.v67Select);updateBulk()}});
