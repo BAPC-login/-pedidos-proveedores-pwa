@@ -14,5 +14,6 @@ import {initializeRuntimeV57 as initializeRuntime} from './app-runtime.js';
 import {initializePaymentWorkflow} from './app-payment-workflow.js';
 import {initializeOrderWorkflow} from './app-order-workflow.js';
 let initialized=false;
-export function initializeProfessional(){if(initialized)return;initialized=true;injectProfessionalStyles();initializeOrdersHistory();initializeCatalog();initializeEnhancements();initializeDocuments();initializePolish();initializeInvoiceReview();initializeEnterprise();initializeProcurement();initializeMasterEditing();initializeReception();initializePaymentWorkflow();initializeOrderWorkflow();initializeRuntime()}
+function loadNativeDesignV80(){if(document.querySelector('link[data-nuvasto-native-v80]'))return;const link=document.createElement('link');link.rel='stylesheet';link.href='./design-system-native-v80.css?v=80';link.dataset.nuvastoNativeV80='1';document.head.append(link)}
+export function initializeProfessional(){if(initialized)return;initialized=true;loadNativeDesignV80();injectProfessionalStyles();initializeOrdersHistory();initializeCatalog();initializeEnhancements();initializeDocuments();initializePolish();initializeInvoiceReview();initializeEnterprise();initializeProcurement();initializeMasterEditing();initializeReception();initializePaymentWorkflow();initializeOrderWorkflow();initializeRuntime()}
 setTimeout(initializeProfessional,120);
