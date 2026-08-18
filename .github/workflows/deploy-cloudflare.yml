@@ -86,7 +86,8 @@ jobs:
           grep -Fq "received:[['closed','Cerrar pedido']]" /tmp/app-orders.js || { echo '::error::recepción no habilita cierre directo'; exit 1; }
           grep -Fq "['delete-draft','Eliminar borrador']" /tmp/app-orders.js || { echo '::error::menú de borrador no permite eliminar borradores'; exit 1; }
           grep -Fq "['preview','Vista previa PDF']" /tmp/app-orders.js || { echo '::error::Pedidos no expone vista previa PDF'; exit 1; }
-          grep -Fq 'openOrderPreview' /tmp/app-orders.js || { echo '::error::vista previa PDF no usa el flujo externo'; exit 1; }
+          grep -Fq 'async function previewOrder(order)' /tmp/app-orders.js || { echo '::error::vista previa PDF no usa el flujo externo'; exit 1; }
+          grep -Fq "window.open('about:blank','_blank')" /tmp/app-orders.js || { echo '::error::vista previa PDF no conserva el gesto nativo del navegador'; exit 1; }
           grep -Fq 'openPaymentDocumentComposer' /tmp/app-payment-workflow.js || { echo '::error::flujo canónico de pagos no está publicado'; exit 1; }
           grep -Fq 'openOrderPaymentHub' /tmp/app-payment-workflow.js || { echo '::error::historial de pagos por pedido no está publicado'; exit 1; }
           grep -Fq 'SERVER_AUTOSAVE_DELAY=1200' /tmp/app-master-order.js || { echo '::error::autosave de Lista Maestra no está publicado'; exit 1; }
