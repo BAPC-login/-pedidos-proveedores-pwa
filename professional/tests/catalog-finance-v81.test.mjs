@@ -47,6 +47,6 @@ assert.match(professional,/\.v32-head,.v40-dashboard-head/,'compact header styli
 assert.match(sw,/nuvasto-v81-catalog-finance-density/,'service worker cache must rotate for v81 assets');
 assert.match(sw,/nuvasto-v80-native-orders-payments/,'v81 cutover must identify the previous v80 cache');
 assert.match(icon,/rx="116"/,'Nuvasto icon must use an iOS-like rounded square');
-assert.match(icon,/#0A84FF/,'Nuvasto icon must retain a restrained iOS accent');
+assert.match(icon,/#718198/,'Nuvasto icon must retain a restrained sober accent');
 
 console.log('catalog finance v81: ok');
