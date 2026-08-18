@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
+const auth=read('worker/src/auth.js');
+const orders=read('worker/src/api/orders-query.js');
+const catalog=read('worker/src/api/catalog-scoped.js');
+const payments=read('worker/src/api/payment-documents.js');
+const router=read('worker/src/router.js');
+
+assert.match(auth,/sessions s[\s\S]+JOIN memberships m ON m\.user_id=s\.user_id AND m\.org_id=s\.org_id/,'session authentication must bind membership to the same organization');
+assert.match(auth,/WHERE m\.org_id=\?/,'user administration must be scoped to actor organization');
+assert.match(auth,/locations WHERE id = \? AND org_id = \?/,'location scope validation must reject cross-organization locations');
+assert.match(orders,/const conditions=\['o\.org_id=\?'\],params=\[actor\.orgId\]/,'order query must begin with organization scope');
+assert.match(orders,/JOIN suppliers s ON s\.id=o\.supplier_id AND s\.org_id=o\.org_id/,'order supplier join must stay tenant-bound');
+assert.match(orders,/WHERE iol\.org_id=\?/,'invoice-order stats must stay tenant-bound');
+assert.match(catalog,/WHERE p\.org_id = \?/,'product listing must be organization-scoped');
+assert.match(catalog,/WHERE pcc\.org_id = \?/,'product cost center links must be organization-scoped');
+assert.match(payments,/payment_methods WHERE id=\? AND org_id=\?/,'payment methods must be tenant-bound');
+assert.match(payments,/invoices WHERE id=\? AND org_id=\?/,'invoice payment lookup must be tenant-bound');
+assert.match(payments,/WHERE pd\.id=\? AND pd\.org_id=\?/,'payment documents must be tenant-bound');
+assert.match(payments,/files WHERE id=\? AND org_id=\?/,'payment proof files must be tenant-bound');
+assert.match(router,/key=`r2\/\$\{actor\.orgId\}\//,'R2 object keys must be namespaced by organization');
+assert.match(router,/customMetadata:\{orgId:actor\.orgId/,'R2 metadata must record organization ownership');
+console.log('v84 tenant isolation gate: OK');
