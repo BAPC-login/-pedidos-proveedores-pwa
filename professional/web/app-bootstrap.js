@@ -10,6 +10,7 @@ import {initializeProcurementEntry} from './app-procurement-entry.js';
 import {initializeFileActions} from './app-file-actions.js';
 import {initializeSettingsPanelsV13} from './app-settings-panels-v13.js';
 import {initializeTelemetryV13} from './app-telemetry-v13.js';
+import {initializeReadinessV85} from './app-readiness-v85.js';
 import {initializeNavigationV14} from './app-navigation-v14.js';
 import {initializeImportPreviewV17} from './app-import-preview-v17.js';
 import {initializeAuthExperience} from './app-auth-experience.js';
@@ -33,6 +34,7 @@ export function initializePlatform(){
   initializeFileActions();
   initializeSettingsPanelsV13();
   initializeTelemetryV13();
+  initializeReadinessV85();
   initializeNavigationV14();
   initializeImportPreviewV17();
   initializeAuthExperience();
