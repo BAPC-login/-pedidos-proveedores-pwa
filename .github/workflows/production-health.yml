@@ -1,0 +1,48 @@
+name: Nuvasto production health
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: nuvasto-production-health
+  cancel-in-progress: true
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify public production health
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://pedidos-pro-ai.botreservasmultilocal.workers.dev'
+          started=$(date +%s%3N)
+          curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/platform/health?monitor=$(date +%s)" -o /tmp/health.json
+          ended=$(date +%s%3N)
+          elapsed=$((ended-started))
+          HEALTH_FILE=/tmp/health.json ELAPSED_MS="$elapsed" node <<'NODE'
+          const fs=require('fs');
+          const h=JSON.parse(fs.readFileSync(process.env.HEALTH_FILE,'utf8'));
+          const required={
+            ok:h.ok===true,
+            r2:h.r2Configured===true&&h.r2Ready===true&&h.storageBackend==='r2',
+            runtime:h.nativePerformanceV45===true&&h.requestCoalescingV45===true&&h.redirectSafeNavigationV50===true,
+            auth:h.passkeyAuthV72===true,
+            invoice:h.adaptiveInvoicePriceMatrixV78===true,
+            payments:h.paymentDocumentsV74===true&&h.paymentLedgerV78===true,
+            closure:h.receptionRequiredForClosure===true&&h.invoiceRequiredForClosure===false&&h.paymentRequiredForClosure===false
+          };
+          const failed=Object.entries(required).filter(([,ok])=>!ok).map(([name])=>name);
+          if(failed.length)throw new Error(`Production health contract failed: ${failed.join(', ')}`);
+          const elapsed=Number(process.env.ELAPSED_MS||0);
+          if(elapsed>5000)throw new Error(`Production health latency ${elapsed}ms exceeds 5000ms monitor budget`);
+          console.log(`Nuvasto production health OK · ${elapsed} ms`);
+          NODE
+      - name: Verify release endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' 'https://pedidos-pro-ai.botreservasmultilocal.workers.dev/platform/release' -o /tmp/release.json
+          node -e "const r=require('/tmp/release.json'); if(!r.release) process.exit(1); console.log('Release',r.release)"

@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const source=fs.readFileSync(new URL('../web/app-telemetry-v13.js',import.meta.url),'utf8');
+assert.match(source,/const P95_WARN_MS=2500/,'client p95 warning budget must stay explicit');
+assert.match(source,/const FAILURE_WARN_RATE=\.03/,'client failure-rate warning budget must stay explicit');
+assert.match(source,/p50Ms:percentile\(value\.samples,\.5\)/,'telemetry must expose p50');
+assert.match(source,/p95Ms:percentile\(value\.samples,\.95\)/,'telemetry must expose p95');
+assert.match(source,/failureRate:/,'telemetry must expose failure rate');
+assert.match(source,/dataset\.performanceSlo/,'DOM must expose current performance SLO state for diagnostics');
+console.log('v84 performance SLO gate: OK');
