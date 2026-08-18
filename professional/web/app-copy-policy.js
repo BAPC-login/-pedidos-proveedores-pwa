@@ -37,7 +37,7 @@ function sanitizeTextElement(node){
   if(/original en R2|\bR2\b/.test(original)){node.textContent=original.replace(/\boriginal en R2\b/ig,'original archivado de forma segura').replace(/\bR2\b/g,'almacenamiento seguro');return}
   if(INTERNAL_TOKEN.test(original)||HTTP_TOKEN.test(original)||ENGLISH_ENGINE.test(original))node.textContent=sanitizeUserMessage(original);
 }
-export function sanitizeUserFacing(root=document){
+export function sanitizeUserFacing(root=typeof document!=='undefined'?document:null){
   if(!root)return;
   const scope=root.nodeType===1?root:root.parentElement;if(!scope)return;
   if(scope.matches?.('.v38-price-breakdown')&&!scope.dataset.copyPolicy)replacePriceBreakdown(scope);
@@ -51,11 +51,12 @@ export function sanitizeUserFacing(root=document){
   scope.querySelectorAll?.('.toast,.v38-progress-card small,.v38-batch-note p,.v30-inline-notice p,.v30-reading-details p').forEach(sanitizeTextElement);
 }
 let scheduled=false,observer=null;
-function schedule(root){if(scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;sanitizeUserFacing(root||document)})}
+function schedule(root){if(scheduled)return;scheduled=true;queueMicrotask(()=>{scheduled=false;sanitizeUserFacing(root||(typeof document!=='undefined'?document:null))})}
 export function initializeCopyPolicy(){
+  if(typeof document==='undefined'||typeof MutationObserver==='undefined')return;
   sanitizeUserFacing(document);
   if(observer||!document.body)return;
   observer=new MutationObserver(records=>{for(const record of records){if(record.type==='characterData')schedule(record.target.parentElement);for(const node of record.addedNodes||[])if(node.nodeType===1)schedule(node)}});
   observer.observe(document.body,{subtree:true,childList:true,characterData:true});
 }
-initializeCopyPolicy();
+if(typeof document!=='undefined')initializeCopyPolicy();
