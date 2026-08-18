@@ -1,3 +1,4 @@
+import './app-copy-policy.js';
 import './app-invoice-entry-v29.js';
 import {initializeScreenState} from './app-screen-state.js';
 import {initializeBrandingFeatures} from './app-branding.js';
