@@ -4,6 +4,8 @@ import {ensureSchema} from './schema.js';
 import {ensureEnterpriseSchemaV41} from './api/schema-v41.js';
 import {ensureProcurementSuiteV44} from './api/schema-v44.js';
 import {updateMasterRecordV44} from './api/master-data-v44.js';
+import {getProductInsightsV81,setManualProductPriceV81,setProductSupplierLinksV81} from './api/product-insights-v81.js';
+import {getFinanceDashboardV81} from './api/dashboard-finance-v81.js';
 import {corsHeaders,errorResponse,ok,routeMatch,securityHeaders,HttpError} from './core.js';
 import {
   assertPermissionV44,bulkMasterDataV44,enqueueJobV44,financePlanningV44,getEffectivePermissionV44,getMasterListAssistV44,globalSearchV44,
@@ -12,9 +14,9 @@ import {
   setFavoriteV44,setMasterDataStatusV44,systemHealthV44,upsertPermissionV44
 } from './api/procurement-os-v44.js';
 
-const VERSION='44';
-const RELEASE_VERSION='2.0.0-alpha.44';
-function decorate(response,request,env){const headers=new Headers(response.headers),origin=request.headers.get('Origin')||'';for(const[name,value]of Object.entries(corsHeaders(origin,env)))headers.set(name,value);for(const[name,value]of Object.entries(securityHeaders()))headers.set(name,value);headers.set('X-Nuvasto-Version',VERSION);headers.set('X-Nuvasto-Procurement-OS','suite-v44');headers.set('X-Nuvasto-Master-Data','lifecycle-v44');headers.set('X-Nuvasto-Observability','jobs-health-v44');headers.set('Access-Control-Allow-Headers','Authorization,Content-Type,Idempotency-Key,X-Bootstrap-Token,X-Pedidos-Client,X-Device-Id,X-Nuvasto-Device');return new Response(response.body,{status:response.status,statusText:response.statusText,headers})}
+const VERSION='81';
+const RELEASE_VERSION='2.0.0-v81';
+function decorate(response,request,env){const headers=new Headers(response.headers),origin=request.headers.get('Origin')||'';for(const[name,value]of Object.entries(corsHeaders(origin,env)))headers.set(name,value);for(const[name,value]of Object.entries(securityHeaders()))headers.set(name,value);headers.set('X-Nuvasto-Version',VERSION);headers.set('X-Nuvasto-Procurement-OS','suite-v44');headers.set('X-Nuvasto-Master-Data','lifecycle-v44');headers.set('X-Nuvasto-Product-Insights','v81');headers.set('X-Nuvasto-Finance-Dashboard','v81');headers.set('X-Nuvasto-Observability','jobs-health-v44');headers.set('Access-Control-Allow-Headers','Authorization,Content-Type,Idempotency-Key,X-Bootstrap-Token,X-Pedidos-Client,X-Device-Id,X-Nuvasto-Device');return new Response(response.body,{status:response.status,statusText:response.statusText,headers})}
 async function prepare(env){await ensureSchema(env);await ensureEnterpriseSchemaV41(env);await ensureProcurementSuiteV44(env)}
 async function auth(request,env){await prepare(env);return authenticate(request,env)}
 async function payload(response){return response.clone().json().catch(()=>({}))}
@@ -23,11 +25,14 @@ function masterRecord(path){const match=path.match(/^\/api\/master-data-v44\/([^
 function permissionUser(path){const match=path.match(/^\/api\/permissions-v44\/([^/]+)$/);return match?decodeURIComponent(match[1]):''}
 function favorite(path){const match=path.match(/^\/api\/master-list-favorites-v44\/([^/]+)$/);return match?decodeURIComponent(match[1]):''}
 function jobAction(path){const match=path.match(/^\/api\/jobs-v44\/([^/]+)\/(retry|run)$/);return match?{id:decodeURIComponent(match[1]),action:match[2]}:null}
+function productInsights(path){const match=path.match(/^\/api\/products\/([^/]+)\/insights$/);return match?decodeURIComponent(match[1]):''}
+function manualPrice(path){const match=path.match(/^\/api\/products\/([^/]+)\/suppliers\/([^/]+)\/manual-price$/);return match?{productId:decodeURIComponent(match[1]),supplierId:decodeURIComponent(match[2])}:null}
+function productSuppliers(path){const match=path.match(/^\/api\/products\/([^/]+)\/suppliers$/);return match?decodeURIComponent(match[1]):''}
 function isCatalogMutation(path,method){if(!['POST','PATCH','PUT','DELETE'].includes(method))return false;return /^\/api\/(products|categories|suppliers|cost-centers|locations)(\/|$)/.test(path)||path.startsWith('/api/catalog/import')}
 async function delegateTracked(request,env,ctx,actor,{jobType,entityType='',entityId=''}){try{const response=await platformWorker.fetch(request,env,ctx);if(response.ok){const body=await payload(response);ctx?.waitUntil?.(recordCompletedJobV44(env,actor,{jobType,entityType,entityId,result:{status:response.status,ok:true,keys:Object.keys(body||{}).slice(0,12)}}).catch(()=>{}))}else ctx?.waitUntil?.(recordFailedJobV44(env,actor,{jobType,entityType,entityId,error:new Error(`HTTP ${response.status}`)}).catch(()=>{}));return response}catch(error){ctx?.waitUntil?.(recordFailedJobV44(env,actor,{jobType,entityType,entityId,error}).catch(()=>{}));throw error}}
 
-export default{async fetch(request,env,ctx){const url=new URL(request.url),method=request.method.toUpperCase(),path=url.pathname,statusMatch=masterStatus(path),recordMatch=masterRecord(path),userId=permissionUser(path),favoriteId=favorite(path),job=jobAction(path),batchEmit=routeMatch(path,'/api/order-batches/:id/emit'),orderReception=routeMatch(path,'/api/orders/:id/receptions'),approval=routeMatch(path,'/api/approvals/:id/resolve');try{
-  if(method==='GET'&&path==='/health'){await prepare(env);const response=await platformWorker.fetch(request,env,ctx),base=await payload(response);return decorate(ok({...base,version:RELEASE_VERSION,procurementOsV44:true,canonicalMasterDataV44:true,masterDataEditingV44:true,masterListAssistV44:true,procurementIntelligenceV44:true,financePlanningV44:true,receptionEvidenceV44:true,granularPermissionsV44:true,jobQueueV44:true,observabilityV44:true,globalSearchV44:true,productionE2EContractV44:true},request,env),request,env)}
+export default{async fetch(request,env,ctx){const url=new URL(request.url),method=request.method.toUpperCase(),path=url.pathname,statusMatch=masterStatus(path),recordMatch=masterRecord(path),userId=permissionUser(path),favoriteId=favorite(path),job=jobAction(path),insightProductId=productInsights(path),manual=manualPrice(path),supplierLinksProductId=productSuppliers(path),batchEmit=routeMatch(path,'/api/order-batches/:id/emit'),orderReception=routeMatch(path,'/api/orders/:id/receptions'),approval=routeMatch(path,'/api/approvals/:id/resolve');try{
+  if(method==='GET'&&path==='/health'){await prepare(env);const response=await platformWorker.fetch(request,env,ctx),base=await payload(response);return decorate(ok({...base,version:RELEASE_VERSION,procurementOsV44:true,canonicalMasterDataV44:true,masterDataEditingV44:true,masterListAssistV44:true,procurementIntelligenceV44:true,financePlanningV44:true,receptionEvidenceV44:true,granularPermissionsV44:true,jobQueueV44:true,observabilityV44:true,globalSearchV44:true,productionE2EContractV44:true,productInsightsV81:true,manualPriceIntegrityV81:true,financeDashboardV81:true,catalogMemorySafetyV81:true},request,env),request,env)}
   if(method==='GET'&&path==='/api/procurement-os-v44/summary'){const actor=await auth(request,env);return decorate(ok({summary:await procurementOsSummaryV44(env,actor)},request,env),request,env)}
   if(method==='GET'&&path==='/api/master-data-v44'){const actor=await auth(request,env);return decorate(ok(await listMasterDataV44(env,actor,url),request,env),request,env)}
   if(statusMatch&&method==='PATCH'){const actor=await auth(request,env);await assertPermissionV44(env,actor,'catalog');return decorate(ok({item:await setMasterDataStatusV44(request,env,actor,statusMatch.entity,statusMatch.id)},request,env),request,env)}
@@ -38,6 +43,10 @@ export default{async fetch(request,env,ctx){const url=new URL(request.url),metho
   if(favoriteId&&method==='PATCH'){const actor=await auth(request,env);return decorate(ok({favorite:await setFavoriteV44(request,env,actor,favoriteId)},request,env),request,env)}
   if(method==='GET'&&path==='/api/procurement-intelligence-v44'){const actor=await auth(request,env);return decorate(ok({intelligence:await procurementIntelligenceV44(env,actor,url)},request,env),request,env)}
   if(method==='GET'&&path==='/api/finance-planning-v44'){const actor=await auth(request,env);return decorate(ok({planning:await financePlanningV44(env,actor,url)},request,env),request,env)}
+  if(method==='GET'&&path==='/api/dashboard/finance-v81'){const actor=await auth(request,env);await assertPermissionV44(env,actor,'finance');return decorate(ok({finance:await getFinanceDashboardV81(env,actor,url)},request,env),request,env)}
+  if(insightProductId&&method==='GET'){const actor=await auth(request,env);return decorate(ok({insights:await getProductInsightsV81(env,actor,url,insightProductId)},request,env),request,env)}
+  if(manual&&method==='PUT'){const actor=await auth(request,env);await assertPermissionV44(env,actor,'catalog');return decorate(ok({price:await setManualProductPriceV81(request,env,actor,manual.productId,manual.supplierId)},request,env),request,env)}
+  if(supplierLinksProductId&&method==='PUT'){const actor=await auth(request,env);await assertPermissionV44(env,actor,'catalog');return decorate(ok(await setProductSupplierLinksV81(request,env,actor,supplierLinksProductId),request,env),request,env)}
   if(method==='GET'&&path==='/api/permissions-v44'){const actor=await auth(request,env);return decorate(ok({permissions:await listPermissionsV44(env,actor)},request,env),request,env)}
   if(userId&&method==='PUT'){const actor=await auth(request,env);return decorate(ok({permission:await upsertPermissionV44(request,env,actor,userId)},request,env),request,env)}
   if(method==='GET'&&path==='/api/my-permissions-v44'){const actor=await auth(request,env);return decorate(ok({permission:await getEffectivePermissionV44(env,actor)},request,env),request,env)}

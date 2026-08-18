@@ -1,17 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
   <title id="title">Nuvasto</title>
-  <defs>
-    <linearGradient id="g" x1="82" y1="76" x2="430" y2="438" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#2BD6A0"/>
-      <stop offset="0.5" stop-color="#6257F2"/>
-      <stop offset="1" stop-color="#31207F"/>
-    </linearGradient>
-    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#000" flood-opacity=".32"/></filter>
-  </defs>
-  <rect width="512" height="512" rx="128" fill="#08111F"/>
-  <g filter="url(#shadow)">
-    <path d="M256 66 408 154v204L256 446 104 358V154L256 66Z" fill="none" stroke="url(#g)" stroke-width="26" stroke-linejoin="round"/>
-    <path d="M168 342V174l176 168V174" fill="none" stroke="url(#g)" stroke-width="50" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="m329 174 15-15 15 15-15 15-15-15Z" fill="#2BD6A0"/>
-  </g>
+  <desc id="desc">Ícono minimalista Nuvasto</desc>
+  <rect width="512" height="512" rx="116" fill="#0B0B0F"/>
+  <path d="M154 350V162c0-13 11-24 24-24 8 0 15 4 20 10l116 151V162c0-13 11-24 24-24s24 11 24 24v188c0 13-11 24-24 24-8 0-15-4-20-10L202 213v137c0 13-11 24-24 24s-24-11-24-24Z" fill="#FFFFFF"/>
+  <circle cx="347" cy="151" r="13" fill="#0A84FF"/>
 </svg>
