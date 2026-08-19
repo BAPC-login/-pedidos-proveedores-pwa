@@ -4,7 +4,8 @@ const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 
 const settings=read('web/app-experience-settings.js');
 const settingsPanels=read('web/app-settings-panels-v13.js');
-const admin=read('web/app-experience-admin.js');
+const navigation=read('web/app-navigation-v14.js');
+const suppliers=read('web/app-suppliers-v94.js');
 const locationIdentity=read('web/app-location-identity.js');
 const settingsApi=read('worker/src/api/settings.js');
 const sessionPolicy=read('worker/src/session-policy-v87.js');
@@ -19,12 +20,15 @@ assert.match(settings,/<h3>Empresa<\/h3>/,'Configuración must expose Empresa');
 assert.match(settings,/<h3>Operación<\/h3>/,'Configuración must expose Operación');
 assert.match(settings,/<h3>Seguridad<\/h3>/,'Configuración must expose Seguridad');
 assert.doesNotMatch(settings,/Catálogo y recorrido|data-procurement-settings/,'procurement traversal must not live inside Configuración');
-assert.match(settings,/data-action=\"new-supplier\"/,'Configuración must restore direct supplier creation');
-assert.match(settings,/data-operations-tab=\"suppliers\"/,'Configuración must link to the canonical supplier manager');
+assert.doesNotMatch(settings,/data-action=\"new-supplier\"/,'supplier creation must live only inside Proveedores');
+assert.doesNotMatch(settings,/data-operations-tab=\"suppliers\"/,'Configuración must not duplicate supplier management');
+assert.match(settings,/data-company-profile-v94/,'Configuración must expose the unified company profile');
 assert.match(settings,/data-location-identity/,'Configuración must expose local logo identity');
-assert.match(settingsPanels,/pdf:openCompanyLogoUploader/,'corporate logo editor must remain canonical');
-assert.match(admin,/data-action=\"new-supplier\"/,'canonical supplier panel must retain create supplier');
-assert.match(admin,/data-supplier-logo=/,'canonical supplier panel must retain supplier logo editing');
+assert.match(settingsPanels,/pdf:openCompanyLogoUploader/,'legacy corporate logo action must remain compatible even though it is no longer a top-level settings card');
+assert.match(navigation,/registerRouteRenderer\('suppliers'/,'Proveedores must own its canonical route');
+assert.match(suppliers,/id=\"newSupplierV94\"/,'canonical supplier workspace must own supplier creation');
+assert.match(suppliers,/supplierProfileLogoFile/,'canonical supplier workspace must own supplier logo editing');
+assert.match(suppliers,/paymentTermType/,'canonical supplier workspace must own agreed payment terms');
 
 assert.match(bootstrap,/initializeLocationIdentity/,'location identity must initialize from canonical bootstrap');
 assert.match(locationIdentity,/purpose:'location-logo'/,'local logos must use a dedicated storage purpose');
@@ -52,4 +56,4 @@ assert.match(procurement,/Unidades por formato/,'format semantics must remain ex
 
 assert.match(sw,/CACHE_VERSION='nuvasto-v\d+-/,'installed PWA cache must remain explicitly versioned');
 assert.match(sw,/app-location-identity\.js/,'local identity must be available to installed PWAs');
-console.log('v87 navigation, sessions and master-order contracts: OK');
+console.log('v87-v94 navigation, sessions and master-order contracts: OK');
