@@ -9,6 +9,12 @@ function decorate(response){
   headers.set('X-Nuvasto-Production-Stability','v91');
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
+async function healthResponse(response,request,env){
+  if(!response.ok)return response;
+  const payload=await response.clone().json().catch(()=>null);
+  if(!payload)return response;
+  return ok({...payload,productionStabilityV91:true,reservedOrdersAdvancedV91:true,transientInvoiceRetryV91:true,verifiedAiUsageV91:true},request,env);
+}
 
 export default{
   async fetch(request,env,ctx){
@@ -21,7 +27,9 @@ export default{
         const actor=await authenticate(request,env);
         return decorate(ok(await listOrdersCanonical(env,actor,url),request,env));
       }
-      return decorate(await legacyWorker.fetch(request,env,ctx));
+      let response=await legacyWorker.fetch(request,env,ctx);
+      if(method==='GET'&&url.pathname==='/health')response=await healthResponse(response,request,env);
+      return decorate(response);
     }catch(error){return decorate(errorResponse(error,request,env))}
   }
 };
