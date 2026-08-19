@@ -59,7 +59,7 @@ assert.match(worker,/extraReceivingV88:true/,'health must expose extra receiving
 assert.match(worker,/noSilentAiAcceptanceV88:true/,'health must expose no-silent-AI policy');
 
 assert.match(payment,/TIMEOUT_MS=24000/,'payment proof AI must use a fast bounded timeout');
-assert.match(payment,/thinkingLevel:'minimal'/,'payment proof extraction must minimize thinking latency');
+assert.match(payment,/thinkingLevel:'minimal'/,'payment extraction must minimize thinking latency');
 assert.match(payment,/evidenceVerified/,'payment extraction must report deterministic evidence completeness');
 assert.match(payment,/Jamás inventes verificadores/,'payment prompt must retain the no-invention rule');
 
@@ -67,9 +67,10 @@ assert.match(mobile,/--nuvasto-safe-top/,'mobile runtime must centralize safe-ar
 assert.match(mobile,/\.topbar\{[^}]*safe-top/s,'top bar must respect device safe area');
 assert.match(mobile,/#modalClose\{[^}]*48px/s,'modal close target must remain reachable and touch-sized');
 assert.match(mobile,/\.bottom-nav\{[^}]*safe-bottom/s,'bottom navigation must respect the home indicator area');
-assert.match(sw,/CACHE_VERSION='nuvasto-v93-branding-launch'/,'v93 must rotate installed PWA assets so existing devices receive branding and launch fixes');
-assert.match(sw,/PREVIOUS_CACHE_VERSION='nuvasto-v91-production-stability'/,'v93 must retain the v91 cache as its direct predecessor');
-assert.match(sw,/LEGACY_CACHE_VERSION_V90='nuvasto-v90-truthful-invoice-transition'/,'v93 must retain the v90 truthful invoice cache lineage');
-assert.match(sw,/LEGACY_CACHE_VERSION_V89='nuvasto-v89-brand-launch'/,'v93 must retain the prior v89 cache lineage');
+assert.match(sw,/CACHE_VERSION='nuvasto-v94-menu-information-architecture'/,'v94 must rotate installed PWA assets for the menu architecture');
+assert.match(sw,/PREVIOUS_CACHE_VERSION='nuvasto-v93-branding-launch'/,'v94 must retain the v93 branding cache as its direct predecessor');
+assert.match(sw,/LEGACY_CACHE_VERSION_V91='nuvasto-v91-production-stability'/,'v94 must retain the v91 stability cache lineage');
+assert.match(sw,/LEGACY_CACHE_VERSION_V90='nuvasto-v90-truthful-invoice-transition'/,'v94 must retain the v90 truthful invoice cache lineage');
+assert.match(sw,/LEGACY_CACHE_VERSION_V89='nuvasto-v89-brand-launch'/,'v94 must retain the prior v89 cache lineage');
 
-console.log('v88/v93 AI reconciliation, truthful review, safe-area and cache contracts: OK');
+console.log('v88/v94 AI reconciliation, truthful review, safe-area and cache contracts: OK');
