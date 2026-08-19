@@ -30,15 +30,14 @@ async function bootstrapWithPropagationRetry(){
 const bootstrap=await bootstrapWithPropagationRetry();
 if(!bootstrap.response.ok&&bootstrap.response.status!==409)throw new Error(`bootstrap DEV ${bootstrap.response.status} · ${bootstrap.payload.error||'request failed'}`);
 
+if(bootstrap.response.status===409){
+  const ensured=await raw('/api/dev/qa/ensure',{method:'POST',headers:{'X-Bootstrap-Token':bootstrapToken},json:{email,password}});
+  if(!ensured.response.ok)throw new Error(`DEV QA ensure ${ensured.response.status} · ${ensured.payload.error||'request failed'}`);
+}
+
 let token=String(bootstrap.payload.token||'');
-async function loginRaw(){return raw('/api/auth/login',{method:'POST',json:{email,password}})}
 if(!token){
-  let login=await loginRaw();
-  if(!login.response.ok&&login.response.status===401){
-    const sync=await raw('/api/dev/qa/sync-identity',{method:'POST',headers:{'X-Bootstrap-Token':bootstrapToken},json:{email,password}});
-    if(!sync.response.ok)throw new Error(`DEV QA identity sync ${sync.response.status} · ${sync.payload.error||'request failed'}`);
-    login=await loginRaw();
-  }
+  const login=await raw('/api/auth/login',{method:'POST',json:{email,password}});
   if(!login.response.ok)throw new Error(`POST /api/auth/login · ${login.response.status} · ${login.payload.error||'request failed'}`);
   token=String(login.payload.token||'');
 }
