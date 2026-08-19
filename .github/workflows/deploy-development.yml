@@ -9,7 +9,7 @@ concurrency: {group: deploy-nuvasto-development, cancel-in-progress: true}
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -40,7 +40,7 @@ jobs:
           wranglerVersion: '4.114.0'
           command: deploy --config wrangler.develop.toml --keep-vars
 
-      - name: Configure optional DEV secrets
+      - name: Configure optional Gemini DEV secret
         id: secrets
         if: steps.deploy.outcome == 'success'
         working-directory: professional
@@ -48,20 +48,13 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}'
           DEV_GEMINI_API_KEY: '${{ secrets.NUVASTO_DEV_GEMINI_API_KEY }}'
-          DEV_BOOTSTRAP_TOKEN: '${{ secrets.NUVASTO_DEV_BOOTSTRAP_TOKEN }}'
         run: |
           set -euo pipefail
           if [ -n "$DEV_GEMINI_API_KEY" ]; then
             printf '%s' "$DEV_GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY --config wrangler.develop.toml
             echo 'Gemini DEV configurado.'
           else
-            echo '::warning::NUVASTO_DEV_GEMINI_API_KEY aún no está configurado. El entorno DEV funcionará, pero el E2E de IA quedará pendiente.'
-          fi
-          if [ -n "$DEV_BOOTSTRAP_TOKEN" ]; then
-            printf '%s' "$DEV_BOOTSTRAP_TOKEN" | npx wrangler secret put BOOTSTRAP_ADMIN_TOKEN --config wrangler.develop.toml
-            echo 'Bootstrap DEV configurado.'
-          else
-            echo '::warning::NUVASTO_DEV_BOOTSTRAP_TOKEN aún no está configurado. La D1 DEV permanecerá sin organización hasta inicializarla.'
+            echo '::warning::NUVASTO_DEV_GEMINI_API_KEY aún no está configurado. El entorno DEV funciona; el E2E de IA real quedará pendiente.'
           fi
 
       - name: Verify development isolation contract
@@ -100,14 +93,47 @@ jobs:
           NODE
           echo "Nuvasto DEV aislado · Worker, D1 y R2 separados de producción."
 
+      - name: Bootstrap and seed DEV QA data
+        id: seed
+        if: steps.verify.outcome == 'success'
+        working-directory: professional
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}'
+          NUVASTO_E2E_PASSWORD: '${{ secrets.NUVASTO_DEV_E2E_PASSWORD }}'
+          NUVASTO_E2E_EMAIL: 'e2e@nuvasto.dev'
+          NUVASTO_BASE_URL: 'https://pedidos-pro-ai-dev.botreservasmultilocal.workers.dev'
+        run: |
+          set -euo pipefail
+          if [ -z "$NUVASTO_E2E_PASSWORD" ]; then
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            echo '::warning::NUVASTO_DEV_E2E_PASSWORD aún no está configurado. DEV está aislado, pero todavía no se inicializa la organización QA.'
+            exit 0
+          fi
+          bootstrap_token=$(openssl rand -hex 32)
+          echo "::add-mask::$bootstrap_token"
+          printf '%s' "$bootstrap_token" | npx wrangler secret put BOOTSTRAP_ADMIN_TOKEN --config wrangler.develop.toml
+          NUVASTO_BOOTSTRAP_TOKEN="$bootstrap_token" node tests/development-seed.mjs
+          echo 'configured=true' >> "$GITHUB_OUTPUT"
+
+      - name: Full authenticated E2E on DEV
+        id: e2e
+        if: steps.seed.outputs.configured == 'true'
+        working-directory: professional
+        env:
+          NUVASTO_BASE_URL: 'https://pedidos-pro-ai-dev.botreservasmultilocal.workers.dev'
+          NUVASTO_E2E_EMAIL: 'e2e@nuvasto.dev'
+          NUVASTO_E2E_PASSWORD: '${{ secrets.NUVASTO_DEV_E2E_PASSWORD }}'
+        run: node tests/production-e2e-v44.mjs
+
       - name: Publish development status on commit
         if: always() && !cancelled()
         shell: bash
         env: {GH_TOKEN: '${{ github.token }}'}
         run: |
-          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ]; then
+          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.seed.outcome }}" != "failure" ] && [ "${{ steps.e2e.outcome }}" != "failure" ]; then
             state=success
-            description='Nuvasto DEV aislado y verificado'
+            if [ "${{ steps.seed.outputs.configured }}" = "true" ]; then description='Nuvasto DEV aislado + E2E autenticado OK'; else description='Nuvasto DEV aislado; falta credencial E2E'; fi
           else
             state=failure
             description='Nuvasto DEV no quedó listo'
