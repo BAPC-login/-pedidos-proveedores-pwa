@@ -7,26 +7,49 @@ const bootstrapToken=String(process.env.NUVASTO_BOOTSTRAP_TOKEN||'');
 const host=new URL(base).hostname;
 
 assert.ok(/pedidos-pro-ai-dev\./.test(host),'development seed refuses to run outside the DEV Worker');
+assert.equal(email,'e2e@nuvasto.dev','development seed only accepts the reserved QA identity');
 if(!password||!bootstrapToken){console.log('development seed NOT CONFIGURED');process.exit(0)}
 
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function raw(path,{method='GET',json,headers={}}={}){
   const response=await fetch(`${base}${path}`,{method,headers:{...(json?{'Content-Type':'application/json'}:{}),...headers},body:json?JSON.stringify(json):undefined});
   const payload=await response.json().catch(()=>({}));
   return {response,payload};
 }
 
-const bootstrap=await raw('/api/bootstrap',{method:'POST',headers:{'X-Bootstrap-Token':bootstrapToken},json:{organizationName:'Nuvasto QA',organizationSlug:'nuvasto-qa',locationName:'Laboratorio',displayName:'Nuvasto E2E',email,password}});
+async function bootstrapWithPropagationRetry(){
+  let result;
+  for(let attempt=1;attempt<=15;attempt++){
+    result=await raw('/api/bootstrap',{method:'POST',headers:{'X-Bootstrap-Token':bootstrapToken},json:{organizationName:'Nuvasto QA',organizationSlug:'nuvasto-qa',locationName:'Laboratorio',displayName:'Nuvasto E2E',email,password}});
+    if(result.response.status!==403)return result;
+    if(attempt<15)await sleep(1000);
+  }
+  return result;
+}
+
+const bootstrap=await bootstrapWithPropagationRetry();
 if(!bootstrap.response.ok&&bootstrap.response.status!==409)throw new Error(`bootstrap DEV ${bootstrap.response.status} · ${bootstrap.payload.error||'request failed'}`);
 
-let token='';
+if(bootstrap.response.status===409){
+  const ensured=await raw('/api/dev/qa/ensure',{method:'POST',headers:{'X-Bootstrap-Token':bootstrapToken},json:{email,password}});
+  if(!ensured.response.ok)throw new Error(`DEV QA ensure ${ensured.response.status} · ${ensured.payload.error||'request failed'}`);
+}
+
+let token=String(bootstrap.payload.token||'');
+if(!token){
+  const login=await raw('/api/auth/login',{method:'POST',json:{email,password}});
+  if(!login.response.ok)throw new Error(`POST /api/auth/login · ${login.response.status} · ${login.payload.error||'request failed'}`);
+  token=String(login.payload.token||'');
+}
+assert.ok(token,'DEV seed login token');
+
 async function call(path,{method='GET',json,headers={}}={}){
-  const response=await fetch(`${base}${path}`,{method,headers:{...(token?{Authorization:`Bearer ${token}`}:{ }),...(json?{'Content-Type':'application/json'}:{}),...headers},body:json?JSON.stringify(json):undefined});
+  const response=await fetch(`${base}${path}`,{method,headers:{Authorization:`Bearer ${token}`,...(json?{'Content-Type':'application/json'}:{}),...headers},body:json?JSON.stringify(json):undefined});
   const payload=await response.json().catch(()=>({}));
   if(!response.ok||payload.ok===false)throw new Error(`${method} ${path} · ${response.status} · ${payload.error||'request failed'}`);
   return payload;
 }
 
-const login=await call('/api/auth/login',{method:'POST',json:{email,password}});token=login.token;assert.ok(token,'DEV seed login token');
 const me=await call('/api/me');assert.equal(me.organization?.name,'Nuvasto QA','seed must remain in QA organization');
 
 const locationsPayload=await call('/api/locations');
