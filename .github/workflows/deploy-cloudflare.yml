@@ -40,7 +40,7 @@ jobs:
           wranglerVersion: '4.114.0'
           command: deploy --config wrangler.toml --keep-vars
 
-      - name: Verify v80 production contract
+      - name: Verify v91 production contract
         id: verify
         shell: bash
         run: |
@@ -61,13 +61,14 @@ jobs:
             const safety=h.issuedOrderDeleteProtectedV80===true&&h.actionablePaymentQueueV80===true&&h.paymentLedgerOrderStateV80===true;
             const finance=h.paymentDocumentsV74===true&&h.collectivePaymentAllocationV74===true&&h.sameSupplierPaymentV74===true&&h.multiInvoicePaymentV74===true&&h.multiOrderPaymentV74===true&&h.paymentProofGeminiV77===true&&h.paymentLedgerV78===true;
             const platform=h.passkeyAuthV72===true&&h.passkeyEnrollmentV78===true&&h.adaptiveInvoicePriceMatrixV78===true&&h.canonicalMasterOrderV71===true&&h.durableMasterDraftV69===true&&h.draftSaveNoFolioLockV69===true;
-            process.stdout.write(storage&&runtime&&migration&&closure&&safety&&finance&&platform?'true':'false');
+            const stability=h.productionStabilityV91===true&&h.reservedOrdersAdvancedV91===true&&h.transientInvoiceRetryV91===true&&h.verifiedAiUsageV91===true;
+            process.stdout.write(storage&&runtime&&migration&&closure&&safety&&finance&&platform&&stability?'true':'false');
           } catch { process.stdout.write('false'); }
           NODE
             )
             if [ "$release" = "$expected" ] && [ "$ready" = "true" ]; then break; fi
             if [ "$attempt" = "24" ]; then
-              echo "::error::Cloudflare no activó el contrato v80 esperado. release=${release:-none} runtime=$ready body=$body"
+              echo "::error::Cloudflare no activó el contrato v91 esperado. release=${release:-none} runtime=$ready body=$body"
               exit 1
             fi
             echo "Esperando despliegue ${attempt}/24 · release=${release:-none} · runtime=$ready"
@@ -75,7 +76,7 @@ jobs:
           done
 
           stamp=$(date +%s)
-          for asset in app.js app-professional.js app-orders.js app-master-order.js app-payment-workflow.js app-order-detail-v30.js design-system-native-v80.css native-performance.css sw.js; do
+          for asset in app.js app-professional.js app-orders.js app-master-order.js app-payment-workflow.js app-file-actions.js app-order-detail-v30.js design-system-native-v80.css native-performance.css sw.js; do
             curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/$asset?v=$stamp" > "/tmp/$asset"
           done
 
@@ -91,10 +92,12 @@ jobs:
           grep -Fq 'openPaymentDocumentComposer' /tmp/app-payment-workflow.js || { echo '::error::flujo canónico de pagos no está publicado'; exit 1; }
           grep -Fq 'openOrderPaymentHub' /tmp/app-payment-workflow.js || { echo '::error::historial de pagos por pedido no está publicado'; exit 1; }
           grep -Fq 'SERVER_AUTOSAVE_DELAY=1200' /tmp/app-master-order.js || { echo '::error::autosave de Lista Maestra no está publicado'; exit 1; }
-          grep -Fq "const VERSION='nuvasto-v80-native-orders-payments'" /tmp/sw.js || { echo '::error::service worker v80 no está activo'; exit 1; }
+          grep -Fq "const CACHE_VERSION='nuvasto-v91-production-stability'" /tmp/sw.js || { echo '::error::service worker v91 no está activo'; exit 1; }
           if grep -Fq "'./app-procurement.js'" /tmp/sw.js; then echo '::error::Service Worker aún precarga bundles no críticos'; exit 1; fi
           grep -Fq 'apiNetworkTimeout' /tmp/sw.js || { echo '::error::timeout API adaptable no está publicado'; exit 1; }
-          echo "Nuvasto v80 · cierre por recepción, folios protegidos, pagos consistentes e interfaz nativa verificados en producción."
+          grep -Fq 'regenerateOrderDocument' /tmp/app-file-actions.js || { echo '::error::recuperación de PDF R2 v91 no está publicada'; exit 1; }
+          grep -Fq 'ensureOrderDocument(order,{force:true})' /tmp/app-file-actions.js || { echo '::error::PDF huérfano no fuerza regeneración'; exit 1; }
+          echo "Nuvasto v91 · rutas reservadas, lectura IA resiliente, cuota verificada y recuperación R2 comprobadas en producción."
 
       - name: Production procurement journey
         id: synthetic
@@ -129,9 +132,9 @@ jobs:
         run: |
           if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.synthetic.outcome }}" != "failure" ]; then
             state=success
-            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto v80 publicado y E2E autenticado OK'; else description='Nuvasto v80 publicado; smoke público verificado'; fi
+            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto v91 publicado y E2E autenticado OK'; else description='Nuvasto v91 publicado; smoke público verificado'; fi
           else
             state=failure
-            description='El despliegue de Nuvasto v80 no quedó verificado'
+            description='El despliegue de Nuvasto v91 no quedó verificado'
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state="$state" -f context='nuvasto/production' -f description="$description" -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
