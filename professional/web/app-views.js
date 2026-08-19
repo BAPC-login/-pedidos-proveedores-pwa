@@ -1,5 +1,7 @@
 import {$,$$,esc,money,date,state,api,isAdmin,initials,roleNames} from './app-core.js';
 import {bindDynamic} from './app-actions.js';
+import {hydrateProtectedImages} from './app-assets-v13.js';
+import {enhanceSettings} from './app-experience-settings.js';
 
 const viewMeta={
   dashboard:['OPERACIÓN','Resumen'],
@@ -252,24 +254,30 @@ async function renderCatalog(){
   bindDynamic();
 }
 
-async function renderSuppliers(){
-  const payload=await api('/api/suppliers');
-  state.cache.suppliers=payload.suppliers;
-  $('#mainContent').innerHTML=`
-    <div class="view-header"><div><h2>Proveedores</h2><p>${payload.suppliers.length} proveedores disponibles para generar pedidos.</p></div><button class="btn primary" data-action="new-supplier">＋ Nuevo proveedor</button></div>
-    <div class="toolbar"><label class="field toolbar-search"><span>Buscar</span><input id="supplierSearch" placeholder="Proveedor o RUT"></label></div>
-    <section class="cards-grid" id="supplierGrid">${supplierCards(payload.suppliers)}</section>`;
-  $('#supplierSearch').oninput=()=>{$('#supplierGrid').innerHTML=supplierCards(state.cache.suppliers.filter(s=>`${s.name} ${s.rut}`.toLowerCase().includes($('#supplierSearch').value.toLowerCase())))};
-  bindDynamic();
+function supplierLogo(supplier,asset={}){
+  return `<span class="entity-logo supplier-entity-logo" data-logo-shell>${asset.logoKey?`<img data-protected-key="${esc(asset.logoKey)}" alt="Logo ${esc(supplier.name)}">`:`<b>${esc(initials(supplier.name))}</b>`}</span>`;
 }
-
-function supplierCards(suppliers){
+function supplierCards(suppliers,assets=[]){
   if(!suppliers.length)return `<div class="panel empty-state"><h3>Sin proveedores</h3><p>Crea uno para poder generar pedidos.</p><button class="btn primary" data-action="new-supplier">＋ Proveedor</button></div>`;
-  return suppliers.map(s=>`<article class="entity-card supplier-card">
-    <div class="entity-head"><span class="entity-logo">${esc(initials(s.name))}</span><span class="status ${s.active?'active':'inactive'}">${s.active?'Activo':'Inactivo'}</span></div>
+  const assetMap=new Map(assets.map(asset=>[asset.supplierId,asset]));
+  return suppliers.map(s=>{const asset=assetMap.get(s.id)||{};return `<article class="entity-card supplier-card">
+    <div class="entity-head">${supplierLogo(s,asset)}<span class="status ${s.active?'active':'inactive'}">${s.active?'Activo':'Inactivo'}</span></div>
     <h3>${esc(s.name)}</h3><p>${esc(s.contactName||s.email||s.rut||'Sin datos de contacto')}</p>
     <div class="entity-meta"><div><span>Productos</span><strong>${s.productCount}</strong></div><div><span>Entrega</span><strong>${s.leadDays||0} días</strong></div></div>
-  </article>`).join('');
+    <div class="supplier-identity-state"><span>${asset.logoKey?'Logo configurado':'Sin logo configurado'}</span><button class="btn small" type="button" data-operations-tab="suppliers">${asset.logoKey?'Cambiar logo':'Configurar logo'}</button></div>
+  </article>`}).join('');
+}
+async function hydrateSupplierGrid(){await hydrateProtectedImages($('#supplierGrid')||document).catch(()=>{})}
+async function renderSuppliers(){
+  const [payload,assetsPayload]=await Promise.all([api('/api/suppliers'),api('/api/supplier-assets')]);
+  state.cache.suppliers=payload.suppliers;
+  state.cache.supplierAssets=assetsPayload.assets||[];
+  $('#mainContent').innerHTML=`
+    <div class="view-header"><div><h2>Proveedores</h2><p>${payload.suppliers.length} proveedores disponibles para generar pedidos.</p></div><div class="view-actions"><button class="btn" type="button" data-operations-tab="suppliers">Identidad y logos</button><button class="btn primary" data-action="new-supplier">＋ Nuevo proveedor</button></div></div>
+    <div class="toolbar"><label class="field toolbar-search"><span>Buscar</span><input id="supplierSearch" placeholder="Proveedor o RUT"></label></div>
+    <section class="cards-grid" id="supplierGrid">${supplierCards(payload.suppliers,state.cache.supplierAssets)}</section>`;
+  $('#supplierSearch').oninput=()=>{const list=state.cache.suppliers.filter(s=>`${s.name} ${s.rut}`.toLowerCase().includes($('#supplierSearch').value.toLowerCase()));$('#supplierGrid').innerHTML=supplierCards(list,state.cache.supplierAssets);bindDynamic();hydrateSupplierGrid()};
+  bindDynamic();await hydrateSupplierGrid();
 }
 
 async function renderTeam(){
@@ -308,46 +316,7 @@ async function renderAudit(){
 }
 
 async function renderSettings(){
-  const platformOwner=Boolean(state.me.user.isPlatformOwner);
-  const requests=[api('/api/locations'),api('/api/cost-centers'),api('/api/sessions')];
-  if(platformOwner)requests.push(api('/api/brands'));
-  const results=await Promise.all(requests);
-  state.cache.locations=results[0].locations;
-  state.cache.costCenters=results[1].costCenters;
-  state.cache.sessions=results[2].sessions;
-  state.cache.brands=platformOwner?results[3].brands:[];
-
-  $('#mainContent').innerHTML=`
-    <div class="view-header">
-      <div><h2>Administración</h2><p>Gestiona marcas, locales, seguridad y sesiones desde un solo lugar.</p></div>
-      <div class="view-actions">${platformOwner?'<button class="btn primary" data-action="new-brand">＋ Marca</button>':''}<button class="btn" data-action="new-location">＋ Local</button></div>
-    </div>
-    ${platformOwner?`<section class="panel">
-      <div class="panel-head"><div><h3>Marcas</h3><small>El selector solo está disponible para el owner principal.</small></div></div>
-      <div class="brand-grid">${state.cache.brands.map(brand=>`<article class="brand-card ${brand.current?'current':''}">
-        <div class="brand-card-head"><span class="entity-logo">${esc(initials(brand.name))}</span><span class="status ${brand.current?'active':''}">${brand.current?'Actual':brand.status}</span></div>
-        <h3>${esc(brand.name)}</h3><p>${brand.locations.map(l=>esc(l.name)).join(', ')||'Sin locales'}</p>
-        <div class="brand-card-foot"><small>${brand.locations.length} local${brand.locations.length===1?'':'es'} · ${esc(brand.plan)}</small>
-        ${brand.current?'':`<button class="btn small" data-switch-brand="${esc(brand.id)}">Cambiar</button>`}</div>
-      </article>`).join('')}</div>
-    </section>`:''}
-    <section class="panel-grid admin-grid">
-      <article class="panel">
-        <div class="panel-head"><div><h3>Locales y centros de costo</h3><small>${state.cache.locations.length} locales activos</small></div><button class="btn small" data-action="new-location">＋ Local</button></div>
-        <div class="location-list">${state.cache.locations.map(location=>`<div class="location-row"><div><strong>${esc(location.name)}</strong><small>${esc(location.code)} · ${esc(location.timezone)}</small></div><div class="chip-row">${state.cache.costCenters.filter(c=>c.locationId===location.id).map(c=>`<span class="cost-chip">${esc(c.name)} · ${c.productCount}</span>`).join('')}</div></div>`).join('')}</div>
-      </article>
-      <article class="panel">
-        <div class="panel-head"><div><h3>Mi cuenta</h3><small>${esc(state.me.user.email)}</small></div></div>
-        <div class="account-summary"><span class="user-avatar large-avatar">${esc(initials(state.me.user.displayName))}</span><div><strong>${esc(state.me.user.displayName)}</strong><p>${esc(roleNames[state.me.user.role]||state.me.user.role)}</p></div></div>
-        <button class="btn wide-action" data-action="change-password">Cambiar mi contraseña</button>
-        ${isAdmin()?'<button class="btn wide-action" data-view-link="team">Administrar usuarios</button>':''}
-      </article>
-    </section>
-    <section class="panel">
-      <div class="panel-head"><div><h3>Sesiones</h3><small>Dispositivos que han iniciado sesión en esta marca.</small></div></div>
-      <div class="session-list">${state.cache.sessions.map(session=>`<div class="session-row"><div><strong>${esc(session.displayName)}</strong><small>${esc(session.userAgent||'Dispositivo')} · ${session.lastSeenAt?date(session.lastSeenAt):'Sin actividad'}</small></div><div>${session.current?'<span class="status active">Actual</span>':session.revokedAt?'<span class="status inactive">Revocada</span>':`<button class="btn small danger" data-revoke-session="${esc(session.id)}">Revocar</button>`}</div></div>`).join('')}</div>
-    </section>`;
-  bindDynamic();
+  await enhanceSettings();
 }
 
 export {navigate};
