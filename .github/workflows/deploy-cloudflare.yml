@@ -99,17 +99,17 @@ jobs:
           grep -Fq 'ensureOrderDocument(order,{force:true})' /tmp/app-file-actions.js || { echo '::error::PDF huérfano no fuerza regeneración'; exit 1; }
           echo "Nuvasto v91 · rutas reservadas, lectura IA resiliente, cuota verificada y recuperación R2 comprobadas en producción."
 
-      - name: Production procurement journey
-        id: synthetic
+      - name: Production authenticated read-only smoke
+        id: authenticated
         if: steps.verify.outcome == 'success'
         working-directory: professional
         env:
           NUVASTO_BASE_URL: https://pedidos-pro-ai.botreservasmultilocal.workers.dev
           NUVASTO_E2E_EMAIL: '${{ secrets.NUVASTO_E2E_EMAIL }}'
           NUVASTO_E2E_PASSWORD: '${{ secrets.NUVASTO_E2E_PASSWORD }}'
-        run: node tests/production-e2e-v44.mjs
+        run: node tests/production-readonly-e2e-v92.mjs
 
-      - name: Report authenticated E2E coverage
+      - name: Report authenticated smoke coverage
         id: e2e_coverage
         if: always() && steps.verify.outcome == 'success'
         shell: bash
@@ -119,10 +119,10 @@ jobs:
         run: |
           if [ -n "$E2E_EMAIL" ] && [ -n "$E2E_PASSWORD" ]; then
             echo 'authenticated=true' >> "$GITHUB_OUTPUT"
-            echo 'E2E autenticado configurado.'
+            echo 'Smoke autenticado de solo lectura configurado.'
           else
             echo 'authenticated=false' >> "$GITHUB_OUTPUT"
-            echo '::warning::E2E autenticado no configurado; el smoke público sí fue ejecutado.'
+            echo '::warning::Smoke autenticado no configurado; el contrato público sí fue ejecutado.'
           fi
 
       - name: Publish production status on commit
@@ -130,9 +130,9 @@ jobs:
         shell: bash
         env: {GH_TOKEN: '${{ github.token }}'}
         run: |
-          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.synthetic.outcome }}" != "failure" ]; then
+          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.authenticated.outcome }}" != "failure" ]; then
             state=success
-            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto v91 publicado y E2E autenticado OK'; else description='Nuvasto v91 publicado; smoke público verificado'; fi
+            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto v91 publicado + smoke autenticado de solo lectura OK'; else description='Nuvasto v91 publicado; smoke público verificado'; fi
           else
             state=failure
             description='El despliegue de Nuvasto v91 no quedó verificado'
