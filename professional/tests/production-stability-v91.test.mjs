@@ -12,6 +12,7 @@ const core91=read('worker/src/worker-core-v91.js');
 const invoiceAi=read('worker/src/api/invoice-ai-fast-v88.js');
 const invoice91=read('worker/src/api/invoice-analysis-v91.js');
 const index39=read('worker/src/index-v39.js');
+const orderPdf=read('worker/src/api/order-pdf-v19.js');
 const fileActions=read('web/app-file-actions.js');
 
 assert.match(index40,/worker-core-v91\.js/,'v91 core guard must be active');
@@ -30,6 +31,10 @@ assert.match(invoice91,/ai_document_attempts/,'attempts must be tracked separate
 assert.match(invoice91,/MAX\(quantity-1,0\)/,'degraded reads must not consume the verified-document quota');
 assert.match(invoice91,/usagePolicyV91:'verified-documents-only'/,'usage policy must be explicit');
 
+assert.match(orderPdf,/env\.FILES\.head\(key\)/,'backend must verify that a current R2 PDF still exists');
+assert.match(orderPdf,/metadataValid&&await storedPdfAvailable\(env,latest\)/,'metadata-valid PDFs must also pass physical storage verification');
+assert.match(orderPdf,/order_pdf_missing_regenerated_v91/,'missing physical PDFs must be regenerated and observable');
+assert.match(orderPdf,/return archiveOrderPdf\(env,actor,order\)/,'missing PDFs must create a fresh archived document');
 assert.match(fileActions,/isMissingStoredDocument/,'missing R2 documents must be detected explicitly');
 assert.match(fileActions,/regenerateOrderDocument/,'stale order PDFs must be regenerable');
 assert.match(fileActions,/ensureOrderDocument\(order,\{force:true\}\)/,'regeneration must bypass stale cached keys');
