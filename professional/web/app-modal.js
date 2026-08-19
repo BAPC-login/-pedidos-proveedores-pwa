@@ -1,13 +1,28 @@
 import {$,$$,esc,setBusy,toast} from './app-core.js';
 
 let modalSequence=0;
+const replaceTimers=new WeakMap();
 
 function normalizeModalButtons(frame){
   frame.querySelectorAll('button:not([type])').forEach(button=>{button.type='button'});
 }
 
+function clearReplaceAnimation(dialog){
+  const timer=replaceTimers.get(dialog);if(timer)clearTimeout(timer);replaceTimers.delete(dialog);dialog.classList.remove('modal-replacing');
+}
+
+function animateReplacement(dialog,frame){
+  clearReplaceAnimation(dialog);
+  void frame.offsetWidth;
+  dialog.classList.add('modal-replacing');
+  const finish=event=>{if(event&&event.target!==frame)return;clearReplaceAnimation(dialog);frame.removeEventListener('animationend',finish)};
+  frame.addEventListener('animationend',finish);
+  replaceTimers.set(dialog,setTimeout(()=>finish(),420));
+}
+
 export function closeModal(reason='cancel'){
   const dialog=$('#modal');
+  if(dialog){clearReplaceAnimation(dialog);dialog.classList.remove('invoice-analysis-transition');dialog.removeAttribute('aria-busy')}
   if(dialog?.open)dialog.close(reason);
 }
 
@@ -27,11 +42,8 @@ export function openModal({eyebrow='PEDIDOS PRO',title,subtitle='',body,submitLa
     ${hideSubmit?'':`<button class="btn primary" type="submit" id="modalSubmit">${esc(submitLabel)}</button>`}
   `;
   normalizeModalButtons(frame);
-  if(!dialog.open)dialog.showModal();
-  else{
-    dialog.classList.add('modal-replacing');
-    requestAnimationFrame(()=>dialog.classList.remove('modal-replacing'));
-  }
+  if(!dialog.open){clearReplaceAnimation(dialog);dialog.showModal()}
+  else animateReplacement(dialog,frame);
 
   $$('[data-modal-close]').forEach(button=>button.onclick=()=>closeModal('cancel'));
   if($('#modalClose'))$('#modalClose').onclick=()=>closeModal('cancel');
