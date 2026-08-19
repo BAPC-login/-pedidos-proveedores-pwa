@@ -10,6 +10,7 @@ const verifyWorkflow=fs.readFileSync('../.github/workflows/verify.yml','utf8');
 const destructiveDev=fs.readFileSync('tests/development-e2e-v92.mjs','utf8');
 const aiCanary=fs.readFileSync('tests/development-ai-canary-v92.mjs','utf8');
 const readonlyProd=fs.readFileSync('tests/production-readonly-e2e-v92.mjs','utf8');
+const devSeed=fs.readFileSync('tests/development-seed.mjs','utf8');
 
 assert.match(prod,/name = "pedidos-pro-ai"/,'production Worker name must stay canonical');
 assert.match(prod,/ENVIRONMENT = "production"/,'production environment must stay production');
@@ -26,6 +27,11 @@ assert.doesNotMatch(dev,/bucket_name = "nuvasto-files"/,'development must never 
 
 assert.match(worker,/environment,developmentEnvironment:environment==='development'/,'health must expose the runtime environment');
 assert.match(worker,/url\.pathname==='\/platform\/health'/,'platform health must be environment-aware');
+assert.match(worker,/url\.pathname==='\/api\/dev\/qa\/sync-identity'/,'QA identity sync must be an explicit DEV maintenance route');
+assert.match(worker,/runtimeEnvironment\(env\)!=='development'/,'QA identity sync must hard-block production');
+assert.match(worker,/DEV_QA_EMAIL='e2e@nuvasto\.dev'/,'QA identity sync must only allow the reserved E2E user');
+assert.match(worker,/DEV_QA_SLUG='nuvasto-qa'/,'QA identity sync must stay scoped to the QA organization');
+assert.match(devSeed,/\/api\/dev\/qa\/sync-identity/,'DEV seed must rotate the existing QA credential instead of requiring a manual DB reset');
 assert.match(prodWorkflow,/branches: \[main\]/,'production deployment must remain main-only');
 assert.doesNotMatch(prodWorkflow,/branches: \[develop\]/,'production workflow must never deploy develop');
 assert.match(devWorkflow,/branches: \[develop\]/,'development deployment must remain develop-only');
@@ -44,4 +50,4 @@ assert.match(prodWorkflow,/production-readonly-e2e-v92\.mjs/,'production must us
 assert.doesNotMatch(prodWorkflow,/run: node tests\/production-e2e-v44\.mjs/,'production must never execute the destructive legacy E2E');
 for(const forbidden of ['/api/order-batches','/api/invoices','/api/finance/payment-documents','/api/autosave','/receptions'])assert.ok(!readonlyProd.includes(forbidden),`production read-only smoke must not mutate via ${forbidden}`);
 
-console.log('environment isolation: OK · develop is destructive-safe and production smoke is read-only');
+console.log('environment isolation: OK · develop is destructive-safe, QA credential rotation is DEV-only and production smoke is read-only');
