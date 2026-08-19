@@ -67,6 +67,7 @@ assert.match(mobile,/--nuvasto-safe-top/,'mobile runtime must centralize safe-ar
 assert.match(mobile,/\.topbar\{[^}]*safe-top/s,'top bar must respect device safe area');
 assert.match(mobile,/#modalClose\{[^}]*48px/s,'modal close target must remain reachable and touch-sized');
 assert.match(mobile,/\.bottom-nav\{[^}]*safe-bottom/s,'bottom navigation must respect the home indicator area');
-assert.match(sw,/CACHE_VERSION='nuvasto-v88-ai-reconciliation-extras'/,'v88 must rotate installed PWA assets');
+assert.match(sw,/CACHE_VERSION='nuvasto-v90-truthful-invoice-transition'/,'v90 must rotate installed PWA assets so existing devices receive the invoice fixes');
+assert.match(sw,/PREVIOUS_CACHE_VERSION='nuvasto-v89-brand-launch'/,'v90 cache cutover must retain the prior cache lineage');
 
 console.log('v88/v90 AI reconciliation, truthful review and safe-area contracts: OK');
