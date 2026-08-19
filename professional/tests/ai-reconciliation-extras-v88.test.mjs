@@ -67,8 +67,9 @@ assert.match(mobile,/--nuvasto-safe-top/,'mobile runtime must centralize safe-ar
 assert.match(mobile,/\.topbar\{[^}]*safe-top/s,'top bar must respect device safe area');
 assert.match(mobile,/#modalClose\{[^}]*48px/s,'modal close target must remain reachable and touch-sized');
 assert.match(mobile,/\.bottom-nav\{[^}]*safe-bottom/s,'bottom navigation must respect the home indicator area');
-assert.match(sw,/CACHE_VERSION='nuvasto-v91-production-stability'/,'v91 must rotate installed PWA assets so existing devices receive the stability fixes');
-assert.match(sw,/PREVIOUS_CACHE_VERSION='nuvasto-v90-truthful-invoice-transition'/,'v91 cache cutover must retain the v90 cache lineage');
-assert.match(sw,/LEGACY_CACHE_VERSION_V89='nuvasto-v89-brand-launch'/,'v91 must retain the prior v89 cache lineage');
+assert.match(sw,/CACHE_VERSION='nuvasto-v93-branding-launch'/,'v93 must rotate installed PWA assets so existing devices receive branding and launch fixes');
+assert.match(sw,/PREVIOUS_CACHE_VERSION='nuvasto-v91-production-stability'/,'v93 must retain the v91 cache as its direct predecessor');
+assert.match(sw,/LEGACY_CACHE_VERSION_V90='nuvasto-v90-truthful-invoice-transition'/,'v93 must retain the v90 truthful invoice cache lineage');
+assert.match(sw,/LEGACY_CACHE_VERSION_V89='nuvasto-v89-brand-launch'/,'v93 must retain the prior v89 cache lineage');
 
-console.log('v88/v91 AI reconciliation, truthful review and safe-area contracts: OK');
+console.log('v88/v93 AI reconciliation, truthful review, safe-area and cache contracts: OK');
