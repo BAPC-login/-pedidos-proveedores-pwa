@@ -115,7 +115,21 @@ jobs:
           bootstrap_token=$(openssl rand -hex 32)
           echo "::add-mask::$bootstrap_token"
           printf '%s' "$bootstrap_token" | npx wrangler secret put BOOTSTRAP_ADMIN_TOKEN --config wrangler.develop.toml
-          NUVASTO_BOOTSTRAP_TOKEN="$bootstrap_token" node tests/development-seed.mjs
+
+          seeded=false
+          for attempt in $(seq 1 12); do
+            if NUVASTO_BOOTSTRAP_TOKEN="$bootstrap_token" node tests/development-seed.mjs; then
+              seeded=true
+              break
+            fi
+            if [ "$attempt" = "12" ]; then
+              echo '::error::El secreto BOOTSTRAP_ADMIN_TOKEN no quedó activo a tiempo en Nuvasto DEV.'
+              exit 1
+            fi
+            echo "Esperando propagación del secreto DEV ${attempt}/12…"
+            sleep 5
+          done
+          if [ "$seeded" != "true" ]; then exit 1; fi
           echo 'configured=true' >> "$GITHUB_OUTPUT"
 
       - name: Full destructive E2E on isolated DEV only
