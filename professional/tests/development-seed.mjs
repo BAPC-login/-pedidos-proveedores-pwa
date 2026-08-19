@@ -10,13 +10,24 @@ assert.ok(/pedidos-pro-ai-dev\./.test(host),'development seed refuses to run out
 assert.equal(email,'e2e@nuvasto.dev','development seed only accepts the reserved QA identity');
 if(!password||!bootstrapToken){console.log('development seed NOT CONFIGURED');process.exit(0)}
 
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function raw(path,{method='GET',json,headers={}}={}){
   const response=await fetch(`${base}${path}`,{method,headers:{...(json?{'Content-Type':'application/json'}:{}),...headers},body:json?JSON.stringify(json):undefined});
   const payload=await response.json().catch(()=>({}));
   return {response,payload};
 }
 
-const bootstrap=await raw('/api/bootstrap',{method:'POST',headers:{'X-Bootstrap-Token':bootstrapToken},json:{organizationName:'Nuvasto QA',organizationSlug:'nuvasto-qa',locationName:'Laboratorio',displayName:'Nuvasto E2E',email,password}});
+async function bootstrapWithPropagationRetry(){
+  let result;
+  for(let attempt=1;attempt<=15;attempt++){
+    result=await raw('/api/bootstrap',{method:'POST',headers:{'X-Bootstrap-Token':bootstrapToken},json:{organizationName:'Nuvasto QA',organizationSlug:'nuvasto-qa',locationName:'Laboratorio',displayName:'Nuvasto E2E',email,password}});
+    if(result.response.status!==403)return result;
+    if(attempt<15)await sleep(1000);
+  }
+  return result;
+}
+
+const bootstrap=await bootstrapWithPropagationRetry();
 if(!bootstrap.response.ok&&bootstrap.response.status!==409)throw new Error(`bootstrap DEV ${bootstrap.response.status} · ${bootstrap.payload.error||'request failed'}`);
 
 let token=String(bootstrap.payload.token||'');
