@@ -30,6 +30,7 @@ assert.match(screenState,/launchOverlay/,'screen arbitration must preserve the l
 assert.doesNotMatch(brandCss,/scale\(24\)/,'launch animation must never use the previous violent 24x zoom');
 assert.match(brandCss,/nuvastoLaunchFade/,'launch animation must end with a controlled fade');
 assert.match(brandCss,/1\.28s cubic-bezier\(\.16,1,\.3,1\)/,'launch motion must use the smoother cinematic timing');
-assert.match(sw,/CACHE_VERSION='nuvasto-v94-menu-information-architecture'/,'service worker must cut over the v94 menu and branding assets');
+assert.match(sw,/CACHE_VERSION='nuvasto-v95-safe-area-contract'/,'service worker must carry the v94 menu/branding assets through the v95 safe-area shell');
+assert.match(sw,/PREVIOUS_CACHE_VERSION='nuvasto-v94-menu-information-architecture'/,'v95 must preserve v94 as the direct predecessor');
 
-console.log('v94 branding experience: OK · company profile unified · supplier identity stays in Proveedores · launch handoff smooth');
+console.log('v95 branding experience: OK · company profile unified · supplier identity stays in Proveedores · launch handoff smooth');
