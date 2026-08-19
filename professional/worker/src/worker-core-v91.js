@@ -3,6 +3,7 @@ import {authenticate} from './auth.js';
 import {HttpError,errorResponse,nowIso,ok,readJson,uuid} from './core.js';
 import {hashPassword} from './password.js';
 import {listOrdersCanonical} from './api/orders-query.js';
+import {updateSupplier} from './api/catalog.js';
 
 const DEV_QA_EMAIL='e2e@nuvasto.dev';
 const DEV_QA_SLUG='nuvasto-qa';
@@ -19,7 +20,7 @@ async function healthResponse(response,request,env){
   const payload=await response.clone().json().catch(()=>null);
   if(!payload)return response;
   const environment=runtimeEnvironment(env);
-  return ok({...payload,environment,developmentEnvironment:environment==='development',productionStabilityV91:true,reservedOrdersAdvancedV91:true,transientInvoiceRetryV91:true,verifiedAiUsageV91:true},request,env);
+  return ok({...payload,environment,developmentEnvironment:environment==='development',productionStabilityV91:true,reservedOrdersAdvancedV91:true,transientInvoiceRetryV91:true,verifiedAiUsageV91:true,supplierProfileV94:true},request,env);
 }
 function assertDevelopmentBootstrap(request,env){
   if(runtimeEnvironment(env)!=='development')throw new HttpError(404,'Ruta no disponible','not_found');
@@ -60,7 +61,7 @@ async function ensureDevelopmentQaTenant(request,env){
 
 export default{
   async fetch(request,env,ctx){
-    const url=new URL(request.url),method=request.method.toUpperCase();
+    const url=new URL(request.url),method=request.method.toUpperCase(),supplierProfile=url.pathname.match(/^\/api\/suppliers\/([^/]+)$/);
     try{
       // Reserved collection endpoints must be resolved before /api/orders/:id.
       // worker-core.js currently computes routeMatch('/api/orders/:id') first, so
@@ -68,6 +69,13 @@ export default{
       if(method==='GET'&&url.pathname==='/api/orders/advanced'){
         const actor=await authenticate(request,env);
         return decorate(ok(await listOrdersCanonical(env,actor,url),request,env));
+      }
+      // Canonical supplier profile mutation. Identity and payment terms remain on
+      // their own explicit subresources; this exact route only updates general
+      // supplier/commercial fields.
+      if(supplierProfile&&method==='PATCH'){
+        const actor=await authenticate(request,env),supplierId=decodeURIComponent(supplierProfile[1]);
+        return decorate(ok({supplier:await updateSupplier(request,env,actor,supplierId)},request,env));
       }
       // DEV-only QA provisioning. The route is hard-disabled in production and
       // can create/repair only Nuvasto QA + e2e@nuvasto.dev.
