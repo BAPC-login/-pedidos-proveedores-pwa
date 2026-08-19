@@ -83,7 +83,7 @@ assert.ok(multiInvoiceSource.includes('orderId:queue.orderId'),'invoice analysis
 assert.ok(multiInvoiceSource.includes("String(item.folio||'').trim()===candidate"),'order resolver must support current folios such as MDRB00002');
 assert.ok(!multiInvoiceSource.includes('/^[A-Z0-9]+-\\d{6}-\\d{3}$/i'),'invoice entry must not depend on the retired date-style folio format');
 assert.ok(!multiInvoiceSource.includes("upload.append('orderFile'"),'invoice flow must not re-upload the order PDF when D1 already owns the canonical order context');
-assert.ok(multiInvoiceSource.includes('Precio final impreso · Total x Unidad')&&multiInvoiceSource.includes('incluido flete'),'review UI must explain supplier-printed final-unit provenance');
+assert.ok(multiInvoiceSource.includes('Precio final impreso · Total x Unidad')&&multiInvoiceSource.includes('documento cierra matemáticamente'),'review UI must explain that the printed supplier value is accepted only after deterministic closure');
 assert.ok(multiInvoiceSource.includes('data-printed-final-unit')&&multiInvoiceSource.includes('printedFinalUnitPrice'),'review/save flow must preserve the printed decimal unit price');
 
 console.log('reconciliation + invoice arithmetic regression tests: OK');
