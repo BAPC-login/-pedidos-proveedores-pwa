@@ -128,6 +128,16 @@ jobs:
           NUVASTO_E2E_PASSWORD: '${{ secrets.NUVASTO_DEV_E2E_PASSWORD }}'
         run: node tests/development-e2e-v92.mjs
 
+      - name: Company and supplier branding E2E on DEV
+        id: branding_e2e
+        if: steps.seed.outputs.configured == 'true'
+        working-directory: professional
+        env:
+          NUVASTO_BASE_URL: 'https://pedidos-pro-ai-dev.botreservasmultilocal.workers.dev'
+          NUVASTO_E2E_EMAIL: 'e2e@nuvasto.dev'
+          NUVASTO_E2E_PASSWORD: '${{ secrets.NUVASTO_DEV_E2E_PASSWORD }}'
+        run: node tests/development-branding-e2e-v93.mjs
+
       - name: Real invoice AI canary on DEV
         id: ai_canary
         if: steps.seed.outputs.configured == 'true' && steps.secrets.outputs.configured == 'true'
@@ -143,12 +153,12 @@ jobs:
         shell: bash
         env: {GH_TOKEN: '${{ github.token }}'}
         run: |
-          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.seed.outcome }}" != "failure" ] && [ "${{ steps.e2e.outcome }}" != "failure" ] && [ "${{ steps.ai_canary.outcome }}" != "failure" ]; then
+          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.seed.outcome }}" != "failure" ] && [ "${{ steps.e2e.outcome }}" != "failure" ] && [ "${{ steps.branding_e2e.outcome }}" != "failure" ] && [ "${{ steps.ai_canary.outcome }}" != "failure" ]; then
             state=success
             if [ "${{ steps.seed.outputs.configured }}" = "true" ] && [ "${{ steps.secrets.outputs.configured }}" = "true" ]; then
-              description='Nuvasto DEV aislado + E2E + IA OK'
+              description='Nuvasto DEV · operación + logos + IA OK'
             elif [ "${{ steps.seed.outputs.configured }}" = "true" ]; then
-              description='Nuvasto DEV aislado + E2E OK; falta Gemini DEV'
+              description='Nuvasto DEV · operación + logos OK; falta Gemini DEV'
             else
               description='Nuvasto DEV aislado; falta credencial E2E'
             fi
