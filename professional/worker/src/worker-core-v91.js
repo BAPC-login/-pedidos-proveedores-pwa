@@ -13,7 +13,8 @@ async function healthResponse(response,request,env){
   if(!response.ok)return response;
   const payload=await response.clone().json().catch(()=>null);
   if(!payload)return response;
-  return ok({...payload,productionStabilityV91:true,reservedOrdersAdvancedV91:true,transientInvoiceRetryV91:true,verifiedAiUsageV91:true},request,env);
+  const environment=String(env.ENVIRONMENT||'production').trim().toLowerCase()||'production';
+  return ok({...payload,environment,developmentEnvironment:environment==='development',productionStabilityV91:true,reservedOrdersAdvancedV91:true,transientInvoiceRetryV91:true,verifiedAiUsageV91:true},request,env);
 }
 
 export default{
@@ -28,7 +29,7 @@ export default{
         return decorate(ok(await listOrdersCanonical(env,actor,url),request,env));
       }
       let response=await legacyWorker.fetch(request,env,ctx);
-      if(method==='GET'&&url.pathname==='/health')response=await healthResponse(response,request,env);
+      if(method==='GET'&&(url.pathname==='/health'||url.pathname==='/platform/health'))response=await healthResponse(response,request,env);
       return decorate(response);
     }catch(error){return decorate(errorResponse(error,request,env))}
   }
