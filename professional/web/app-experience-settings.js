@@ -1,5 +1,6 @@
 import {$,esc,state,api,isAdmin} from './app-core.js';
 import {bindDynamic} from './app-actions.js';
+import {protectedAssetUrl} from './app-assets-v13.js';
 
 let busy=false;
 function card(icon,title,description,action,label='Abrir',extra=''){return `<article class="settings-menu-card"><span class="settings-card-icon">${icon}</span><div><h3>${esc(title)}</h3><p>${esc(description)}</p>${extra}</div><button class="btn small" type="button" ${action}>${esc(label)}</button></article>`}
@@ -14,12 +15,14 @@ export async function enhanceSettings(){
     if(state.view!=='settings')return;
     state.cache.locations=locationsData.locations||[];state.cache.costCenters=centersData.costCenters||[];state.cache.sessions=sessionsData.sessions||[];
     const business=settings.organization.business||{},branding=settings.organization.branding||{},alerts=notificationsData.notifications||[],account=accountData.account;
+    const companyLogoUrl=branding.logoKey?await protectedAssetUrl(branding.logoKey):'';
+    if(state.view!=='settings')return;
     $('#mainContent').innerHTML=`<div id="settingsExperienceHub">
       <div class="view-header ops-header"><div><span class="eyebrow">ADMINISTRACIÓN</span><h2>Configuración</h2><p>Empresa, operación y seguridad. El catálogo y su recorrido se administran desde Catálogo, no desde Configuración.</p></div></div>
 
       <section class="settings-section" id="settingsCompany"><div class="settings-section-head"><div><h3>Empresa</h3><p>Identidad corporativa y datos de cada local.</p></div></div><div class="settings-menu-grid">
         ${card('🏢','Datos de la empresa','Razón social, RUT, dirección y contacto.','data-settings-panel="company"','Editar empresa',`<div class="settings-inline-meta"><span>${esc(business.legalName||settings.organization.name)}</span><span>${esc(business.rut||'RUT pendiente')}</span></div>`)}
-        ${card('◈','Logo corporativo y PDF','Carga el logo de empresa y define su tamaño y posición en documentos.','data-settings-panel="pdf"','Editar logo',`<div class="settings-inline-meta"><span>${branding.logoKey?'Logo corporativo cargado':'Sin logo corporativo'}</span><span>${Number(branding.logoSize||42)} mm</span></div>`)}
+        ${card('◈','Logo corporativo y PDF','Carga el logo de empresa y define su tamaño y posición en documentos.','data-settings-panel="pdf"','Editar logo',`<div class="settings-company-logo" data-company-logo-preview>${companyLogoUrl?`<img src="${companyLogoUrl}" alt="Logo de ${esc(settings.organization.name)}">`:'<span>Sin logo corporativo</span>'}</div><div class="settings-inline-meta"><span>${branding.logoKey?'Logo corporativo cargado':'Sin logo corporativo'}</span><span>${Number(branding.logoSize||42)} mm</span></div>`)}
         ${card('⌂','Datos de locales','Dirección, RUT y contacto específico de cada local.','data-settings-panel="locations"','Editar locales',`<div class="settings-inline-meta"><span>${countLabel(state.cache.locations.length,'local','locales')}</span></div>`)}
         ${card('▣','Logos de locales','Carga o reemplaza la identidad visual propia de cada local.','data-location-identity','Editar logos',`<div class="settings-inline-meta"><span>${countLabel(state.cache.locations.length,'local','locales')}</span></div>`)}
         ${card('✺','Apariencia','Colores de la aplicación, tabla y texto al pie.','data-settings-panel="palette"','Editar apariencia',`<div class="settings-palette-preview"><i style="background:${esc(branding.primaryColor||'#6246EA')}"></i><i style="background:${esc(branding.secondaryColor||'#8067FF')}"></i><i style="background:${esc(branding.tableHeaderColor||'#48484C')}"></i></div>`)}
