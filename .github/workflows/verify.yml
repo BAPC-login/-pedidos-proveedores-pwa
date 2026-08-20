@@ -3,9 +3,6 @@ on:
   pull_request:
     branches: [main]
     paths: ['professional/**','worker/**','wrangler.jsonc','.github/workflows/**']
-  push:
-    branches: [develop, 'agent/**']
-    paths: ['professional/**','worker/**','wrangler.jsonc','.github/workflows/**']
   workflow_dispatch:
 permissions:
   contents: read

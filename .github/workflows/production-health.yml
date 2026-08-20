@@ -33,17 +33,18 @@ jobs:
             invoice:h.adaptiveInvoicePriceMatrixV78===true,
             payments:h.paymentDocumentsV74===true&&h.paymentLedgerV78===true,
             closure:h.receptionRequiredForClosure===true&&h.invoiceRequiredForClosure===false&&h.paymentRequiredForClosure===false,
-            stabilityV91:h.productionStabilityV91===true&&h.reservedOrdersAdvancedV91===true&&h.transientInvoiceRetryV91===true&&h.verifiedAiUsageV91===true
+            stability:h.productionStabilityV91===true&&h.reservedOrdersAdvancedV91===true&&h.transientInvoiceRetryV91===true&&h.verifiedAiUsageV91===true
           };
           const failed=Object.entries(required).filter(([,ok])=>!ok).map(([name])=>name);
           if(failed.length)throw new Error(`Production health contract failed: ${failed.join(', ')}`);
           const elapsed=Number(process.env.ELAPSED_MS||0);
           if(elapsed>5000)throw new Error(`Production health latency ${elapsed}ms exceeds 5000ms monitor budget`);
-          console.log(`Nuvasto production health OK · ${elapsed} ms · v91 stability contract active`);
+          console.log(`Nuvasto production health OK · ${elapsed} ms · current capability contract active`);
           NODE
+
       - name: Verify release endpoint
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' 'https://pedidos-pro-ai.botreservasmultilocal.workers.dev/platform/release' -o /tmp/release.json
-          node -e "const r=require('/tmp/release.json'); if(!r.release) process.exit(1); console.log('Release',r.release)"
+          curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' 'https://pedidos-pro-ai.botreservasmultilocal.workers.dev/platform/release?monitor=1' -o /tmp/release.json
+          node -e "const r=require('/tmp/release.json'); if(!r.release) process.exit(1); console.log('Current release',r.release)"

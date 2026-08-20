@@ -2,7 +2,7 @@ name: Deploy Nuvasto development
 on:
   push:
     branches: [develop]
-    paths: ['professional/**','worker/**','wrangler.jsonc','.github/workflows/deploy-development.yml','.github/workflows/verify.yml']
+    paths: ['professional/**','worker/**','wrangler.jsonc','.github/workflows/deploy-development.yml']
   workflow_dispatch:
 permissions: {contents: read, statuses: write}
 concurrency: {group: deploy-nuvasto-development, cancel-in-progress: true}
@@ -21,14 +21,10 @@ jobs:
         run: npm run verify
 
       - name: Confirm Cloudflare deployment credential
-        id: credential
         shell: bash
         env: {CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}'}
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::error::Falta CLOUDFLARE_API_TOKEN"
-            exit 1
-          fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "::error::Falta CLOUDFLARE_API_TOKEN"; exit 1; fi
 
       - name: Deploy isolated Worker, D1 and R2
         id: deploy
@@ -40,7 +36,7 @@ jobs:
           wranglerVersion: '4.114.0'
           command: deploy --config wrangler.develop.toml --keep-vars
 
-      - name: Configure optional Gemini DEV secret
+      - name: Configure Gemini DEV secret
         id: secrets
         if: steps.deploy.outcome == 'success'
         working-directory: professional
@@ -53,47 +49,18 @@ jobs:
           if [ -n "$DEV_GEMINI_API_KEY" ]; then
             printf '%s' "$DEV_GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY --config wrangler.develop.toml
             echo 'configured=true' >> "$GITHUB_OUTPUT"
-            echo 'Gemini DEV configurado.'
           else
             echo 'configured=false' >> "$GITHUB_OUTPUT"
-            echo '::warning::NUVASTO_DEV_GEMINI_API_KEY aún no está configurado. El entorno DEV funciona; el canary real de IA quedará pendiente.'
+            echo '::warning::NUVASTO_DEV_GEMINI_API_KEY no está configurado; el canary IA se omitirá.'
           fi
 
-      - name: Verify development isolation contract
+      - name: Verify live current generation
         id: verify
-        shell: bash
-        run: |
-          set -euo pipefail
-          expected=$(node -e "const s=require('fs').readFileSync('worker/src/combined.js','utf8');const m=s.match(/PLATFORM_RELEASE='([^']+)'/);if(!m)process.exit(1);process.stdout.write(m[1])")
-          base='https://pedidos-pro-ai-dev.botreservasmultilocal.workers.dev'
-
-          for attempt in $(seq 1 24); do
-            body=$(curl --fail --silent --show-error --max-time 30 "$base/platform/health?release=$expected&attempt=$attempt" 2>/dev/null || true)
-            ready=$(PLATFORM_HEALTH="$body" node <<'NODE'
-          try {
-            const h=JSON.parse(process.env.PLATFORM_HEALTH||'{}');
-            const environment=h.environment==='development'&&h.developmentEnvironment===true;
-            const stability=h.productionStabilityV91===true&&h.reservedOrdersAdvancedV91===true&&h.transientInvoiceRetryV91===true&&h.verifiedAiUsageV91===true;
-            const storage=h.r2Configured===true&&h.r2Required===true&&h.r2Ready===true&&h.storageBackend==='r2';
-            process.stdout.write(h.ok===true&&environment&&stability&&storage?'true':'false');
-          } catch { process.stdout.write('false'); }
-          NODE
-            )
-            if [ "$ready" = "true" ]; then break; fi
-            if [ "$attempt" = "24" ]; then
-              echo "::error::Nuvasto DEV no activó el contrato aislado esperado. runtime=$ready body=$body"
-              exit 1
-            fi
-            echo "Esperando DEV ${attempt}/24 · runtime=$ready"
-            sleep 10
-          done
-
-          release=$(curl --fail --silent --show-error --max-time 20 "$base/platform/release?ts=$(date +%s)")
-          RELEASE_PAYLOAD="$release" EXPECTED_RELEASE="$expected" node <<'NODE'
-          const p=JSON.parse(process.env.RELEASE_PAYLOAD||'{}');
-          if(p.release!==process.env.EXPECTED_RELEASE){console.error(`release DEV inesperado: ${p.release||'none'}`);process.exit(1)}
-          NODE
-          echo "Nuvasto DEV aislado · Worker, D1 y R2 separados de producción."
+        working-directory: professional
+        env:
+          NUVASTO_BASE_URL: 'https://pedidos-pro-ai-dev.botreservasmultilocal.workers.dev'
+          NUVASTO_EXPECT_ENV: development
+        run: node scripts/verify-live-current.mjs
 
       - name: Bootstrap and seed DEV QA data
         id: seed
@@ -109,14 +76,20 @@ jobs:
           set -euo pipefail
           if [ -z "$NUVASTO_E2E_PASSWORD" ]; then
             echo 'configured=false' >> "$GITHUB_OUTPUT"
-            echo '::warning::NUVASTO_DEV_E2E_PASSWORD aún no está configurado. DEV está aislado, pero todavía no se inicializa la organización QA.'
+            echo '::warning::NUVASTO_DEV_E2E_PASSWORD no está configurado; los E2E autenticados se omitirán.'
             exit 0
           fi
           bootstrap_token=$(openssl rand -hex 32)
           echo "::add-mask::$bootstrap_token"
           printf '%s' "$bootstrap_token" | npx wrangler secret put BOOTSTRAP_ADMIN_TOKEN --config wrangler.develop.toml
-          NUVASTO_BOOTSTRAP_TOKEN="$bootstrap_token" node tests/development-seed.mjs
-          echo 'configured=true' >> "$GITHUB_OUTPUT"
+          for attempt in $(seq 1 12); do
+            if NUVASTO_BOOTSTRAP_TOKEN="$bootstrap_token" node tests/development-seed.mjs; then
+              echo 'configured=true' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$attempt" = "12" ]; then echo '::error::BOOTSTRAP_ADMIN_TOKEN no se propagó a tiempo'; exit 1; fi
+            sleep 5
+          done
 
       - name: Full destructive E2E on isolated DEV only
         id: e2e
@@ -127,6 +100,26 @@ jobs:
           NUVASTO_E2E_EMAIL: 'e2e@nuvasto.dev'
           NUVASTO_E2E_PASSWORD: '${{ secrets.NUVASTO_DEV_E2E_PASSWORD }}'
         run: node tests/development-e2e-v92.mjs
+
+      - name: Company and supplier branding E2E on DEV
+        id: branding_e2e
+        if: steps.seed.outputs.configured == 'true'
+        working-directory: professional
+        env:
+          NUVASTO_BASE_URL: 'https://pedidos-pro-ai-dev.botreservasmultilocal.workers.dev'
+          NUVASTO_E2E_EMAIL: 'e2e@nuvasto.dev'
+          NUVASTO_E2E_PASSWORD: '${{ secrets.NUVASTO_DEV_E2E_PASSWORD }}'
+        run: node tests/development-branding-e2e-v93.mjs
+
+      - name: Supplier profile and payment terms E2E on DEV
+        id: supplier_e2e
+        if: steps.seed.outputs.configured == 'true'
+        working-directory: professional
+        env:
+          NUVASTO_BASE_URL: 'https://pedidos-pro-ai-dev.botreservasmultilocal.workers.dev'
+          NUVASTO_E2E_EMAIL: 'e2e@nuvasto.dev'
+          NUVASTO_E2E_PASSWORD: '${{ secrets.NUVASTO_DEV_E2E_PASSWORD }}'
+        run: node tests/development-supplier-profile-e2e-v94.mjs
 
       - name: Real invoice AI canary on DEV
         id: ai_canary
@@ -143,15 +136,9 @@ jobs:
         shell: bash
         env: {GH_TOKEN: '${{ github.token }}'}
         run: |
-          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.seed.outcome }}" != "failure" ] && [ "${{ steps.e2e.outcome }}" != "failure" ] && [ "${{ steps.ai_canary.outcome }}" != "failure" ]; then
+          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.seed.outcome }}" != "failure" ] && [ "${{ steps.e2e.outcome }}" != "failure" ] && [ "${{ steps.branding_e2e.outcome }}" != "failure" ] && [ "${{ steps.supplier_e2e.outcome }}" != "failure" ] && [ "${{ steps.ai_canary.outcome }}" != "failure" ]; then
             state=success
-            if [ "${{ steps.seed.outputs.configured }}" = "true" ] && [ "${{ steps.secrets.outputs.configured }}" = "true" ]; then
-              description='Nuvasto DEV aislado + E2E + IA OK'
-            elif [ "${{ steps.seed.outputs.configured }}" = "true" ]; then
-              description='Nuvasto DEV aislado + E2E OK; falta Gemini DEV'
-            else
-              description='Nuvasto DEV aislado; falta credencial E2E'
-            fi
+            if [ "${{ steps.seed.outputs.configured }}" = "true" ] && [ "${{ steps.secrets.outputs.configured }}" = "true" ]; then description='Nuvasto DEV · current UI + operación + proveedores + logos + IA OK'; else description='Nuvasto DEV current verificado; cobertura opcional incompleta'; fi
           else
             state=failure
             description='Nuvasto DEV no quedó listo'

@@ -21,14 +21,10 @@ jobs:
         run: npm run verify
 
       - name: Confirm Cloudflare deployment credential
-        id: credential
         shell: bash
         env: {CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}'}
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::error::Falta CLOUDFLARE_API_TOKEN"
-            exit 1
-          fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "::error::Falta CLOUDFLARE_API_TOKEN"; exit 1; fi
 
       - name: Deploy Worker, assets, D1 and R2 bindings
         id: deploy
@@ -40,71 +36,20 @@ jobs:
           wranglerVersion: '4.114.0'
           command: deploy --config wrangler.toml --keep-vars
 
-      - name: Verify v91 production contract
+      - name: Verify live current production generation
         id: verify
-        shell: bash
-        run: |
-          set -euo pipefail
-          expected=$(node -e "const s=require('fs').readFileSync('worker/src/combined.js','utf8');const m=s.match(/PLATFORM_RELEASE='([^']+)'/);if(!m)process.exit(1);process.stdout.write(m[1])")
-          base='https://pedidos-pro-ai.botreservasmultilocal.workers.dev'
-
-          for attempt in $(seq 1 24); do
-            body=$(curl --fail --silent --show-error --max-time 30 --dump-header /tmp/headers "$base/platform/health?release=$expected&attempt=$attempt" 2>/dev/null || true)
-            release=$(grep -Ei '^x-nuvasto-release:|^x-pedidos-pro-release:' /tmp/headers 2>/dev/null | head -1 | tr -d '\r' | awk '{print $2}' || true)
-            ready=$(PLATFORM_HEALTH="$body" node <<'NODE'
-          try {
-            const h=JSON.parse(process.env.PLATFORM_HEALTH||'{}');
-            const storage=h.ok===true&&h.r2Configured===true&&h.r2Required===true&&h.r2Ready===true&&h.storageBackend==='r2';
-            const runtime=h.nativePerformanceV45===true&&h.schemaOffCriticalPathV45===true&&h.requestCoalescingV45===true&&h.operationsBootstrapV45===true&&h.directR2StreamingV45===true&&h.redirectSafeNavigationV50===true;
-            const migration=h.folioMigrationV67===true&&Number(h.folioMigrationDetails?.skipped||0)===0&&h.ordersSchemaV67===true&&h.scopedHistoricalFoliosV67===true&&h.cursorOrdersV67===true;
-            const closure=h.reconciliationRequiredForClosure===false&&h.receptionRequiredForClosure===true&&h.invoiceRequiredForClosure===false&&h.paymentRequiredForClosure===false;
-            const safety=h.issuedOrderDeleteProtectedV80===true&&h.actionablePaymentQueueV80===true&&h.paymentLedgerOrderStateV80===true;
-            const finance=h.paymentDocumentsV74===true&&h.collectivePaymentAllocationV74===true&&h.sameSupplierPaymentV74===true&&h.multiInvoicePaymentV74===true&&h.multiOrderPaymentV74===true&&h.paymentProofGeminiV77===true&&h.paymentLedgerV78===true;
-            const platform=h.passkeyAuthV72===true&&h.passkeyEnrollmentV78===true&&h.adaptiveInvoicePriceMatrixV78===true&&h.canonicalMasterOrderV71===true&&h.durableMasterDraftV69===true&&h.draftSaveNoFolioLockV69===true;
-            const stability=h.productionStabilityV91===true&&h.reservedOrdersAdvancedV91===true&&h.transientInvoiceRetryV91===true&&h.verifiedAiUsageV91===true;
-            process.stdout.write(storage&&runtime&&migration&&closure&&safety&&finance&&platform&&stability?'true':'false');
-          } catch { process.stdout.write('false'); }
-          NODE
-            )
-            if [ "$release" = "$expected" ] && [ "$ready" = "true" ]; then break; fi
-            if [ "$attempt" = "24" ]; then
-              echo "::error::Cloudflare no activó el contrato v91 esperado. release=${release:-none} runtime=$ready body=$body"
-              exit 1
-            fi
-            echo "Esperando despliegue ${attempt}/24 · release=${release:-none} · runtime=$ready"
-            sleep 10
-          done
-
-          stamp=$(date +%s)
-          for asset in app.js app-professional.js app-orders.js app-master-order.js app-payment-workflow.js app-file-actions.js app-order-detail-v30.js design-system-native-v80.css native-performance.css sw.js; do
-            curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/$asset?v=$stamp" > "/tmp/$asset"
-          done
-
-          grep -Fq "CLIENT_RELEASE='$expected'" /tmp/app.js || { echo '::error::app.js productivo no coincide con el release'; exit 1; }
-          grep -Fq 'design-system-native-v80.css' /tmp/app-professional.js || { echo '::error::runtime profesional no carga la capa visual nativa v80'; exit 1; }
-          grep -Fq -- '--ios-blue:#007aff' /tmp/design-system-native-v80.css || { echo '::error::tokens iOS v80 no están publicados'; exit 1; }
-          grep -Fq -- '-apple-system' /tmp/design-system-native-v80.css || { echo '::error::tipografía nativa no está publicada'; exit 1; }
-          grep -Fq "received:[['closed','Cerrar pedido']]" /tmp/app-orders.js || { echo '::error::recepción no habilita cierre directo'; exit 1; }
-          grep -Fq "['delete-draft','Eliminar borrador']" /tmp/app-orders.js || { echo '::error::menú de borrador no permite eliminar borradores'; exit 1; }
-          grep -Fq "['preview','Vista previa PDF']" /tmp/app-orders.js || { echo '::error::Pedidos no expone vista previa PDF'; exit 1; }
-          grep -Fq 'async function previewOrder(order)' /tmp/app-orders.js || { echo '::error::vista previa PDF no usa el flujo externo'; exit 1; }
-          grep -Fq "window.open('about:blank','_blank')" /tmp/app-orders.js || { echo '::error::vista previa PDF no conserva el gesto nativo del navegador'; exit 1; }
-          grep -Fq 'openPaymentDocumentComposer' /tmp/app-payment-workflow.js || { echo '::error::flujo canónico de pagos no está publicado'; exit 1; }
-          grep -Fq 'openOrderPaymentHub' /tmp/app-payment-workflow.js || { echo '::error::historial de pagos por pedido no está publicado'; exit 1; }
-          grep -Fq 'SERVER_AUTOSAVE_DELAY=1200' /tmp/app-master-order.js || { echo '::error::autosave de Lista Maestra no está publicado'; exit 1; }
-          grep -Fq "const CACHE_VERSION='nuvasto-v91-production-stability'" /tmp/sw.js || { echo '::error::service worker v91 no está activo'; exit 1; }
-          if grep -Fq "'./app-procurement.js'" /tmp/sw.js; then echo '::error::Service Worker aún precarga bundles no críticos'; exit 1; fi
-          grep -Fq 'apiNetworkTimeout' /tmp/sw.js || { echo '::error::timeout API adaptable no está publicado'; exit 1; }
-          grep -Fq 'regenerateOrderDocument' /tmp/app-file-actions.js || { echo '::error::recuperación de PDF R2 v91 no está publicada'; exit 1; }
-          grep -Fq 'ensureOrderDocument(order,{force:true})' /tmp/app-file-actions.js || { echo '::error::PDF huérfano no fuerza regeneración'; exit 1; }
-          echo "Nuvasto v91 · rutas reservadas, lectura IA resiliente, cuota verificada y recuperación R2 comprobadas en producción."
+        working-directory: professional
+        env:
+          NUVASTO_BASE_URL: 'https://pedidos-pro-ai.botreservasmultilocal.workers.dev'
+          NUVASTO_EXPECT_ENV: production
+        run: node scripts/verify-live-current.mjs
 
       - name: Production authenticated read-only smoke
         id: authenticated
         if: steps.verify.outcome == 'success'
         working-directory: professional
         env:
-          NUVASTO_BASE_URL: https://pedidos-pro-ai.botreservasmultilocal.workers.dev
+          NUVASTO_BASE_URL: 'https://pedidos-pro-ai.botreservasmultilocal.workers.dev'
           NUVASTO_E2E_EMAIL: '${{ secrets.NUVASTO_E2E_EMAIL }}'
           NUVASTO_E2E_PASSWORD: '${{ secrets.NUVASTO_E2E_PASSWORD }}'
         run: node tests/production-readonly-e2e-v92.mjs
@@ -117,13 +62,7 @@ jobs:
           E2E_EMAIL: '${{ secrets.NUVASTO_E2E_EMAIL }}'
           E2E_PASSWORD: '${{ secrets.NUVASTO_E2E_PASSWORD }}'
         run: |
-          if [ -n "$E2E_EMAIL" ] && [ -n "$E2E_PASSWORD" ]; then
-            echo 'authenticated=true' >> "$GITHUB_OUTPUT"
-            echo 'Smoke autenticado de solo lectura configurado.'
-          else
-            echo 'authenticated=false' >> "$GITHUB_OUTPUT"
-            echo '::warning::Smoke autenticado no configurado; el contrato público sí fue ejecutado.'
-          fi
+          if [ -n "$E2E_EMAIL" ] && [ -n "$E2E_PASSWORD" ]; then echo 'authenticated=true' >> "$GITHUB_OUTPUT"; else echo 'authenticated=false' >> "$GITHUB_OUTPUT"; fi
 
       - name: Publish production status on commit
         if: always() && !cancelled()
@@ -132,9 +71,9 @@ jobs:
         run: |
           if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.authenticated.outcome }}" != "failure" ]; then
             state=success
-            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto v91 publicado + smoke autenticado de solo lectura OK'; else description='Nuvasto v91 publicado; smoke público verificado'; fi
+            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto current publicado + smoke autenticado read-only OK'; else description='Nuvasto current publicado; contrato live verificado'; fi
           else
             state=failure
-            description='El despliegue de Nuvasto v91 no quedó verificado'
+            description='El despliegue current de Nuvasto no quedó verificado'
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state="$state" -f context='nuvasto/production' -f description="$description" -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"

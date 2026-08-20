@@ -6,4 +6,4 @@ assert.match(url.hostname,/^pedidos-pro-ai-dev\./,'destructive E2E refuses to ru
 assert.ok(!/pedidos-pro-ai\.botreservasmultilocal\.workers\.dev$/.test(url.hostname),'destructive E2E must never target production');
 
 process.env.NUVASTO_BASE_URL=base;
-await import('./production-e2e-v44.mjs');
+await import('./development-e2e-current.mjs');

@@ -1,5 +1,6 @@
 import {$,$$,esc,state,api,toast,setBusy,showApp} from './app-core.js';
 import {openModal} from './app-modal.js';
+import {protectedAssetUrl} from './app-assets-v13.js';
 
 let settingsCache = null;
 let currentLogoUrl = '';
@@ -61,11 +62,13 @@ export async function refreshBranding(force=false){
   if(!state.token||!state.me)return null;
   if(settingsCache&&!force){applyBranding(settingsCache);return settingsCache}
   try{
-    settingsCache=await api('/api/settings');
+    settingsCache=await api('/api/settings',{fresh:force});
     applyBranding(settingsCache);
     if(settingsCache.user?.profile)state.me.user.profile=settingsCache.user.profile;
     if(settingsCache.user?.displayName)state.me.user.displayName=settingsCache.user.displayName;
     if(settingsCache.organization?.name)state.me.organization.name=settingsCache.organization.name;
+    const logoKey=settingsCache.organization?.branding?.logoKey||'';
+    state.organizationLogoUrl=logoKey?await protectedAssetUrl(logoKey):'';
     showApp();
     return settingsCache;
   }catch(error){
@@ -141,7 +144,6 @@ async function openBrandingSettings(){
   if(!settings)return toast('No se pudo cargar la configuración','error');
   const business=settings.organization.business||{};
   const branding=settings.organization.branding||{};
-  const firstLocation=settings.locations[0];
   const logoUrl=await fetchLogoUrl(branding.logoKey);
   openModal({
     eyebrow:'IDENTIDAD VISUAL',title:'Empresa, local y documentos',subtitle:'Configura una sola vez los datos y el diseño que aparecerán en cada PDF.',size:'large',
@@ -175,13 +177,13 @@ async function openBrandingSettings(){
       if(file){const uploaded=await uploadLogo(file);logo={key:uploaded.key,name:uploaded.name,width:uploaded.width,height:uploaded.height}}
       if($('#removeBrandLogo').dataset.remove==='1')logo={key:'',name:'',width:0,height:0};
       const location=localById(settings,$('#brandLocation').value);
-      settingsCache=await api('/api/settings',{method:'PATCH',json:{
+      await api('/api/settings',{method:'PATCH',json:{
         organizationName:form.get('organizationName'),
         business:{legalName:form.get('legalName'),rut:form.get('rut'),address:form.get('address'),commune:form.get('commune'),city:form.get('city'),phone:form.get('phone'),email:form.get('businessEmail')},
         branding:{primaryColor:form.get('primaryColor'),secondaryColor:form.get('secondaryColor'),tableHeaderColor:form.get('tableHeaderColor'),logoKey:logo.key,logoName:logo.name,logoWidth:logo.width,logoHeight:logo.height,logoSize:Number(form.get('logoSize')),logoPosition:form.get('logoPosition'),logoAlignX:form.get('logoAlignX'),logoAlignY:form.get('logoAlignY'),footerText:form.get('footerText')},
         location:location?{id:location.id,details:{legalName:form.get('localLegalName'),rut:form.get('localRut'),address:form.get('localAddress'),commune:form.get('localCommune'),city:form.get('localCity'),phone:form.get('localPhone'),email:form.get('localEmail'),contactName:form.get('localContact')}}:null
       }});
-      applyBranding(settingsCache);state.me.organization.name=settingsCache.organization.name;showApp();toast('Identidad visual y PDF actualizados');
+      settingsCache=null;await refreshBranding(true);toast('Identidad visual y PDF actualizados');
       const navigate=(await import('./app-views.js')).navigate;await navigate('settings');
     }
   });

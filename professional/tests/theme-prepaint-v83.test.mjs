@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const html=fs.readFileSync(new URL('../web/index.html',import.meta.url),'utf8');
+const currentCss=fs.readFileSync(new URL('../web/app-current.css',import.meta.url),'utf8');
 const scriptIndex=html.indexOf("localStorage.getItem('pp:theme')");
-const cssIndex=html.indexOf('styles.css');
-assert.ok(scriptIndex>0&&scriptIndex<cssIndex,'theme choice must run before CSS loads');
-assert.match(html,/data-nuvasto-native-v80/);
-assert.match(html,/data-nuvasto-native-v82/);
-console.log('v83 prepaint theme stability: OK');
+const cssIndex=html.indexOf('app-current.css');
+assert.ok(scriptIndex>0&&cssIndex>scriptIndex,'theme choice must run before the single current stylesheet loads');
+assert.match(html,/id="nuvastoCurrentStyles"/,'shell must identify the single current stylesheet');
+assert.doesNotMatch(html,/data-nuvasto-native-v80|data-nuvasto-native-v82/,'shell must not mount parallel native style generations');
+assert.match(currentCss,/design-system-native-v80\.css/,'current cascade must retain validated native design rules');
+assert.match(currentCss,/design-system-native-v82\.css/,'current cascade must retain validated dark contrast rules');
+console.log('prepaint theme stability: OK · single current stylesheet');

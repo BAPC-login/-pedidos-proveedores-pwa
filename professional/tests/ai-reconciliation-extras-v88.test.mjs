@@ -59,16 +59,18 @@ assert.match(worker,/extraReceivingV88:true/,'health must expose extra receiving
 assert.match(worker,/noSilentAiAcceptanceV88:true/,'health must expose no-silent-AI policy');
 
 assert.match(payment,/TIMEOUT_MS=24000/,'payment proof AI must use a fast bounded timeout');
-assert.match(payment,/thinkingLevel:'minimal'/,'payment proof extraction must minimize thinking latency');
+assert.match(payment,/thinkingLevel:'minimal'/,'payment extraction must minimize thinking latency');
 assert.match(payment,/evidenceVerified/,'payment extraction must report deterministic evidence completeness');
 assert.match(payment,/Jamás inventes verificadores/,'payment prompt must retain the no-invention rule');
 
 assert.match(mobile,/--nuvasto-safe-top/,'mobile runtime must centralize safe-area variables');
 assert.match(mobile,/\.topbar\{[^}]*safe-top/s,'top bar must respect device safe area');
+assert.match(mobile,/padding-top:calc\(var\(--nuvasto-safe-top\) \+ 10px\)!important/,'topbar must add breathing room after the full safe inset');
 assert.match(mobile,/#modalClose\{[^}]*48px/s,'modal close target must remain reachable and touch-sized');
 assert.match(mobile,/\.bottom-nav\{[^}]*safe-bottom/s,'bottom navigation must respect the home indicator area');
-assert.match(sw,/CACHE_VERSION='nuvasto-v91-production-stability'/,'v91 must rotate installed PWA assets so existing devices receive the stability fixes');
-assert.match(sw,/PREVIOUS_CACHE_VERSION='nuvasto-v90-truthful-invoice-transition'/,'v91 cache cutover must retain the v90 cache lineage');
-assert.match(sw,/LEGACY_CACHE_VERSION_V89='nuvasto-v89-brand-launch'/,'v91 must retain the prior v89 cache lineage');
+assert.match(sw,/safe-area-v95\.css/,'current shell must retain the safe-area contract');
+assert.match(sw,/importScripts\('\.\/sw-release\.js'\)/,'current shell must consume generated release state');
+assert.match(sw,/deleteStaleNuvastoCaches/,'activation must delete stale cache generations');
+assert.doesNotMatch(sw,/LEGACY_CACHE_VERSION|PREVIOUS_CACHE_VERSION|PREVIOUS_VERSION/,'AI/mobile contracts must not force historical caches to remain available');
 
-console.log('v88/v91 AI reconciliation, truthful review and safe-area contracts: OK');
+console.log('AI reconciliation, truthful review, safe-area and current-cache contracts: OK');

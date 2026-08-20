@@ -6,6 +6,7 @@ const read=path=>fs.readFileSync(new URL(path,import.meta.url),'utf8');
 const mobile=read('../web/app-mobile-runtime.js');
 const auth=read('../web/app-auth-experience.js');
 const index=read('../web/index.html');
+const currentCss=read('../web/app-current.css');
 const copy=read('../web/app-copy-policy.js');
 const sw=read('../web/sw.js');
 
@@ -16,11 +17,14 @@ assert.doesNotMatch(auth,/location\.reload\(\)/,'biometric login must complete i
 assert.match(auth,/completeBiometricLogin/,'biometric login must reuse the authenticated app runtime');
 assert.match(auth,/biometricIcon\(\)/,'biometric login must be an icon control');
 assert.match(index,/localStorage\.getItem\('pp:theme'\)/,'theme must be resolved before first paint');
-assert.match(index,/design-system-native-v80\.css\?v=83/,'native design must be loaded before authentication');
-assert.match(index,/design-system-native-v82\.css\?v=83/,'dark contrast pass must be loaded before authentication');
+assert.match(index,/id="nuvastoCurrentStyles"[^>]+app-current\.css/,'the shell must load one current stylesheet before authentication');
+assert.doesNotMatch(index,/href="\.\/(?:styles|pro-ui|experience|design-system-|brand-v|native-performance)/,'the shell must not mount parallel historical style entries');
+assert.match(currentCss,/design-system-native-v80\.css/,'current cascade must retain validated native design rules');
+assert.match(currentCss,/design-system-native-v82\.css/,'current cascade must retain validated dark contrast rules');
 assert.match(copy,/netLineTotal/,'copy policy must recognize implementation tokens');
 assert.match(copy,/Observaciones de lectura/i,'technical reading notes must be removed from user-facing checkout');
-assert.match(sw,/nuvasto-v83-mobile-auth-invoice/,'service worker cache must rotate for v83');
+assert.match(sw,/importScripts\('\.\/sw-release\.js'\)/,'mobile shell must consume the current generated release');
+assert.doesNotMatch(sw,/LEGACY_CACHE_VERSION|PREVIOUS_CACHE_VERSION/,'mobile shell must not retain historical cache generations');
 
 const grossLines=[
   {invoiceQuantity:1,totalUnits:1,netLineTotal:100},
@@ -46,4 +50,4 @@ assert.equal(netLines[0].grossLineTotal,119);
 assert.equal(netLines[1].grossLineTotal,238);
 assert.equal(warnings.some(value=>/netLineTotal|freightLine|additionalTaxLine|invoice-column|proportional/i.test(value)),false);
 
-console.log('v83 mobile/auth/invoice contracts: OK');
+console.log('mobile/auth/invoice contracts: OK');

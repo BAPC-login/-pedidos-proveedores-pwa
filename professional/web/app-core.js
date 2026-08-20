@@ -15,7 +15,8 @@ const state = {
   me: null,
   view: 'dashboard',
   subview: '',
-  cache: {dashboard:null,orders:[],invoices:[],products:[],suppliers:[],categories:[],locations:[],costCenters:[],users:[],audit:[],brands:[],sessions:[]},
+  organizationLogoUrl: '',
+  cache: {dashboard:null,orders:[],invoices:[],products:[],suppliers:[],supplierAssets:[],categories:[],locations:[],costCenters:[],users:[],audit:[],brands:[],sessions:[]},
   online: navigator.onLine,
   pending: []
 };
@@ -42,6 +43,7 @@ const getQueue=[];
 let dataWorker=null,workerSequence=0;
 const workerJobs=new Map();
 const toastJobs=new Map();
+let launchExitTimer=0;
 
 function cacheKeyFor(path){return `${state.token.slice(-12)}:${path}`}
 function requestTimeoutError(){return Object.assign(new Error('La solicitud tardó demasiado. Intenta nuevamente.'),{code:'request_timeout',status:0})}
@@ -187,8 +189,17 @@ async function readMutations(){const db=await openDb();return new Promise((resol
 async function removeMutation(id){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction('mutations','readwrite');tx.objectStore('mutations').delete(id);tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{db.close();reject(tx.error)}})}
 async function syncMutations(){if(!navigator.onLine||!state.token)return;for(const mutation of await readMutations().catch(()=>[])){try{await api(mutation.path,{method:mutation.method,json:mutation.json,headers:{'Idempotency-Key':mutation.id},persist:true});await removeMutation(mutation.id)}catch(error){if(error.status===401)break;console.warn('sync_failed',mutation,error)}}await updateSyncChip()}
 async function updateSyncChip(){const count=(await readMutations().catch(()=>[])).length;const chip=$('#syncChip');if(!chip)return;chip.querySelector('span').textContent=!navigator.onLine?'Sin conexión':count?`${count} pendiente${count===1?'':'s'}`:'Sincronizado';chip.classList.toggle('pending',count>0||!navigator.onLine)}
-function hideStartup(){$('#startupScreen')?.classList.add('hidden')}
+function hideStartup(){
+  const startup=$('#startupScreen');if(!startup||startup.classList.contains('hidden')||startup.classList.contains('launch-exit'))return;
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){startup.classList.add('hidden');return}
+  startup.classList.add('launch-exit');clearTimeout(launchExitTimer);launchExitTimer=setTimeout(()=>{startup.classList.add('hidden');startup.classList.remove('launch-exit')},360);
+}
 function showAuth(){hideStartup();$('#authScreen')?.classList.remove('hidden');$('#appShell')?.classList.add('hidden')}
-function showApp(){hideStartup();$('#authScreen')?.classList.add('hidden');$('#appShell')?.classList.remove('hidden');const {user,organization,plan}=state.me;$('#workspaceName').textContent=organization.name;$('#workspacePlan').textContent=user.isPlatformOwner?'Owner de plataforma':`Plan ${plan.name==='free'?'gratuito':plan.name}`;$('#workspaceAvatar').textContent=initials(organization.name);$('#workspaceCard').disabled=false;$('#workspaceCard').classList.add('selectable');$('#workspaceChevron').classList.remove('hidden');$('#userName').textContent=user.displayName;$('#userRole').textContent=roleNames[user.role]||user.role;$('#userAvatar').textContent=initials(user.displayName);$('#mobileWorkspaceName')&&($('#mobileWorkspaceName').textContent=organization.name);$('#mobileUserAvatar')&&($('#mobileUserAvatar').textContent=initials(user.displayName));$$('.admin-only').forEach(node=>node.classList.toggle('hidden',!isAdmin()))}
-function logoutLocal(){beginViewRequestScope();state.token='';state.me=null;clearResponseCache();localStorage.removeItem('pp:token');showAuth()}
+function renderWorkspaceIdentity(organization){
+  const avatar=$('#workspaceAvatar'),mobileMark=$('#mobileWorkspaceButton .brand-mark img');
+  if(avatar){avatar.textContent='';avatar.classList.toggle('has-logo',Boolean(state.organizationLogoUrl));if(state.organizationLogoUrl){const image=document.createElement('img');image.src=state.organizationLogoUrl;image.alt=`Logo ${organization.name}`;avatar.append(image)}else avatar.textContent=initials(organization.name)}
+  if(mobileMark){mobileMark.src=state.organizationLogoUrl||'./nuvasto-mark.svg';mobileMark.alt=state.organizationLogoUrl?`Logo ${organization.name}`:'';mobileMark.closest('.brand-mark')?.classList.toggle('has-workspace-logo',Boolean(state.organizationLogoUrl))}
+}
+function showApp(){hideStartup();$('#authScreen')?.classList.add('hidden');$('#appShell')?.classList.remove('hidden');const {user,organization,plan}=state.me;$('#workspaceName').textContent=organization.name;$('#workspacePlan').textContent=user.isPlatformOwner?'Owner de plataforma':`Plan ${plan.name==='free'?'gratuito':plan.name}`;renderWorkspaceIdentity(organization);$('#workspaceCard').disabled=false;$('#workspaceCard').classList.add('selectable');$('#workspaceChevron').classList.remove('hidden');$('#userName').textContent=user.displayName;$('#userRole').textContent=roleNames[user.role]||user.role;$('#userAvatar').textContent=initials(user.displayName);$('#mobileWorkspaceName')&&($('#mobileWorkspaceName').textContent=organization.name);$('#mobileUserAvatar')&&($('#mobileUserAvatar').textContent=initials(user.displayName));$$('.admin-only').forEach(node=>node.classList.toggle('hidden',!isAdmin()))}
+function logoutLocal(){beginViewRequestScope();state.token='';state.me=null;state.organizationLogoUrl='';clearResponseCache();localStorage.removeItem('pp:token');showAuth()}
 export {$,$$,esc,money,date,roleNames,state,api,toast,initials,isAdmin,canBuy,setBusy,setTheme,queueMutation,readMutations,syncMutations,updateSyncChip,showAuth,showApp,logoutLocal,sessionStillValid,clearResponseCache,seedResponseCache,beginViewRequestScope,runDataWorker};
