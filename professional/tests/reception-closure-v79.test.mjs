@@ -36,7 +36,8 @@ assert.match(invoice,/name="markReceived"/,'invoice UI must keep the explicit re
 assert.match(invoice,/receptionDate/,'invoice UI must let the user choose reception date');
 assert.match(query,/deliveryOutcome.*not_presented/s,'canonical history query must expose no-show outcome');
 assert.match(fallback,/deliveryOutcome.*not_presented/s,'fallback history query must expose no-show outcome');
-assert.match(shell,/design-system-v79\.css/,'v79 presentation system must remain available under the v80 native layer');
-assert.match(sw,/nuvasto-v80-native-orders-payments/,'service worker cache must rotate to the v80 native/payment release');
+assert.match(shell,/design-system-v79\.css/,'current presentation bundle must retain the validated reception layout contract');
+assert.match(sw,/importScripts\('\.\/sw-release\.js'\)/,'service worker cache identity must come only from the generated current release');
+assert.match(sw,/deleteStaleNuvastoCaches/,'service worker activation must delete all stale Nuvasto caches');
 
-console.log('reception-closure-v79 contracts: ok');
+console.log('reception-closure contracts: ok');
