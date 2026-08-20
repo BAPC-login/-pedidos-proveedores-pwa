@@ -4,7 +4,7 @@ on:
     branches: [main]
     paths: ['professional/**','worker/**','wrangler.jsonc','.github/workflows/**']
   push:
-    branches: [develop, 'agent/**']
+    branches: [develop]
     paths: ['professional/**','worker/**','wrangler.jsonc','.github/workflows/**']
   workflow_dispatch:
 permissions:
