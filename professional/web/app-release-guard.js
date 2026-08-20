@@ -1,7 +1,6 @@
 import {CLIENT_RELEASE,ARCHITECTURE_GENERATION} from './app-release.js';
 
 const RELOAD_MARK='nuvasto:release-guard-reload';
-const LEGACY_STYLE_NAMES=new Set(['styles.css','pro-ui.css','experience.css','design-system-v13.css','design-system-v14.css','brand-v21.css','native-performance.css','design-system-v79.css','design-system-native-v80.css','design-system-native-v82.css']);
 
 function releaseUrl(){return `/platform/release?client=${encodeURIComponent(CLIENT_RELEASE)}&architecture=${ARCHITECTURE_GENERATION}&ts=${Date.now()}`}
 function requestedRelease(response,payload){return String(response?.headers?.get?.('X-Nuvasto-Release')||payload?.release||'').trim()}
@@ -31,22 +30,18 @@ async function waitForController(registration,serverRelease){
   return changed;
 }
 export async function ensureCurrentStylesheet(){
-  const existing=document.getElementById('nuvastoCurrentStyles');if(existing)return true;
+  const existing=document.getElementById('nuvastoCurrentStyles');
+  if(existing){document.documentElement.dataset.currentStyles=CLIENT_RELEASE;return true}
   const link=document.createElement('link');link.id='nuvastoCurrentStyles';link.rel='stylesheet';link.href=`./app-current.css?release=${encodeURIComponent(CLIENT_RELEASE)}`;
   const loaded=new Promise(resolve=>{link.onload=()=>resolve(true);link.onerror=()=>resolve(false)});document.head.append(link);
   if(!await loaded){link.remove();return false}
-  for(const legacy of document.querySelectorAll('link[rel="stylesheet"]')){
-    if(legacy===link)continue;
-    let name='';try{name=new URL(legacy.href,location.href).pathname.split('/').pop()||''}catch{}
-    if(LEGACY_STYLE_NAMES.has(name))legacy.disabled=true;
-  }
   document.documentElement.dataset.currentStyles=CLIENT_RELEASE;
   return true;
 }
 export async function ensureCurrentRelease(){
   document.documentElement.dataset.clientRelease=CLIENT_RELEASE;
   document.documentElement.dataset.architectureGeneration=String(ARCHITECTURE_GENERATION);
-  await ensureCurrentStylesheet();
+  if(!await ensureCurrentStylesheet())return false;
   if(!navigator.onLine)return true;
   let response,payload;
   try{response=await fetch(releaseUrl(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});if(!response.ok)return true;payload=await response.json().catch(()=>({}))}catch{return true}
