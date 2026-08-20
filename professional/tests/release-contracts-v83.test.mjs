@@ -20,6 +20,9 @@ assert.equal(clientRelease,'2026.08.19.96','v96 client release must be explicit'
 assert.equal(platformRelease,clientRelease,'client and platform release handshake must always match');
 assert.match(sw,new RegExp(`CACHE_VERSION='nuvasto-v${releaseNumber}-`),'service worker cache must rotate with the active release number');
 assert.match(app,/OFFLINE_WARM_KEY='nuvasto:offline-warm-v96'/,'v96 must refresh the offline operating snapshot');
+assert.match(app,/registration\.update\(\)/,'release mismatch must explicitly check for a new service worker');
+assert.match(app,/controllerchange/,'client must wait for the new service worker to control the page before reloading');
+assert.doesNotMatch(app,/setTimeout\(\(\)=>location\.reload\(\),420\)/,'client must not blindly reload before service worker activation');
 assert.match(app,/app-session-bootstrap\.js/,'session bootstrap must remain canonical');
 assert.match(auth,/isUserVerifyingPlatformAuthenticatorAvailable/,'platform biometric availability detection is required');
 assert.match(auth,/biometricIcon\(\)/,'biometric login must be icon based');
@@ -49,6 +52,7 @@ assert.match(sw,/LEGACY_CACHE_VERSION_V84='nuvasto-v84-professional-readiness'/,
 assert.match(sw,/LEGACY_CACHE_VERSION_V83='nuvasto-v83-mobile-auth-invoice'/,'v96 must preserve v83 cache lineage');
 assert.match(sw,/Promise\.all\(PRECACHE\.map/,'critical release assets must install atomically');
 assert.match(sw,/precache_failed:/,'failed critical assets must abort activation instead of producing a mixed shell');
+assert.match(sw,/client\.navigate\(client\.url\)/,'activated v96 worker must force open legacy clients onto the coherent shell');
 assert.match(sw,/safe-area-v95\.css/,'safe-area contract must be available offline');
 assert.match(sw,/app-navigation-v14\.js/,'canonical navigation must be available offline');
 assert.match(sw,/app-suppliers-v94\.js/,'supplier workspace must be available offline');
