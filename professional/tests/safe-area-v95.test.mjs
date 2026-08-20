@@ -28,9 +28,10 @@ assert.match(mobile,/\.auth-screen:not\(#startupScreen\)/,'runtime must also pro
 assert.match(mobile,/\.modal-frame\{[^}]*100dvh - var\(--nuvasto-safe-top\) - var\(--nuvasto-safe-bottom\)/s,'runtime modal height must subtract both unsafe areas');
 assert.match(mobile,/\.toast-region\{[^}]*safe-bottom/s,'runtime toast placement must stay above bottom device chrome');
 
-assert.match(sw,/CACHE_VERSION='nuvasto-v95-safe-area-contract'/,'installed PWAs must rotate to the v95 safe-area shell');
-assert.match(sw,/PREVIOUS_CACHE_VERSION='nuvasto-v94-menu-information-architecture'/,'v95 must preserve the menu architecture cache as predecessor');
-assert.match(sw,/LEGACY_CACHE_VERSION_V93='nuvasto-v93-branding-launch'/,'v95 must preserve v93 cache lineage');
+assert.match(sw,/CACHE_VERSION='nuvasto-v96-release-coherence'/,'installed PWAs must rotate to the v96 coherent shell while retaining the v95 safe-area contract');
+assert.match(sw,/PREVIOUS_CACHE_VERSION='nuvasto-v95-safe-area-contract'/,'v96 must preserve the safe-area shell as its direct predecessor');
+assert.match(sw,/LEGACY_CACHE_VERSION_V94='nuvasto-v94-menu-information-architecture'/,'v96 must preserve the menu architecture cache lineage');
+assert.match(sw,/LEGACY_CACHE_VERSION_V93='nuvasto-v93-branding-launch'/,'v96 must preserve v93 cache lineage');
 assert.match(sw,/'\.\/safe-area-v95\.css'/,'safe-area stylesheet must be precached for offline startup');
 
-console.log('v95 safe-area contract: OK · auth, app chrome, content, sheets, search, toasts and bottom navigation stay outside device bars');
+console.log('v95-v96 safe-area contract: OK · auth, app chrome, content, sheets, search, toasts and bottom navigation stay outside device bars');
