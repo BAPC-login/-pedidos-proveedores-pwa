@@ -4,8 +4,10 @@ const read=path=>fs.readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 
 const settings=read('web/app-experience-settings.js');
 const settingsPanels=read('web/app-settings-panels-v13.js');
-const navigation=read('web/app-navigation-v14.js');
-const suppliers=read('web/app-suppliers-v94.js');
+const navigation=read('web/app-navigation.js');
+const suppliers=read('web/app-suppliers.js');
+const legacyNavigation=read('web/app-navigation-v14.js');
+const legacySuppliers=read('web/app-suppliers-v94.js');
 const locationIdentity=read('web/app-location-identity.js');
 const settingsApi=read('worker/src/api/settings.js');
 const sessionPolicy=read('worker/src/session-policy-v87.js');
@@ -26,10 +28,13 @@ assert.match(settings,/data-company-profile-v94/,'Configuración must expose the
 assert.match(settings,/data-location-profile/,'Configuración must expose the unified local profile');
 assert.doesNotMatch(settings,/data-location-identity/,'Configuración must not expose the retired split local-logo card');
 assert.match(settingsPanels,/pdf:openCompanyLogoUploader/,'legacy corporate logo action must remain compatible even though it is no longer a top-level settings card');
-assert.match(navigation,/registerRouteRenderer\('suppliers'/,'Proveedores must own its canonical route');
+assert.match(navigation,/registerRouteRenderer\('suppliers'/,'Proveedores must own its canonical route in the semantic navigation module');
+assert.match(navigation,/renderSuppliersWorkspace/,'Proveedores route must resolve to the dedicated supplier workspace');
+assert.match(legacyNavigation,/Compatibility alias only/,'versioned navigation file must be a non-owning compatibility facade');
 assert.match(suppliers,/id=\"newSupplierV94\"/,'canonical supplier workspace must own supplier creation');
 assert.match(suppliers,/supplierProfileLogoFile/,'canonical supplier workspace must own supplier logo editing');
 assert.match(suppliers,/paymentTermType/,'canonical supplier workspace must own agreed payment terms');
+assert.match(legacySuppliers,/Compatibility alias only/,'versioned supplier file must be a non-owning compatibility facade');
 
 assert.match(bootstrap,/initializeLocationIdentity/,'location profile must initialize from canonical bootstrap');
 assert.match(locationIdentity,/title:'Perfil de local'/,'local data and logo must share one canonical editor');
@@ -56,6 +61,7 @@ assert.doesNotMatch(procurement,/data-unit-up|data-unit-down/,'legacy tiny up/do
 assert.match(procurement,/Formatos de compra/,'format editor must use the modern canonical panel');
 assert.match(procurement,/Unidades por formato/,'format semantics must remain explicit');
 
-assert.match(sw,/CACHE_VERSION='nuvasto-v\d+-/,'installed PWA cache must remain explicitly versioned');
+assert.match(sw,/CACHE_VERSION=self\.NUVASTO_CACHE/,'installed PWA cache identity must be generated from the current release manifest');
+assert.match(sw,/deleteStaleNuvastoCaches/,'activation must remove every stale Nuvasto generation');
 assert.match(sw,/app-location-identity\.js/,'local profile must be available to installed PWAs');
-console.log('v87-v96 navigation, sessions and master-order contracts: OK');
+console.log('navigation, sessions and master-order contracts: OK');
