@@ -23,6 +23,10 @@ const legacyNavigation=read('web/app-navigation-v14.js');
 const packageJson=JSON.parse(read('package.json'));
 const prod=read('wrangler.toml');
 const dev=read('wrangler.develop.toml');
+const liveVerifier=read('scripts/verify-live-current.mjs');
+const devWorkflow=root('.github/workflows/deploy-development.yml');
+const prodWorkflow=root('.github/workflows/deploy-cloudflare.yml');
+const verifyWorkflow=root('.github/workflows/verify.yml');
 
 assert.match(release.release,/^\d{4}\.\d{2}\.\d{2}\.\d+$/,'release manifest must be explicit');
 assert.ok(generatedClient.includes(`CLIENT_RELEASE='${release.release}'`),'client release must be generated from release.json');
@@ -70,8 +74,15 @@ assert.match(legacyNavigation,/from '\.\/app-navigation\.js'/,'old navigation UR
 
 assert.ok(String(packageJson.scripts.verify).startsWith('npm run build:current && npm run check:release-sync &&'),'verification must regenerate and prove release artifacts were already committed in sync');
 assert.ok(String(packageJson.scripts['check:release-sync']).includes('git diff --exit-code'),'release sync gate must fail stale generated artifacts');
-for(const config of [prod,dev]){
-  assert.match(config,/"\/", "\/index\.html", "\/sw\.js", "\/sw-release\.js", "\/app-release\.js", "\/manifest\.webmanifest"/,'current shell must pass through the release-aware worker');
-}
+for(const config of [prod,dev])assert.match(config,/"\/", "\/index\.html", "\/sw\.js", "\/sw-release\.js", "\/app-release\.js", "\/manifest\.webmanifest"/,'current shell must pass through the release-aware worker');
 
-console.log(`current architecture gate: OK · ${release.release} · one supplier owner · one release owner · latest-only caches`);
+assert.match(liveVerifier,/release\.json/,'live verifier must use the same canonical release manifest');
+assert.match(liveVerifier,/Pago pactado/,'live verifier must prove the current supplier UI is actually served');
+assert.match(liveVerifier,/app-suppliers-v94\.js/,'live verifier must prove stale supplier URLs are only aliases to current code');
+for(const workflow of [devWorkflow,prodWorkflow])assert.match(workflow,/node scripts\/verify-live-current\.mjs/,'DEV and production must share one live current-generation verification gate');
+assert.match(devWorkflow,/branches: \[develop\]/,'only develop may trigger the DEV deployment');
+assert.match(prodWorkflow,/branches: \[main\]/,'only main may trigger the production deployment');
+assert.doesNotMatch(verifyWorkflow,/push:\s*[\s\S]*branches: \[develop\]/,'develop must not run a redundant second verification workflow');
+assert.match(verifyWorkflow,/pull_request:\s*[\s\S]*branches: \[main\]/,'main promotion must still run the candidate verification workflow');
+
+console.log(`current architecture gate: OK · ${release.release} · one supplier owner · one release owner · one live verifier · latest-only caches`);
