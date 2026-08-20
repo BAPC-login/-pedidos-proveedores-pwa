@@ -119,7 +119,9 @@ jobs:
           grep -Fq 'Paleta y documentos' /tmp/app-company-profile.js || { echo '::error::Perfil de empresa DEV no publica paleta/documentos'; exit 1; }
           grep -Fq "importScripts('./sw-release.js')" /tmp/sw.js || { echo '::error::Service Worker DEV no usa identidad de release generada'; exit 1; }
           grep -Fq 'deleteStaleNuvastoCaches' /tmp/sw.js || { echo '::error::Service Worker DEV no elimina caches obsoletos'; exit 1; }
-          grep -Fq "CACHE_VERSION='nuvasto-current-$generation'" /tmp/sw-release.js || { echo '::error::sw-release.js DEV no coincide con la generación actual'; exit 1; }
+          grep -Fq "self.NUVASTO_RELEASE='$expected'" /tmp/sw-release.js || { echo '::error::sw-release.js DEV no coincide con el release actual'; exit 1; }
+          grep -Fq "self.NUVASTO_ARCHITECTURE_GENERATION=$generation" /tmp/sw-release.js || { echo '::error::sw-release.js DEV no coincide con la generación actual'; exit 1; }
+          grep -Fq "self.NUVASTO_CACHE='nuvasto-current-$generation'" /tmp/sw-release.js || { echo '::error::sw-release.js DEV no coincide con el cache actual'; exit 1; }
           echo "Nuvasto DEV aislado y UI actual verificada · release $expected · generación $generation."
 
       - name: Bootstrap and seed DEV QA data
