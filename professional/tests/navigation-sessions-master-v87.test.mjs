@@ -23,16 +23,18 @@ assert.doesNotMatch(settings,/Catálogo y recorrido|data-procurement-settings/,'
 assert.doesNotMatch(settings,/data-action=\"new-supplier\"/,'supplier creation must live only inside Proveedores');
 assert.doesNotMatch(settings,/data-operations-tab=\"suppliers\"/,'Configuración must not duplicate supplier management');
 assert.match(settings,/data-company-profile-v94/,'Configuración must expose the unified company profile');
-assert.match(settings,/data-location-identity/,'Configuración must expose local logo identity');
+assert.match(settings,/data-location-profile/,'Configuración must expose the unified local profile');
+assert.doesNotMatch(settings,/data-location-identity/,'Configuración must not expose the retired split local-logo card');
 assert.match(settingsPanels,/pdf:openCompanyLogoUploader/,'legacy corporate logo action must remain compatible even though it is no longer a top-level settings card');
 assert.match(navigation,/registerRouteRenderer\('suppliers'/,'Proveedores must own its canonical route');
 assert.match(suppliers,/id=\"newSupplierV94\"/,'canonical supplier workspace must own supplier creation');
 assert.match(suppliers,/supplierProfileLogoFile/,'canonical supplier workspace must own supplier logo editing');
 assert.match(suppliers,/paymentTermType/,'canonical supplier workspace must own agreed payment terms');
 
-assert.match(bootstrap,/initializeLocationIdentity/,'location identity must initialize from canonical bootstrap');
+assert.match(bootstrap,/initializeLocationIdentity/,'location profile must initialize from canonical bootstrap');
+assert.match(locationIdentity,/title:'Perfil de local'/,'local data and logo must share one canonical editor');
 assert.match(locationIdentity,/purpose:'location-logo'/,'local logos must use a dedicated storage purpose');
-assert.match(locationIdentity,/location:\{id:selectedId,details:/,'local logos must persist through settings location details');
+assert.match(locationIdentity,/json:\{location:\{id:selectedId,details\}\}/,'local profile must persist merged settings location details');
 assert.match(settingsApi,/logoKey: text\(raw\.logoKey \?\? previous\.logoKey/,'location settings must preserve logo key');
 assert.match(settingsApi,/verifyLocationLogo/,'local logo ownership/type must be validated server-side');
 assert.match(settingsApi,/'location-logo'/,'local logo validation must require the proper file purpose');
@@ -55,5 +57,5 @@ assert.match(procurement,/Formatos de compra/,'format editor must use the modern
 assert.match(procurement,/Unidades por formato/,'format semantics must remain explicit');
 
 assert.match(sw,/CACHE_VERSION='nuvasto-v\d+-/,'installed PWA cache must remain explicitly versioned');
-assert.match(sw,/app-location-identity\.js/,'local identity must be available to installed PWAs');
-console.log('v87-v94 navigation, sessions and master-order contracts: OK');
+assert.match(sw,/app-location-identity\.js/,'local profile must be available to installed PWAs');
+console.log('v87-v96 navigation, sessions and master-order contracts: OK');
