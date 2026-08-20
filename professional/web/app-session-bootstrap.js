@@ -1,3 +1,7 @@
+import {ensureCurrentRelease} from './app-release-guard.js';
+
+if(!await ensureCurrentRelease())await new Promise(()=>{});
+
 (()=>{
   try{
     const ephemeral=localStorage.getItem('nuvasto:ephemeral-token')==='1',active=sessionStorage.getItem('nuvasto:ephemeral-session')==='1';
