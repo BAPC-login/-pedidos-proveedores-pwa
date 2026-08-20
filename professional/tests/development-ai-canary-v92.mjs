@@ -100,7 +100,8 @@ const cases=[
       assert.equal(line.productId,products.fernet.id,'Total x Unidad invoice must reconcile Fernet');
       assert.equal(invoice.pricingSummary?.sourceFinalPriceBasis,'physical_units','Total x Unidad must resolve as physical-unit price');
       assert.equal(line.finalQuantityBasis,'physical_units','canonical price must remain per physical unit');
-      assert.ok(close(line.grossUnitPrice,14105.2,.01),`physical final unit expected 14105.2, got ${line.grossUnitPrice}`);
+      assert.ok(close(line.sourcePrintedFinalUnitPrice,14105.2,.01),`printed physical unit price expected 14105.2, got ${line.sourcePrintedFinalUnitPrice}`);
+      assert.ok(close(line.grossUnitPrice,84631/6,.001),`canonical physical unit expected ${84631/6}, got ${line.grossUnitPrice}`);
       assert.ok(String(line.priceSource||'').includes('printed-final'),'physical final unit must retain printed-price provenance');
     }
   },
