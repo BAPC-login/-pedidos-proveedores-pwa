@@ -49,8 +49,8 @@ const unmatched=one({descriptionOriginal:'PRODUCTO TOTALMENTE DESCONOCIDO 330 ML
 assert.equal(unmatched.productId,'','unrelated line must stay unmatched');
 
 // Regression based on Pisquera de Chile factura electrónica 23826680 (07/08/2026).
-// CCU/Pisquera/VSPT documents print a far-right "Total x Unidad" value that already includes
-// discounts, taxes and prorated charges such as freight. That printed unit value is authoritative.
+// The source "Total x Unidad" remains auditable, but the final costing matrix must also
+// absorb the supplier's one-peso rounding so Σ(cantidad × precio final) equals the official total.
 const liquorContext={products:[
   {productId:'fernet',description:'LICOR FERNET BRANCA',supplierProductName:'FERNET BRANCA 39GL 1000CC X 6',unit:'CAJA(6)',orderedQty:1,unitsPerOrderUnit:6},
   {productId:'nobel',description:'PISCO MISTRAL NOBEL',supplierProductName:'MISTRAL NOBEL VNR750CC X 06 TR',unit:'CAJA(6)',orderedQty:1,unitsPerOrderUnit:6},
@@ -65,18 +65,39 @@ const realInvoice=normalizeInvoiceAnalysis({invoice:{supplierName:'COMPAÑIA PIS
 ]}},liquorContext);
 
 const priced=realInvoice.invoice.lines;
-assert.deepEqual(priced.map(item=>item.grossUnitPrice),[14105.2,11462.8,6677.2,8499.7],'printed Total x Unidad must become the final base-unit cost without reconstruction');
-assert.deepEqual(priced.map(item=>item.grossLineTotal),[84631,68777,80126,152995],'line extensions must be derived from printed final unit price only for checksum purposes');
+assert.deepEqual(priced.map(item=>item.grossUnitPrice),[14105.167,11462.833,6677.167,8499.667],'canonical physical-unit cost must include the deterministic supplier rounding adjustment');
+assert.deepEqual(priced.map(item=>item.sourcePrintedFinalUnitPrice),[14105.2,11462.8,6677.2,8499.7],'literal supplier prices must remain auditable separately from canonical product cost');
+assert.deepEqual(priced.map(item=>item.grossLineTotal),[84631,68777,80126,152994],'effective line totals must absorb only the supplier rounding needed to close the official total');
 assert.ok(priced.every(item=>item.priceSource==='printed-final-unit'&&item.taxAllocationMethod==='supplier-total-x-unidad'),'printed supplier pricing must expose explicit provenance');
+assert.ok(priced.every(item=>item.finalQuantityBasis==='physical_units'),'Pisquera Total x Unidad must be validated against physical units');
 assert.equal(realInvoice.invoice.pricingSummary.method,'printed-final-unit-column','printed final-unit column must outrank proportional tax reconstruction');
-assert.equal(realInvoice.invoice.pricingSummary.extendedExact,386529,'decimal printed unit prices reproduce the invoice total within supplier rounding');
-assert.equal(realInvoice.invoice.pricingSummary.checksumDelta,-1,'one-peso rounding delta is acceptable for the printed supplier column');
-assert.equal(realInvoice.invoice.pricingSummary.verified,true,'printed final-unit pricing is verified when the extended total closes within rounding tolerance');
+assert.equal(realInvoice.invoice.pricingSummary.sourceExtendedRounded,386529,'the source printed prices remain auditable before rounding reconciliation');
+assert.equal(realInvoice.invoice.pricingSummary.sourceChecksumDelta,-1,'the source supplier prices differ by one peso because of supplier rounding');
+assert.equal(realInvoice.invoice.pricingSummary.formulaExtendedTotal,386528,'the effective product-cost formula must equal the official invoice total');
+assert.equal(realInvoice.invoice.pricingSummary.checksumDelta,0,'final product checksum must be exact after deterministic rounding allocation');
+assert.equal(realInvoice.invoice.pricingSummary.verified,true,'printed final-unit pricing is verified only when the effective product matrix closes');
+assert.equal(Math.round(priced.reduce((sum,item)=>sum+item.finalQuantity*item.finalUnitPrice,0)),386528,'Σ(cantidad × precio final) must equal invoice total');
 
-// If a document does not expose Total x Unidad, retain the deterministic invoice-level fallback.
+// If a document does not expose Total x Unidad, retain deterministic invoice-level allocation.
 const fallbackInvoice=normalizeInvoiceAnalysis({invoice:{totals:{net:1000,vat:190,additionalTax:0,other:0,total:1190},warnings:[],lines:[{matchedOrderProductId:'fernet',descriptionOriginal:'FERNET BRANCA 39GL 1000CC X 6',invoiceQuantity:1,packSize:6,netLineTotal:1000}]}},liquorContext);
 assert.equal(fallbackInvoice.invoice.lines[0].priceSource,'invoice-total-tax-allocation','documents without printed final-unit price must keep deterministic fallback');
 assert.equal(fallbackInvoice.invoice.lines[0].grossLineTotal,1190);
+assert.equal(fallbackInvoice.invoice.pricingSummary.formulaExtendedTotal,1190);
+
+// VCT-style headers can express a final price per billed quantity/case instead of per bottle.
+// The backup source field survives the legacy normalizer and the matrix selects invoice_quantity.
+const vctLike=normalizeInvoiceAnalysis({invoice:{totals:{total:285257},warnings:[],lines:[
+  {descriptionOriginal:'LICOR PISCO MAL PASO ICONO 40° 06U',invoiceQuantity:1,packSize:6,sourcePrintedFinalUnitPrice:93600,sourceFinalUnitPriceHeader:'Precio Unit Bruto Final'},
+  {descriptionOriginal:'VINO CLOS DE PIRQUE CAB.SAUV 6 TPK',invoiceQuantity:1,packSize:6,sourcePrintedFinalUnitPrice:25335,sourceFinalUnitPriceHeader:'Precio Unit Bruto Final'},
+  {descriptionOriginal:'VINO MARQUES BLUE CARMENERE',invoiceQuantity:2,packSize:6,sourcePrintedFinalUnitPrice:83161,sourceFinalUnitPriceHeader:'Precio Unit Bruto Final'}
+]}},{products:[],aliases:[]});
+assert.equal(vctLike.invoice.pricingSummary.sourceFinalPriceBasis,'invoice_quantity','source final-price basis must be discovered mathematically, not by supplier name');
+assert.equal(vctLike.invoice.pricingSummary.finalQuantityBasis,'physical_units','canonical product cost must always end as physical-unit quantity × physical-unit price');
+assert.equal(vctLike.invoice.pricingSummary.formulaExtendedTotal,285257);
+assert.equal(vctLike.invoice.pricingSummary.verified,true);
+assert.equal(vctLike.invoice.lines[0].sourcePrintedFinalUnitPrice,93600,'literal billed-unit price must survive normalization for audit');
+assert.equal(vctLike.invoice.lines[0].printedFinalUnitPrice,15600,'current review UI must receive the reconciled physical-unit cost, not a case price labeled as unit price');
+assert.equal(vctLike.invoice.lines[0].finalUnitPriceHeader,'Precio Unit Bruto Final','source final-price header must remain literal');
 
 const multiInvoiceSource=fs.readFileSync(new URL('../web/app-multi-invoice.js',import.meta.url),'utf8');
 assert.ok(multiInvoiceSource.includes('orderId:queue.orderId'),'invoice analysis must send the already-selected order id to the server');
