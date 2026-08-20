@@ -27,7 +27,11 @@ const dev=read('wrangler.develop.toml');
 assert.match(release.release,/^\d{4}\.\d{2}\.\d{2}\.\d+$/,'release manifest must be explicit');
 assert.ok(generatedClient.includes(`CLIENT_RELEASE='${release.release}'`),'client release must be generated from release.json');
 assert.ok(generatedWorker.includes(`PLATFORM_RELEASE='${release.release}'`),'platform release must be generated from release.json');
-assert.match(app,new RegExp(`CLIENT_RELEASE='${release.release.replaceAll('.','\\.')}'`),'build must synchronize the current client release before tests/deploy');
+assert.match(app,/from '\.\/app-release\.js'/,'runtime must consume generated client release state');
+assert.doesNotMatch(app,/const CLIENT_RELEASE=|const OFFLINE_WARM_KEY=/,'runtime source must not duplicate generated release literals');
+assert.doesNotMatch(app,/verifyClientRelease|releaseCheckPromise|releaseFetch/,'release mismatch logic must exist only in the pre-hydration release guard');
+assert.match(app,/from '\.\/app-navigation\.js'/,'runtime must use semantic navigation directly');
+assert.doesNotMatch(app,/app-navigation-v14\.js|openInitialRouteV14/,'runtime must not execute the versioned navigation facade');
 assert.match(combined,/from '\.\/release\.js'/,'combined worker must consume generated release state');
 assert.doesNotMatch(combined,/const PLATFORM_RELEASE='[^']+'/,'combined worker must not own a second release literal');
 
@@ -64,9 +68,10 @@ assert.match(legacySupplier,/export \* from '\.\/app-suppliers\.js'/,'old suppli
 assert.match(legacyRouter,/export \* from '\.\/app-router\.js'/,'old router URL must be a harmless alias to current code');
 assert.match(legacyNavigation,/from '\.\/app-navigation\.js'/,'old navigation URL must be a harmless alias to current code');
 
-assert.ok(String(packageJson.scripts.verify).startsWith('npm run build:current &&'),'verification must synchronize release artifacts first');
+assert.ok(String(packageJson.scripts.verify).startsWith('npm run build:current && npm run check:release-sync &&'),'verification must regenerate and prove release artifacts were already committed in sync');
+assert.ok(String(packageJson.scripts['check:release-sync']).includes('git diff --exit-code'),'release sync gate must fail stale generated artifacts');
 for(const config of [prod,dev]){
   assert.match(config,/"\/", "\/index\.html", "\/sw\.js", "\/sw-release\.js", "\/app-release\.js", "\/manifest\.webmanifest"/,'current shell must pass through the release-aware worker');
 }
 
-console.log(`current architecture gate: OK · ${release.release} · one supplier owner · latest-only caches · generated release`);
+console.log(`current architecture gate: OK · ${release.release} · one supplier owner · one release owner · latest-only caches`);
