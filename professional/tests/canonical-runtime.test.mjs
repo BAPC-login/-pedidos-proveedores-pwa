@@ -25,12 +25,12 @@ assert.ok(master.includes('LOCAL_DRAFT_VERSION=71')&&master.includes('SERVER_AUT
 assert.ok(master.includes('id="clearMasterQuantities"')&&master.includes("for(const value of selections.values())value.quantity=''"), 'master list must clear all quantity inputs without recapturing stale DOM values');
 assert.ok(master.includes('Formato: <b>')&&master.includes('openMasterOrder({order:'),'create and edit must share the same master order renderer with visible purchase format');
 assert.ok(runtime.includes('.v40-dashboard')&&runtime.includes('.v40-chart-line'),'dashboard visual system must be loaded by canonical runtime');
-assert.ok(sw.includes('nuvasto-v80-native-orders-payments')&&sw.includes('sessionCacheKey')&&sw.includes('apiDataResponse'),'service worker must provide authenticated offline data fallback and invalidate stale operational UI');
+assert.ok(sw.includes('nuvasto-v96-release-coherence')&&sw.includes('sessionCacheKey')&&sw.includes('apiDataResponse'),'service worker must provide authenticated offline data fallback and invalidate stale operational UI');
 assert.ok(!sw.includes("'./app-procurement.js'")&&!sw.includes("'./app-enterprise.js'"),'service worker critical precache must exclude noncritical feature bundles');
 assert.ok(sw.includes('RELEASE_ASSET')&&sw.includes('releaseAssetResponse')&&sw.includes('const cached=await cache.match'),'release JS/CSS must be cache-first inside a release-scoped cache');
 assert.ok(documents.includes('minValue')&&documents.includes('meta.suppliers')&&documents.includes('data-v32-image-key'),'documents must expose preview and operational filters');
 assert.ok(payments.includes('openPaymentForOrder')&&payments.includes('openPaymentDocumentComposer')&&payments.includes('openCollectivePayment')&&payments.includes('openPaymentMethodsManager')&&entry.includes('initializePaymentWorkflow()'),'orders, history and finance must converge on one semantic payment-document workflow');
 assert.ok(app.includes('payment-collective')&&app.includes('openCollectivePayment'),'mobile More must expose direct collective payment access');
-assert.ok(app.includes('controllerchange')&&app.includes("registration?.waiting?.postMessage?.({type:'SKIP_WAITING'})"),'client must force a clean service-worker release cutover');
+assert.ok(app.includes('controllerchange')&&app.includes("waiting?.postMessage?.({type:'SKIP_WAITING'})"),'client must force a clean service-worker release cutover');
 assert.ok(telemetry.includes("window.addEventListener('nuvasto:api-metric'")&&telemetry.includes('requestBudget')&&telemetry.includes('DAY_LIMIT=100000'),'request budgets must be measured without adding per-request telemetry calls');
 console.log('canonical runtime regression gate: OK');
