@@ -8,6 +8,7 @@ const prodWorkflow=fs.readFileSync('../.github/workflows/deploy-cloudflare.yml',
 const devWorkflow=fs.readFileSync('../.github/workflows/deploy-development.yml','utf8');
 const verifyWorkflow=fs.readFileSync('../.github/workflows/verify.yml','utf8');
 const destructiveDev=fs.readFileSync('tests/development-e2e-v92.mjs','utf8');
+const destructiveCurrent=fs.readFileSync('tests/development-e2e-current.mjs','utf8');
 const aiCanary=fs.readFileSync('tests/development-ai-canary-v92.mjs','utf8');
 const readonlyProd=fs.readFileSync('tests/production-readonly-e2e-v92.mjs','utf8');
 const devSeed=fs.readFileSync('tests/development-seed.mjs','utf8');
@@ -37,9 +38,14 @@ assert.doesNotMatch(prodWorkflow,/branches: \[develop\]/,'production workflow mu
 assert.match(devWorkflow,/branches: \[develop\]/,'development deployment must remain develop-only');
 assert.match(devWorkflow,/wrangler\.develop\.toml/,'development workflow must use isolated Cloudflare config');
 assert.match(verifyWorkflow,/branches: \[main\]/,'PR verification must continue to target main');
+assert.doesNotMatch(verifyWorkflow,/agent\/\*\*/,'temporary agent branches must not create verification noise');
 
-assert.match(destructiveDev,/pedidos-pro-ai-dev\\\./,'destructive E2E must hard-guard the DEV host');
-assert.match(destructiveDev,/production-e2e-v44\.mjs/,'legacy full journey may only be reached through the DEV guard');
+assert.match(destructiveDev,/pedidos-pro-ai-dev\\\./,'destructive E2E wrapper must hard-guard the DEV host');
+assert.match(destructiveDev,/development-e2e-current\.mjs/,'DEV wrapper must execute only the current destructive journey');
+assert.doesNotMatch(destructiveDev,/production-e2e-v44\.mjs/,'DEV must not depend on the historical production E2E');
+assert.match(destructiveCurrent,/pedidos-pro-ai-dev\\\./,'current destructive E2E must independently hard-guard DEV');
+assert.match(destructiveCurrent,/release\.json/,'current destructive E2E must use the canonical release source');
+assert.match(destructiveCurrent,/receptionRequiredForClosure/,'current destructive E2E must validate reception-first closure');
 assert.match(devWorkflow,/development-e2e-v92\.mjs/,'DEV workflow must use the guarded destructive journey');
 assert.match(devWorkflow,/development-ai-canary-v92\.mjs/,'DEV workflow must run the real invoice AI canary when Gemini is configured');
 assert.match(aiCanary,/pedidos-pro-ai-dev\\\./,'AI canary must hard-guard the DEV host');
@@ -47,7 +53,7 @@ assert.match(aiCanary,/\/api\/invoices\/analyze/,'AI canary must exercise the ac
 assert.match(aiCanary,/application\/pdf/,'AI canary must send a real PDF fixture');
 
 assert.match(prodWorkflow,/production-readonly-e2e-v92\.mjs/,'production must use the read-only authenticated smoke');
-assert.doesNotMatch(prodWorkflow,/run: node tests\/production-e2e-v44\.mjs/,'production must never execute the destructive legacy E2E');
+assert.doesNotMatch(prodWorkflow,/run: node tests\/production-e2e-v44\.mjs/,'production must never execute the destructive historical E2E');
 for(const forbidden of ['/api/order-batches','/api/invoices','/api/finance/payment-documents','/api/autosave','/receptions'])assert.ok(!readonlyProd.includes(forbidden),`production read-only smoke must not mutate via ${forbidden}`);
 
-console.log('environment isolation: OK · develop is destructive-safe, QA provisioning is DEV-only and production smoke is read-only');
+console.log('environment isolation: OK · develop current E2E is destructive-safe, QA provisioning is DEV-only and production smoke is read-only');
