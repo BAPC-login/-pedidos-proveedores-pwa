@@ -2,7 +2,7 @@ name: Deploy Nuvasto development
 on:
   push:
     branches: [develop]
-    paths: ['professional/**','worker/**','wrangler.jsonc','.github/workflows/deploy-development.yml','.github/workflows/verify.yml']
+    paths: ['professional/**','worker/**','wrangler.jsonc','.github/workflows/deploy-development.yml']
   workflow_dispatch:
 permissions: {contents: read, statuses: write}
 concurrency: {group: deploy-nuvasto-development, cancel-in-progress: true}
@@ -21,14 +21,10 @@ jobs:
         run: npm run verify
 
       - name: Confirm Cloudflare deployment credential
-        id: credential
         shell: bash
         env: {CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}'}
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::error::Falta CLOUDFLARE_API_TOKEN"
-            exit 1
-          fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "::error::Falta CLOUDFLARE_API_TOKEN"; exit 1; fi
 
       - name: Deploy isolated Worker, D1 and R2
         id: deploy
@@ -40,7 +36,7 @@ jobs:
           wranglerVersion: '4.114.0'
           command: deploy --config wrangler.develop.toml --keep-vars
 
-      - name: Configure optional Gemini DEV secret
+      - name: Configure Gemini DEV secret
         id: secrets
         if: steps.deploy.outcome == 'success'
         working-directory: professional
@@ -53,76 +49,18 @@ jobs:
           if [ -n "$DEV_GEMINI_API_KEY" ]; then
             printf '%s' "$DEV_GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY --config wrangler.develop.toml
             echo 'configured=true' >> "$GITHUB_OUTPUT"
-            echo 'Gemini DEV configurado.'
           else
             echo 'configured=false' >> "$GITHUB_OUTPUT"
-            echo '::warning::NUVASTO_DEV_GEMINI_API_KEY aún no está configurado. El entorno DEV funciona; el canary real de IA quedará pendiente.'
+            echo '::warning::NUVASTO_DEV_GEMINI_API_KEY no está configurado; el canary IA se omitirá.'
           fi
 
-      - name: Verify development isolation and current UI generation
+      - name: Verify live current generation
         id: verify
-        shell: bash
-        run: |
-          set -euo pipefail
-          expected=$(node -e "const r=require('./professional/release.json');process.stdout.write(String(r.release||''))")
-          generation=$(node -e "const r=require('./professional/release.json');process.stdout.write(String(r.generation||''))")
-          if [ -z "$expected" ] || [ -z "$generation" ]; then
-            echo '::error::professional/release.json no define release/generation'
-            exit 1
-          fi
-          base='https://pedidos-pro-ai-dev.botreservasmultilocal.workers.dev'
-
-          for attempt in $(seq 1 24); do
-            body=$(curl --fail --silent --show-error --max-time 30 -H 'Cache-Control: no-cache' "$base/platform/health?release=$expected&attempt=$attempt" 2>/dev/null || true)
-            ready=$(PLATFORM_HEALTH="$body" node <<'NODE'
-          try {
-            const h=JSON.parse(process.env.PLATFORM_HEALTH||'{}');
-            const environment=h.environment==='development'&&h.developmentEnvironment===true;
-            const stability=h.productionStabilityV91===true&&h.reservedOrdersAdvancedV91===true&&h.transientInvoiceRetryV91===true&&h.verifiedAiUsageV91===true;
-            const storage=h.r2Configured===true&&h.r2Required===true&&h.r2Ready===true&&h.storageBackend==='r2';
-            process.stdout.write(h.ok===true&&environment&&stability&&storage?'true':'false');
-          } catch { process.stdout.write('false'); }
-          NODE
-            )
-            release=$(curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/platform/release?ts=$(date +%s)$attempt" 2>/dev/null || true)
-            release_ok=$(RELEASE_PAYLOAD="$release" EXPECTED_RELEASE="$expected" node <<'NODE'
-          try { const p=JSON.parse(process.env.RELEASE_PAYLOAD||'{}'); process.stdout.write(p.release===process.env.EXPECTED_RELEASE?'true':'false'); }
-          catch { process.stdout.write('false'); }
-          NODE
-            )
-            if [ "$ready" = "true" ] && [ "$release_ok" = "true" ]; then break; fi
-            if [ "$attempt" = "24" ]; then
-              echo "::error::Nuvasto DEV no activó la generación actual. release_ok=$release_ok runtime=$ready body=$body release=$release"
-              exit 1
-            fi
-            echo "Esperando DEV ${attempt}/24 · release=$release_ok · runtime=$ready"
-            sleep 10
-          done
-
-          stamp="$(date +%s)-$generation"
-          for asset in index.html app.js app-release.js app-session-bootstrap.js app-release-guard.js app-router.js app-navigation.js app-suppliers.js app-experience-settings.js app-company-profile.js app-current.css sw.js sw-release.js; do
-            curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache, no-store' "$base/$asset?v=$stamp" > "/tmp/$asset"
-          done
-
-          grep -Fq "CLIENT_RELEASE='$expected'" /tmp/app-release.js || { echo '::error::app-release.js DEV no coincide con release.json'; exit 1; }
-          grep -Fq "ARCHITECTURE_GENERATION=$generation" /tmp/app-release.js || { echo '::error::app-release.js DEV no coincide con la generación actual'; exit 1; }
-          grep -Fq "CURRENT_CACHE='nuvasto-current-$generation'" /tmp/app-release.js || { echo '::error::cache DEV no pertenece a la generación actual'; exit 1; }
-          grep -Fq "from './app-navigation.js'" /tmp/app.js || { echo '::error::app.js DEV no usa navegación canónica'; exit 1; }
-          grep -Fq "from './app-release.js'" /tmp/app.js || { echo '::error::app.js DEV no usa release canónico'; exit 1; }
-          grep -Fq "from './app-release-guard.js'" /tmp/app-session-bootstrap.js || { echo '::error::bootstrap DEV no ejecuta el release guard'; exit 1; }
-          grep -Fq 'duplicate_route_owner' /tmp/app-router.js || { echo '::error::router DEV no bloquea propietarios duplicados'; exit 1; }
-          grep -Fq 'Pago pactado' /tmp/app-suppliers.js || { echo '::error::Proveedores DEV no publica Pago pactado'; exit 1; }
-          grep -Fq 'Editar perfil' /tmp/app-suppliers.js || { echo '::error::Proveedores DEV no publica Editar perfil'; exit 1; }
-          grep -Fq 'Identidad visual' /tmp/app-suppliers.js || { echo '::error::Proveedores DEV no publica administración de logo'; exit 1; }
-          grep -Fq 'Perfil de empresa' /tmp/app-experience-settings.js || { echo '::error::DEV no publica Perfil de empresa'; exit 1; }
-          grep -Fq 'Perfil de local' /tmp/app-experience-settings.js || { echo '::error::DEV no publica Perfil de local'; exit 1; }
-          grep -Fq 'Paleta y documentos' /tmp/app-company-profile.js || { echo '::error::Perfil de empresa DEV no publica paleta/documentos'; exit 1; }
-          grep -Fq "importScripts('./sw-release.js')" /tmp/sw.js || { echo '::error::Service Worker DEV no usa identidad de release generada'; exit 1; }
-          grep -Fq 'deleteStaleNuvastoCaches' /tmp/sw.js || { echo '::error::Service Worker DEV no elimina caches obsoletos'; exit 1; }
-          grep -Fq "self.NUVASTO_RELEASE='$expected'" /tmp/sw-release.js || { echo '::error::sw-release.js DEV no coincide con el release actual'; exit 1; }
-          grep -Fq "self.NUVASTO_ARCHITECTURE_GENERATION=$generation" /tmp/sw-release.js || { echo '::error::sw-release.js DEV no coincide con la generación actual'; exit 1; }
-          grep -Fq "self.NUVASTO_CACHE='nuvasto-current-$generation'" /tmp/sw-release.js || { echo '::error::sw-release.js DEV no coincide con el cache actual'; exit 1; }
-          echo "Nuvasto DEV aislado y UI actual verificada · release $expected · generación $generation."
+        working-directory: professional
+        env:
+          NUVASTO_BASE_URL: 'https://pedidos-pro-ai-dev.botreservasmultilocal.workers.dev'
+          NUVASTO_EXPECT_ENV: development
+        run: node scripts/verify-live-current.mjs
 
       - name: Bootstrap and seed DEV QA data
         id: seed
@@ -138,28 +76,20 @@ jobs:
           set -euo pipefail
           if [ -z "$NUVASTO_E2E_PASSWORD" ]; then
             echo 'configured=false' >> "$GITHUB_OUTPUT"
-            echo '::warning::NUVASTO_DEV_E2E_PASSWORD aún no está configurado. DEV está aislado, pero todavía no se inicializa la organización QA.'
+            echo '::warning::NUVASTO_DEV_E2E_PASSWORD no está configurado; los E2E autenticados se omitirán.'
             exit 0
           fi
           bootstrap_token=$(openssl rand -hex 32)
           echo "::add-mask::$bootstrap_token"
           printf '%s' "$bootstrap_token" | npx wrangler secret put BOOTSTRAP_ADMIN_TOKEN --config wrangler.develop.toml
-
-          seeded=false
           for attempt in $(seq 1 12); do
             if NUVASTO_BOOTSTRAP_TOKEN="$bootstrap_token" node tests/development-seed.mjs; then
-              seeded=true
-              break
+              echo 'configured=true' >> "$GITHUB_OUTPUT"
+              exit 0
             fi
-            if [ "$attempt" = "12" ]; then
-              echo '::error::El secreto BOOTSTRAP_ADMIN_TOKEN no quedó activo a tiempo en Nuvasto DEV.'
-              exit 1
-            fi
-            echo "Esperando propagación del secreto DEV ${attempt}/12…"
+            if [ "$attempt" = "12" ]; then echo '::error::BOOTSTRAP_ADMIN_TOKEN no se propagó a tiempo'; exit 1; fi
             sleep 5
           done
-          if [ "$seeded" != "true" ]; then exit 1; fi
-          echo 'configured=true' >> "$GITHUB_OUTPUT"
 
       - name: Full destructive E2E on isolated DEV only
         id: e2e
@@ -208,13 +138,7 @@ jobs:
         run: |
           if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.seed.outcome }}" != "failure" ] && [ "${{ steps.e2e.outcome }}" != "failure" ] && [ "${{ steps.branding_e2e.outcome }}" != "failure" ] && [ "${{ steps.supplier_e2e.outcome }}" != "failure" ] && [ "${{ steps.ai_canary.outcome }}" != "failure" ]; then
             state=success
-            if [ "${{ steps.seed.outputs.configured }}" = "true" ] && [ "${{ steps.secrets.outputs.configured }}" = "true" ]; then
-              description='Nuvasto DEV · current UI + operación + proveedores + logos + IA OK'
-            elif [ "${{ steps.seed.outputs.configured }}" = "true" ]; then
-              description='Nuvasto DEV · current UI + operación + proveedores + logos OK; falta Gemini DEV'
-            else
-              description='Nuvasto DEV current UI verificada; falta credencial E2E'
-            fi
+            if [ "${{ steps.seed.outputs.configured }}" = "true" ] && [ "${{ steps.secrets.outputs.configured }}" = "true" ]; then description='Nuvasto DEV · current UI + operación + proveedores + logos + IA OK'; else description='Nuvasto DEV current verificado; cobertura opcional incompleta'; fi
           else
             state=failure
             description='Nuvasto DEV no quedó listo'
