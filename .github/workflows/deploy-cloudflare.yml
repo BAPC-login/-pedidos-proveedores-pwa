@@ -40,17 +40,21 @@ jobs:
           wranglerVersion: '4.114.0'
           command: deploy --config wrangler.toml --keep-vars
 
-      - name: Verify v91 production contract
+      - name: Verify current production generation
         id: verify
         shell: bash
         run: |
           set -euo pipefail
-          expected=$(node -e "const s=require('fs').readFileSync('worker/src/combined.js','utf8');const m=s.match(/PLATFORM_RELEASE='([^']+)'/);if(!m)process.exit(1);process.stdout.write(m[1])")
+          expected=$(node -e "const r=require('./professional/release.json');process.stdout.write(String(r.release||''))")
+          generation=$(node -e "const r=require('./professional/release.json');process.stdout.write(String(r.generation||''))")
+          if [ -z "$expected" ] || [ -z "$generation" ]; then
+            echo '::error::professional/release.json no define release/generation'
+            exit 1
+          fi
           base='https://pedidos-pro-ai.botreservasmultilocal.workers.dev'
 
           for attempt in $(seq 1 24); do
-            body=$(curl --fail --silent --show-error --max-time 30 --dump-header /tmp/headers "$base/platform/health?release=$expected&attempt=$attempt" 2>/dev/null || true)
-            release=$(grep -Ei '^x-nuvasto-release:|^x-pedidos-pro-release:' /tmp/headers 2>/dev/null | head -1 | tr -d '\r' | awk '{print $2}' || true)
+            body=$(curl --fail --silent --show-error --max-time 30 -H 'Cache-Control: no-cache' "$base/platform/health?release=$expected&attempt=$attempt" 2>/dev/null || true)
             ready=$(PLATFORM_HEALTH="$body" node <<'NODE'
           try {
             const h=JSON.parse(process.env.PLATFORM_HEALTH||'{}');
@@ -66,38 +70,43 @@ jobs:
           } catch { process.stdout.write('false'); }
           NODE
             )
-            if [ "$release" = "$expected" ] && [ "$ready" = "true" ]; then break; fi
+            release=$(curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/platform/release?ts=$(date +%s)$attempt" 2>/dev/null || true)
+            release_ok=$(RELEASE_PAYLOAD="$release" EXPECTED_RELEASE="$expected" node <<'NODE'
+          try { const p=JSON.parse(process.env.RELEASE_PAYLOAD||'{}'); process.stdout.write(p.release===process.env.EXPECTED_RELEASE?'true':'false'); }
+          catch { process.stdout.write('false'); }
+          NODE
+            )
+            if [ "$ready" = "true" ] && [ "$release_ok" = "true" ]; then break; fi
             if [ "$attempt" = "24" ]; then
-              echo "::error::Cloudflare no activó el contrato v91 esperado. release=${release:-none} runtime=$ready body=$body"
+              echo "::error::Producción no activó la generación actual. release_ok=$release_ok runtime=$ready body=$body release=$release"
               exit 1
             fi
-            echo "Esperando despliegue ${attempt}/24 · release=${release:-none} · runtime=$ready"
+            echo "Esperando producción ${attempt}/24 · release=$release_ok · runtime=$ready"
             sleep 10
           done
 
-          stamp=$(date +%s)
-          for asset in app.js app-professional.js app-orders.js app-master-order.js app-payment-workflow.js app-file-actions.js app-order-detail-v30.js design-system-native-v80.css native-performance.css sw.js; do
-            curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/$asset?v=$stamp" > "/tmp/$asset"
+          stamp="$(date +%s)-$generation"
+          for asset in index.html app.js app-release.js app-session-bootstrap.js app-release-guard.js app-router.js app-navigation.js app-suppliers.js app-experience-settings.js app-company-profile.js app-current.css sw.js sw-release.js; do
+            curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache, no-store' "$base/$asset?v=$stamp" > "/tmp/$asset"
           done
 
-          grep -Fq "CLIENT_RELEASE='$expected'" /tmp/app.js || { echo '::error::app.js productivo no coincide con el release'; exit 1; }
-          grep -Fq 'design-system-native-v80.css' /tmp/app-professional.js || { echo '::error::runtime profesional no carga la capa visual nativa v80'; exit 1; }
-          grep -Fq -- '--ios-blue:#007aff' /tmp/design-system-native-v80.css || { echo '::error::tokens iOS v80 no están publicados'; exit 1; }
-          grep -Fq -- '-apple-system' /tmp/design-system-native-v80.css || { echo '::error::tipografía nativa no está publicada'; exit 1; }
-          grep -Fq "received:[['closed','Cerrar pedido']]" /tmp/app-orders.js || { echo '::error::recepción no habilita cierre directo'; exit 1; }
-          grep -Fq "['delete-draft','Eliminar borrador']" /tmp/app-orders.js || { echo '::error::menú de borrador no permite eliminar borradores'; exit 1; }
-          grep -Fq "['preview','Vista previa PDF']" /tmp/app-orders.js || { echo '::error::Pedidos no expone vista previa PDF'; exit 1; }
-          grep -Fq 'async function previewOrder(order)' /tmp/app-orders.js || { echo '::error::vista previa PDF no usa el flujo externo'; exit 1; }
-          grep -Fq "window.open('about:blank','_blank')" /tmp/app-orders.js || { echo '::error::vista previa PDF no conserva el gesto nativo del navegador'; exit 1; }
-          grep -Fq 'openPaymentDocumentComposer' /tmp/app-payment-workflow.js || { echo '::error::flujo canónico de pagos no está publicado'; exit 1; }
-          grep -Fq 'openOrderPaymentHub' /tmp/app-payment-workflow.js || { echo '::error::historial de pagos por pedido no está publicado'; exit 1; }
-          grep -Fq 'SERVER_AUTOSAVE_DELAY=1200' /tmp/app-master-order.js || { echo '::error::autosave de Lista Maestra no está publicado'; exit 1; }
-          grep -Fq "const CACHE_VERSION='nuvasto-v91-production-stability'" /tmp/sw.js || { echo '::error::service worker v91 no está activo'; exit 1; }
-          if grep -Fq "'./app-procurement.js'" /tmp/sw.js; then echo '::error::Service Worker aún precarga bundles no críticos'; exit 1; fi
-          grep -Fq 'apiNetworkTimeout' /tmp/sw.js || { echo '::error::timeout API adaptable no está publicado'; exit 1; }
-          grep -Fq 'regenerateOrderDocument' /tmp/app-file-actions.js || { echo '::error::recuperación de PDF R2 v91 no está publicada'; exit 1; }
-          grep -Fq 'ensureOrderDocument(order,{force:true})' /tmp/app-file-actions.js || { echo '::error::PDF huérfano no fuerza regeneración'; exit 1; }
-          echo "Nuvasto v91 · rutas reservadas, lectura IA resiliente, cuota verificada y recuperación R2 comprobadas en producción."
+          grep -Fq "CLIENT_RELEASE='$expected'" /tmp/app-release.js || { echo '::error::app-release.js productivo no coincide con release.json'; exit 1; }
+          grep -Fq "ARCHITECTURE_GENERATION=$generation" /tmp/app-release.js || { echo '::error::generación productiva no coincide'; exit 1; }
+          grep -Fq "CURRENT_CACHE='nuvasto-current-$generation'" /tmp/app-release.js || { echo '::error::cache productivo no pertenece a la generación actual'; exit 1; }
+          grep -Fq "from './app-navigation.js'" /tmp/app.js || { echo '::error::app.js productivo no usa navegación canónica'; exit 1; }
+          grep -Fq "from './app-release.js'" /tmp/app.js || { echo '::error::app.js productivo no usa release canónico'; exit 1; }
+          grep -Fq "from './app-release-guard.js'" /tmp/app-session-bootstrap.js || { echo '::error::bootstrap productivo no ejecuta release guard'; exit 1; }
+          grep -Fq 'duplicate_route_owner' /tmp/app-router.js || { echo '::error::router productivo no bloquea propietarios duplicados'; exit 1; }
+          grep -Fq 'Pago pactado' /tmp/app-suppliers.js || { echo '::error::Proveedores productivo no publica Pago pactado'; exit 1; }
+          grep -Fq 'Editar perfil' /tmp/app-suppliers.js || { echo '::error::Proveedores productivo no publica Editar perfil'; exit 1; }
+          grep -Fq 'Identidad visual' /tmp/app-suppliers.js || { echo '::error::Proveedores productivo no publica administración de logo'; exit 1; }
+          grep -Fq 'Perfil de empresa' /tmp/app-experience-settings.js || { echo '::error::Configuración productiva no publica Perfil de empresa'; exit 1; }
+          grep -Fq 'Perfil de local' /tmp/app-experience-settings.js || { echo '::error::Configuración productiva no publica Perfil de local'; exit 1; }
+          grep -Fq "importScripts('./sw-release.js')" /tmp/sw.js || { echo '::error::Service Worker productivo no usa release generado'; exit 1; }
+          grep -Fq 'deleteStaleNuvastoCaches' /tmp/sw.js || { echo '::error::Service Worker productivo no elimina caches obsoletos'; exit 1; }
+          grep -Fq "CACHE_VERSION='nuvasto-current-$generation'" /tmp/sw-release.js || { echo '::error::sw-release.js productivo no coincide con generación actual'; exit 1; }
+          echo "release=$expected" >> "$GITHUB_OUTPUT"
+          echo "Nuvasto current publicado · release $expected · generación $generation · UI canónica verificada."
 
       - name: Production authenticated read-only smoke
         id: authenticated
@@ -132,9 +141,9 @@ jobs:
         run: |
           if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.authenticated.outcome }}" != "failure" ]; then
             state=success
-            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto v91 publicado + smoke autenticado de solo lectura OK'; else description='Nuvasto v91 publicado; smoke público verificado'; fi
+            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto current publicado + smoke autenticado read-only OK'; else description='Nuvasto current publicado; contrato público verificado'; fi
           else
             state=failure
-            description='El despliegue de Nuvasto v91 no quedó verificado'
+            description='El despliegue current de Nuvasto no quedó verificado'
           fi
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -f state="$state" -f context='nuvasto/production' -f description="$description" -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
