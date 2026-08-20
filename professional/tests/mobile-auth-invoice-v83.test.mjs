@@ -20,7 +20,8 @@ assert.match(index,/design-system-native-v80\.css\?v=83/,'native design must be 
 assert.match(index,/design-system-native-v82\.css\?v=83/,'dark contrast pass must be loaded before authentication');
 assert.match(copy,/netLineTotal/,'copy policy must recognize implementation tokens');
 assert.match(copy,/Observaciones de lectura/i,'technical reading notes must be removed from user-facing checkout');
-assert.match(sw,/nuvasto-v83-mobile-auth-invoice/,'service worker cache must rotate for v83');
+assert.match(sw,/importScripts\('\.\/sw-release\.js'\)/,'mobile shell must consume the current generated release');
+assert.doesNotMatch(sw,/LEGACY_CACHE_VERSION|PREVIOUS_CACHE_VERSION/,'mobile shell must not retain historical cache generations');
 
 const grossLines=[
   {invoiceQuantity:1,totalUnits:1,netLineTotal:100},
@@ -46,4 +47,4 @@ assert.equal(netLines[0].grossLineTotal,119);
 assert.equal(netLines[1].grossLineTotal,238);
 assert.equal(warnings.some(value=>/netLineTotal|freightLine|additionalTaxLine|invoice-column|proportional/i.test(value)),false);
 
-console.log('v83 mobile/auth/invoice contracts: OK');
+console.log('mobile/auth/invoice contracts: OK');
