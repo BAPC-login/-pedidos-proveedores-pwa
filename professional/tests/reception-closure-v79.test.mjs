@@ -9,6 +9,7 @@ const invoice=read('../web/app-invoice-v30.js');
 const query=read('../worker/src/api/orders-query.js');
 const fallback=read('../worker/src/api/orders-list-v2.js');
 const shell=read('../web/index.html');
+const currentCss=read('../web/app-current.css');
 const sw=read('../web/sw.js');
 
 assert.match(worker,/receptionRequiredForClosure:true/,'health must expose reception as the closure gate');
@@ -36,7 +37,8 @@ assert.match(invoice,/name="markReceived"/,'invoice UI must keep the explicit re
 assert.match(invoice,/receptionDate/,'invoice UI must let the user choose reception date');
 assert.match(query,/deliveryOutcome.*not_presented/s,'canonical history query must expose no-show outcome');
 assert.match(fallback,/deliveryOutcome.*not_presented/s,'fallback history query must expose no-show outcome');
-assert.match(shell,/design-system-v79\.css/,'current presentation bundle must retain the validated reception layout contract');
+assert.match(shell,/id="nuvastoCurrentStyles"[^>]+app-current\.css/,'shell must expose only the current presentation entry');
+assert.match(currentCss,/design-system-v79\.css/,'current presentation cascade must retain the validated reception layout contract');
 assert.match(sw,/importScripts\('\.\/sw-release\.js'\)/,'service worker cache identity must come only from the generated current release');
 assert.match(sw,/deleteStaleNuvastoCaches/,'service worker activation must delete all stale Nuvasto caches');
 
