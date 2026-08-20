@@ -1,6 +1,7 @@
 import {normalizeInvoiceTotals,reconcileInvoicePricing as reconcileCanonicalPricing} from '../../../worker/src/invoice-cost-reconciliation.js';
 
 export {normalizeInvoiceTotals};
+export const PRINTED_FINAL_UNIT_METHOD='printed-final-unit-column';
 
 export function reconcileInvoicePricing(lines,totals,warnings=[]){
   const result=reconcileCanonicalPricing(lines,totals,warnings);
