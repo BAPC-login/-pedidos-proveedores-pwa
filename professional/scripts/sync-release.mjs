@@ -13,13 +13,6 @@ if(!/^\d{4}\.\d{2}\.\d{2}\.\d+$/.test(release))throw new Error(`release.json: re
 if(!Number.isInteger(generation)||generation<1)throw new Error('release.json: generation inválido');
 if(!/^nuvasto-[a-z0-9-]+$/.test(cache))throw new Error(`release.json: cache inválido (${cache})`);
 
-const appPath=path.join(root,'web/app.js');
-let app=fs.readFileSync(appPath,'utf8');
-app=app.replace(/const CLIENT_RELEASE='[^']+';/,`const CLIENT_RELEASE='${release}';`)
-  .replace(/const OFFLINE_WARM_KEY='[^']+';/,`const OFFLINE_WARM_KEY='nuvasto:offline-warm-current-${generation}';`);
-if(!app.includes(`const CLIENT_RELEASE='${release}';`))throw new Error('No se pudo sincronizar CLIENT_RELEASE');
-fs.writeFileSync(appPath,app);
-
 fs.writeFileSync(path.join(root,'web/app-release.js'),`// GENERATED from professional/release.json. Do not edit by hand.\nexport const CLIENT_RELEASE='${release}';\nexport const ARCHITECTURE_GENERATION=${generation};\nexport const CURRENT_CACHE='${cache}';\nexport const OFFLINE_WARM_KEY='nuvasto:offline-warm-current-${generation}';\n`);
 fs.writeFileSync(path.join(root,'web/sw-release.js'),`// GENERATED from professional/release.json. Do not edit by hand.\nself.NUVASTO_RELEASE='${release}';\nself.NUVASTO_ARCHITECTURE_GENERATION=${generation};\nself.NUVASTO_CACHE='${cache}';\n`);
 fs.writeFileSync(path.join(repo,'worker/src/release.js'),`// GENERATED from professional/release.json. Do not edit by hand.\nexport const PLATFORM_RELEASE='${release}';\nexport const ARCHITECTURE_GENERATION=${generation};\n`);
