@@ -100,7 +100,7 @@ jobs:
           done
 
           stamp="$(date +%s)-$generation"
-          for asset in index.html app.js app-release.js app-session-bootstrap.js app-release-guard.js app-router.js app-navigation.js app-suppliers.js app-company-profile.js app-current.css sw.js sw-release.js; do
+          for asset in index.html app.js app-release.js app-session-bootstrap.js app-release-guard.js app-router.js app-navigation.js app-suppliers.js app-experience-settings.js app-company-profile.js app-current.css sw.js sw-release.js; do
             curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache, no-store' "$base/$asset?v=$stamp" > "/tmp/$asset"
           done
 
@@ -114,7 +114,9 @@ jobs:
           grep -Fq 'Pago pactado' /tmp/app-suppliers.js || { echo '::error::Proveedores DEV no publica Pago pactado'; exit 1; }
           grep -Fq 'Editar perfil' /tmp/app-suppliers.js || { echo '::error::Proveedores DEV no publica Editar perfil'; exit 1; }
           grep -Fq 'Identidad visual' /tmp/app-suppliers.js || { echo '::error::Proveedores DEV no publica administración de logo'; exit 1; }
-          grep -Fq 'Perfil de local' /tmp/app-company-profile.js || { echo '::error::DEV no publica Perfil de local'; exit 1; }
+          grep -Fq 'Perfil de empresa' /tmp/app-experience-settings.js || { echo '::error::DEV no publica Perfil de empresa'; exit 1; }
+          grep -Fq 'Perfil de local' /tmp/app-experience-settings.js || { echo '::error::DEV no publica Perfil de local'; exit 1; }
+          grep -Fq 'Paleta y documentos' /tmp/app-company-profile.js || { echo '::error::Perfil de empresa DEV no publica paleta/documentos'; exit 1; }
           grep -Fq "importScripts('./sw-release.js')" /tmp/sw.js || { echo '::error::Service Worker DEV no usa identidad de release generada'; exit 1; }
           grep -Fq 'deleteStaleNuvastoCaches' /tmp/sw.js || { echo '::error::Service Worker DEV no elimina caches obsoletos'; exit 1; }
           grep -Fq "CACHE_VERSION='nuvasto-current-$generation'" /tmp/sw-release.js || { echo '::error::sw-release.js DEV no coincide con la generación actual'; exit 1; }
