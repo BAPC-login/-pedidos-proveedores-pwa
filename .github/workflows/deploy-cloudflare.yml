@@ -21,14 +21,10 @@ jobs:
         run: npm run verify
 
       - name: Confirm Cloudflare deployment credential
-        id: credential
         shell: bash
         env: {CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}'}
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::error::Falta CLOUDFLARE_API_TOKEN"
-            exit 1
-          fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "::error::Falta CLOUDFLARE_API_TOKEN"; exit 1; fi
 
       - name: Deploy Worker, assets, D1 and R2 bindings
         id: deploy
@@ -40,80 +36,20 @@ jobs:
           wranglerVersion: '4.114.0'
           command: deploy --config wrangler.toml --keep-vars
 
-      - name: Verify current production generation
+      - name: Verify live current production generation
         id: verify
-        shell: bash
-        run: |
-          set -euo pipefail
-          expected=$(node -e "const r=require('./professional/release.json');process.stdout.write(String(r.release||''))")
-          generation=$(node -e "const r=require('./professional/release.json');process.stdout.write(String(r.generation||''))")
-          if [ -z "$expected" ] || [ -z "$generation" ]; then
-            echo '::error::professional/release.json no define release/generation'
-            exit 1
-          fi
-          base='https://pedidos-pro-ai.botreservasmultilocal.workers.dev'
-
-          for attempt in $(seq 1 24); do
-            body=$(curl --fail --silent --show-error --max-time 30 -H 'Cache-Control: no-cache' "$base/platform/health?release=$expected&attempt=$attempt" 2>/dev/null || true)
-            ready=$(PLATFORM_HEALTH="$body" node <<'NODE'
-          try {
-            const h=JSON.parse(process.env.PLATFORM_HEALTH||'{}');
-            const storage=h.ok===true&&h.r2Configured===true&&h.r2Required===true&&h.r2Ready===true&&h.storageBackend==='r2';
-            const runtime=h.nativePerformanceV45===true&&h.schemaOffCriticalPathV45===true&&h.requestCoalescingV45===true&&h.operationsBootstrapV45===true&&h.directR2StreamingV45===true&&h.redirectSafeNavigationV50===true;
-            const migration=h.folioMigrationV67===true&&Number(h.folioMigrationDetails?.skipped||0)===0&&h.ordersSchemaV67===true&&h.scopedHistoricalFoliosV67===true&&h.cursorOrdersV67===true;
-            const closure=h.reconciliationRequiredForClosure===false&&h.receptionRequiredForClosure===true&&h.invoiceRequiredForClosure===false&&h.paymentRequiredForClosure===false;
-            const safety=h.issuedOrderDeleteProtectedV80===true&&h.actionablePaymentQueueV80===true&&h.paymentLedgerOrderStateV80===true;
-            const finance=h.paymentDocumentsV74===true&&h.collectivePaymentAllocationV74===true&&h.sameSupplierPaymentV74===true&&h.multiInvoicePaymentV74===true&&h.multiOrderPaymentV74===true&&h.paymentProofGeminiV77===true&&h.paymentLedgerV78===true;
-            const platform=h.passkeyAuthV72===true&&h.passkeyEnrollmentV78===true&&h.adaptiveInvoicePriceMatrixV78===true&&h.canonicalMasterOrderV71===true&&h.durableMasterDraftV69===true&&h.draftSaveNoFolioLockV69===true;
-            const stability=h.productionStabilityV91===true&&h.reservedOrdersAdvancedV91===true&&h.transientInvoiceRetryV91===true&&h.verifiedAiUsageV91===true;
-            process.stdout.write(storage&&runtime&&migration&&closure&&safety&&finance&&platform&&stability?'true':'false');
-          } catch { process.stdout.write('false'); }
-          NODE
-            )
-            release=$(curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache' "$base/platform/release?ts=$(date +%s)$attempt" 2>/dev/null || true)
-            release_ok=$(RELEASE_PAYLOAD="$release" EXPECTED_RELEASE="$expected" node <<'NODE'
-          try { const p=JSON.parse(process.env.RELEASE_PAYLOAD||'{}'); process.stdout.write(p.release===process.env.EXPECTED_RELEASE?'true':'false'); }
-          catch { process.stdout.write('false'); }
-          NODE
-            )
-            if [ "$ready" = "true" ] && [ "$release_ok" = "true" ]; then break; fi
-            if [ "$attempt" = "24" ]; then
-              echo "::error::Producción no activó la generación actual. release_ok=$release_ok runtime=$ready body=$body release=$release"
-              exit 1
-            fi
-            echo "Esperando producción ${attempt}/24 · release=$release_ok · runtime=$ready"
-            sleep 10
-          done
-
-          stamp="$(date +%s)-$generation"
-          for asset in index.html app.js app-release.js app-session-bootstrap.js app-release-guard.js app-router.js app-navigation.js app-suppliers.js app-experience-settings.js app-company-profile.js app-current.css sw.js sw-release.js; do
-            curl --fail --silent --show-error --max-time 20 -H 'Cache-Control: no-cache, no-store' "$base/$asset?v=$stamp" > "/tmp/$asset"
-          done
-
-          grep -Fq "CLIENT_RELEASE='$expected'" /tmp/app-release.js || { echo '::error::app-release.js productivo no coincide con release.json'; exit 1; }
-          grep -Fq "ARCHITECTURE_GENERATION=$generation" /tmp/app-release.js || { echo '::error::generación productiva no coincide'; exit 1; }
-          grep -Fq "CURRENT_CACHE='nuvasto-current-$generation'" /tmp/app-release.js || { echo '::error::cache productivo no pertenece a la generación actual'; exit 1; }
-          grep -Fq "from './app-navigation.js'" /tmp/app.js || { echo '::error::app.js productivo no usa navegación canónica'; exit 1; }
-          grep -Fq "from './app-release.js'" /tmp/app.js || { echo '::error::app.js productivo no usa release canónico'; exit 1; }
-          grep -Fq "from './app-release-guard.js'" /tmp/app-session-bootstrap.js || { echo '::error::bootstrap productivo no ejecuta release guard'; exit 1; }
-          grep -Fq 'duplicate_route_owner' /tmp/app-router.js || { echo '::error::router productivo no bloquea propietarios duplicados'; exit 1; }
-          grep -Fq 'Pago pactado' /tmp/app-suppliers.js || { echo '::error::Proveedores productivo no publica Pago pactado'; exit 1; }
-          grep -Fq 'Editar perfil' /tmp/app-suppliers.js || { echo '::error::Proveedores productivo no publica Editar perfil'; exit 1; }
-          grep -Fq 'Identidad visual' /tmp/app-suppliers.js || { echo '::error::Proveedores productivo no publica administración de logo'; exit 1; }
-          grep -Fq 'Perfil de empresa' /tmp/app-experience-settings.js || { echo '::error::Configuración productiva no publica Perfil de empresa'; exit 1; }
-          grep -Fq 'Perfil de local' /tmp/app-experience-settings.js || { echo '::error::Configuración productiva no publica Perfil de local'; exit 1; }
-          grep -Fq "importScripts('./sw-release.js')" /tmp/sw.js || { echo '::error::Service Worker productivo no usa release generado'; exit 1; }
-          grep -Fq 'deleteStaleNuvastoCaches' /tmp/sw.js || { echo '::error::Service Worker productivo no elimina caches obsoletos'; exit 1; }
-          grep -Fq "CACHE_VERSION='nuvasto-current-$generation'" /tmp/sw-release.js || { echo '::error::sw-release.js productivo no coincide con generación actual'; exit 1; }
-          echo "release=$expected" >> "$GITHUB_OUTPUT"
-          echo "Nuvasto current publicado · release $expected · generación $generation · UI canónica verificada."
+        working-directory: professional
+        env:
+          NUVASTO_BASE_URL: 'https://pedidos-pro-ai.botreservasmultilocal.workers.dev'
+          NUVASTO_EXPECT_ENV: production
+        run: node scripts/verify-live-current.mjs
 
       - name: Production authenticated read-only smoke
         id: authenticated
         if: steps.verify.outcome == 'success'
         working-directory: professional
         env:
-          NUVASTO_BASE_URL: https://pedidos-pro-ai.botreservasmultilocal.workers.dev
+          NUVASTO_BASE_URL: 'https://pedidos-pro-ai.botreservasmultilocal.workers.dev'
           NUVASTO_E2E_EMAIL: '${{ secrets.NUVASTO_E2E_EMAIL }}'
           NUVASTO_E2E_PASSWORD: '${{ secrets.NUVASTO_E2E_PASSWORD }}'
         run: node tests/production-readonly-e2e-v92.mjs
@@ -126,13 +62,7 @@ jobs:
           E2E_EMAIL: '${{ secrets.NUVASTO_E2E_EMAIL }}'
           E2E_PASSWORD: '${{ secrets.NUVASTO_E2E_PASSWORD }}'
         run: |
-          if [ -n "$E2E_EMAIL" ] && [ -n "$E2E_PASSWORD" ]; then
-            echo 'authenticated=true' >> "$GITHUB_OUTPUT"
-            echo 'Smoke autenticado de solo lectura configurado.'
-          else
-            echo 'authenticated=false' >> "$GITHUB_OUTPUT"
-            echo '::warning::Smoke autenticado no configurado; el contrato público sí fue ejecutado.'
-          fi
+          if [ -n "$E2E_EMAIL" ] && [ -n "$E2E_PASSWORD" ]; then echo 'authenticated=true' >> "$GITHUB_OUTPUT"; else echo 'authenticated=false' >> "$GITHUB_OUTPUT"; fi
 
       - name: Publish production status on commit
         if: always() && !cancelled()
@@ -141,7 +71,7 @@ jobs:
         run: |
           if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.authenticated.outcome }}" != "failure" ]; then
             state=success
-            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto current publicado + smoke autenticado read-only OK'; else description='Nuvasto current publicado; contrato público verificado'; fi
+            if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto current publicado + smoke autenticado read-only OK'; else description='Nuvasto current publicado; contrato live verificado'; fi
           else
             state=failure
             description='El despliegue current de Nuvasto no quedó verificado'
