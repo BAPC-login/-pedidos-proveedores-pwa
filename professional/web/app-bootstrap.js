@@ -12,10 +12,9 @@ import {initializeFileActions} from './app-file-actions.js';
 import {initializeSettingsPanelsV13} from './app-settings-panels-v13.js';
 import {initializeTelemetryV13} from './app-telemetry-v13.js';
 import {initializeReadinessV85} from './app-readiness-v85.js';
-import {initializeNavigationV14} from './app-navigation-v14.js';
+import {initializeNavigation} from './app-navigation.js';
 import {initializeImportPreviewV17} from './app-import-preview-v17.js';
 import {initializeAuthExperience} from './app-auth-experience.js';
-import {initializeProfessionalV20} from './app-professional-v20.js';
 import {initializeNuvastoV21} from './app-nuvasto-v21.js';
 import {initializeCheckoutInvoiceV29} from './app-checkout-invoice-v29.js';
 import {initializeLegalExperience} from './app-legal.js';
@@ -37,10 +36,9 @@ export function initializePlatform(){
   initializeSettingsPanelsV13();
   initializeTelemetryV13();
   initializeReadinessV85();
-  initializeNavigationV14();
+  initializeNavigation();
   initializeImportPreviewV17();
   initializeAuthExperience();
-  initializeProfessionalV20();
   initializeCheckoutInvoiceV29();
   initializeLegalExperience();
 }
