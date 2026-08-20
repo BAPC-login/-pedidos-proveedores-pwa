@@ -66,19 +66,32 @@ let supplier=(suppliersPayload.suppliers||[]).find(item=>item.name==='Proveedor 
 if(!supplier){const created=await call('/api/suppliers',{method:'POST',json:{name:'Proveedor E2E',legalName:'Proveedor E2E QA',paymentTerms:'Pruebas automáticas'}});supplier=created.supplier||created}
 assert.ok(supplier?.id,'DEV seed supplier');
 
-let productsPayload=await call('/api/products');
-let product=(productsPayload.products||[]).find(item=>item.name==='Producto E2E');
-if(!product){const created=await call('/api/products',{method:'POST',json:{name:'Producto E2E',brand:'Nuvasto QA',variant:'Synthetic',contentValue:1,contentUnit:'un',baseUnit:'unidad',costCenterIds:[center.id]}});product=created.product||created}
-assert.ok(product?.id,'DEV seed product');
+const productDefinitions=[
+  {name:'Producto E2E',brand:'Nuvasto QA',variant:'Synthetic',contentValue:1,contentUnit:'un',baseUnit:'unidad',supplierProductName:'Producto E2E',supplierSku:'E2E-001',orderUnit:'UNIDAD',unitsPerOrderUnit:1},
+  {name:'Fernet Branca E2E 1000 ml',brand:'Nuvasto QA',variant:'Botella 1000 ml',contentValue:1000,contentUnit:'ml',baseUnit:'botella',supplierProductName:'FERNET BRANCA E2E 1000CC X 6',supplierSku:'E2E-FERNET-6',orderUnit:'CAJA (6)',unitsPerOrderUnit:6},
+  {name:'Mistral 35 E2E 1000 ml',brand:'Nuvasto QA',variant:'Botella 1000 ml',contentValue:1000,contentUnit:'ml',baseUnit:'botella',supplierProductName:'MISTRAL 35 E2E 1000CC X 12',supplierSku:'E2E-M35-12',orderUnit:'CAJA (12)',unitsPerOrderUnit:12},
+  {name:'Vino Cabernet E2E 750 ml',brand:'Nuvasto QA',variant:'Botella 750 ml',contentValue:750,contentUnit:'ml',baseUnit:'botella',supplierProductName:'VINO CABERNET E2E 750CC X 6',supplierSku:'E2E-VINO-6',orderUnit:'CAJA (6)',unitsPerOrderUnit:6}
+];
 
-productsPayload=await call('/api/products');
-product=(productsPayload.products||[]).find(item=>item.id===product.id)||product;
-if(!(product.costCenters||[]).some(item=>item.id===center.id))await call(`/api/products/${encodeURIComponent(product.id)}/cost-centers`,{method:'PUT',json:{costCenterIds:[center.id]}});
-if(!(product.suppliers||[]).some(item=>item.supplierId===supplier.id))await call(`/api/products/${encodeURIComponent(product.id)}/suppliers`,{method:'POST',json:{supplierId:supplier.id,supplierProductName:'Producto E2E',supplierSku:'E2E-001',orderUnit:'UNIDAD',unitsPerOrderUnit:1,minimumQuantity:1,quantityMultiple:1}});
+async function ensureProduct(definition){
+  let productsPayload=await call('/api/products');
+  let product=(productsPayload.products||[]).find(item=>item.name===definition.name);
+  if(!product){
+    const created=await call('/api/products',{method:'POST',json:{name:definition.name,brand:definition.brand,variant:definition.variant,contentValue:definition.contentValue,contentUnit:definition.contentUnit,baseUnit:definition.baseUnit,costCenterIds:[center.id]}});
+    product=created.product||created;
+  }
+  productsPayload=await call('/api/products');
+  product=(productsPayload.products||[]).find(item=>item.id===product.id)||product;
+  if(!(product.costCenters||[]).some(item=>item.id===center.id))await call(`/api/products/${encodeURIComponent(product.id)}/cost-centers`,{method:'PUT',json:{costCenterIds:[center.id]}});
+  if(!(product.suppliers||[]).some(item=>item.supplierId===supplier.id))await call(`/api/products/${encodeURIComponent(product.id)}/suppliers`,{method:'POST',json:{supplierId:supplier.id,supplierProductName:definition.supplierProductName,supplierSku:definition.supplierSku,orderUnit:definition.orderUnit,unitsPerOrderUnit:definition.unitsPerOrderUnit,minimumQuantity:1,quantityMultiple:1}});
+  const refreshed=await call('/api/products');
+  const seeded=(refreshed.products||[]).find(item=>item.id===product.id);
+  assert.ok(seeded?.costCenters?.some(item=>item.id===center.id),`seeded product center relation: ${definition.name}`);
+  assert.ok(seeded?.suppliers?.some(item=>item.supplierId===supplier.id),`seeded product supplier relation: ${definition.name}`);
+  return seeded;
+}
 
-const finalProducts=await call('/api/products');
-const seeded=(finalProducts.products||[]).find(item=>item.id===product.id);
-assert.ok(seeded?.costCenters?.some(item=>item.id===center.id),'seeded product center relation');
-assert.ok(seeded?.suppliers?.some(item=>item.supplierId===supplier.id),'seeded product supplier relation');
+const seededProducts=[];
+for(const definition of productDefinitions)seededProducts.push(await ensureProduct(definition));
 
-console.log(`development seed: OK · ${email} · ${location.name}/${center.name} · ${supplier.name} · ${seeded.name}`);
+console.log(`development seed: OK · ${email} · ${location.name}/${center.name} · ${supplier.name} · ${seededProducts.length} invoice products`);
