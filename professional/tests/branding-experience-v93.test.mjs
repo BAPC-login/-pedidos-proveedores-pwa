@@ -18,6 +18,7 @@ assert.match(suppliers,/hydrateProtectedImages/,'supplier logos must hydrate thr
 assert.match(suppliers,/\/identity/,'supplier profile must expose logo management inside Proveedores');
 assert.match(settings,/Perfil de empresa/,'settings must expose the unified company profile');
 assert.match(settings,/settings-company-logo/,'settings must visibly preview the configured company logo');
+assert.match(settings,/Perfil de local/,'settings must expose the unified local profile');
 assert.doesNotMatch(settings,/Proveedores e identidad/,'supplier identity must no longer be duplicated in settings');
 assert.match(companyProfile,/protectedAssetUrl/,'company profile must load the logo through authenticated asset handling');
 assert.match(companyProfile,/Paleta y documentos/,'company profile must combine logo, palette and document identity');
@@ -30,7 +31,8 @@ assert.match(screenState,/launchOverlay/,'screen arbitration must preserve the l
 assert.doesNotMatch(brandCss,/scale\(24\)/,'launch animation must never use the previous violent 24x zoom');
 assert.match(brandCss,/nuvastoLaunchFade/,'launch animation must end with a controlled fade');
 assert.match(brandCss,/1\.28s cubic-bezier\(\.16,1,\.3,1\)/,'launch motion must use the smoother cinematic timing');
-assert.match(sw,/CACHE_VERSION='nuvasto-v95-safe-area-contract'/,'service worker must carry the v94 menu/branding assets through the v95 safe-area shell');
-assert.match(sw,/PREVIOUS_CACHE_VERSION='nuvasto-v94-menu-information-architecture'/,'v95 must preserve v94 as the direct predecessor');
+assert.match(sw,/CACHE_VERSION='nuvasto-v96-release-coherence'/,'service worker must carry the v94 menu/branding assets through the v96 coherent shell');
+assert.match(sw,/PREVIOUS_CACHE_VERSION='nuvasto-v95-safe-area-contract'/,'v96 must preserve v95 as the direct predecessor');
+assert.match(sw,/LEGACY_CACHE_VERSION_V94='nuvasto-v94-menu-information-architecture'/,'v96 must preserve v94 menu and supplier ownership lineage');
 
-console.log('v95 branding experience: OK · company profile unified · supplier identity stays in Proveedores · launch handoff smooth');
+console.log('v93-v96 branding experience: OK · company/local profiles unified · supplier identity stays in Proveedores · launch handoff smooth');
