@@ -133,7 +133,9 @@ assert.match(productionDeploy, /secret list --config wrangler\.toml --format jso
 assert.match(developmentDeploy, /secret list --config wrangler\.develop\.toml --format json/);
 assert.doesNotMatch(productionDeploy, /secret list[^\n]*--json/);
 assert.doesNotMatch(developmentDeploy, /secret list[^\n]*--json/);
-assert.match(backupWorkflow, /D1 Nuvasto resuelta automáticamente por firma de esquema/);
+assert.match(backupWorkflow, /D1 Nuvasto resuelta automáticamente por firma de esquema y entorno/);
+assert.match(backupWorkflow, /production_matches=\(\)/);
+assert.match(backupWorkflow, /dev\|development\|staging\|test\|qa/);
 assert.doesNotMatch(backupWorkflow, /if:\s*\$\{\{[^\n]*NUVASTO_D1_DATABASE/);
 assert.match(backupWorkflow, /workflow_run:/);
 assert.match(backupWorkflow, /workflows: \['Deploy Nuvasto to Cloudflare'\]/);
