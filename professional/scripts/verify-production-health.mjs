@@ -15,9 +15,9 @@ export function validateRelease(payload = {}) {
   const required = {
     ok: payload.ok === true,
     release: Boolean(payload.release),
-    phase: payload.phase === 14,
-    phaseRelease: payload.phaseRelease === 'phase-14-nuvasto-20260902-r1',
-    contract: payload.integrationContractVersion === 'r-system-procurement-v1'
+    phase: payload.phase === 15,
+    phaseRelease: payload.phaseRelease === 'phase-15-native-procurement-20260902-r1',
+    contract: payload.integrationContractVersion === 'r-system-procurement-v2'
   };
   assertChecks('release', required);
   return payload;
@@ -28,11 +28,13 @@ export function validateIntegrationContract(payload = {}) {
     ok: payload.ok === true,
     service: payload.service === 'nuvasto',
     module: payload.module === 'procurement',
-    phase: payload.phase === 14,
-    contract: payload.contract_version === 'r-system-procurement-v1',
+    phase: payload.phase === 15,
+    contract: payload.contract_version === 'r-system-procurement-v2',
     sourceOfTruth: payload.source_of_truth?.duplicated_in_r_system === false,
     rpc: payload.integration?.entrypoint === 'RSystemProcurementEntrypoint',
-    phase15Boundary: payload.integration?.operational_rpc_begins_in_phase === 15
+    phase15Boundary: payload.integration?.operational_rpc_begins_in_phase === 15,
+    operational: payload.integration?.operational_rpc_ready === true,
+    native: payload.integration?.native_r_system_route === '/procurement.html' && payload.integration?.external_launch === false
   };
   assertChecks('integration contract', required);
   return payload;
@@ -48,8 +50,8 @@ export function validateHealth(payload = {}) {
     payments: payload.paymentDocumentsV74 === true && payload.paymentLedgerV78 === true,
     closure: payload.receptionRequiredForClosure === true && payload.invoiceRequiredForClosure === false && payload.paymentRequiredForClosure === false,
     stability: payload.productionStabilityV91 === true && payload.reservedOrdersAdvancedV91 === true && payload.transientInvoiceRetryV91 === true && payload.verifiedAiUsageV91 === true,
-    phase14: payload.phase === 14 && payload.phase14Stabilized === true,
-    integration: payload.integrationContractVersion === 'r-system-procurement-v1' && payload.rSystemProcurementRpc === true,
+    phase14: payload.phase === 15 && payload.phase14Stabilized === true,
+    integration: payload.integrationContractVersion === 'r-system-procurement-v2' && payload.rSystemProcurementRpc === true && payload.operationalRpcReady === true,
     privateIpHashSalt: payload.ipHashSaltConfigured === true && payload.defaultIpHashSaltDisabled === true
   };
   assertChecks('health', required);
