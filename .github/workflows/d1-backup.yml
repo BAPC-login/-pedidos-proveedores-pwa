@@ -51,12 +51,25 @@ jobs:
                 fi
               fi
             done
+            if [ "${#matches[@]}" -gt 1 ]; then
+              production_matches=()
+              for match in "${matches[@]}"; do
+                normalized="${match,,}"
+                if [[ ! "$normalized" =~ (^|[-_])(dev|development|staging|test|qa)([-_]|$) ]]; then
+                  production_matches+=("$match")
+                fi
+              done
+              if [ "${#production_matches[@]}" -eq 1 ]; then
+                matches=("${production_matches[0]}")
+              fi
+            fi
             if [ "${#matches[@]}" -ne 1 ]; then
-              echo "::error::No se pudo resolver una única D1 de Nuvasto por firma de esquema (coincidencias: ${#matches[@]}). Configura NUVASTO_D1_DATABASE explícitamente."
+              printf 'Coincidencia D1: %s\n' "${matches[@]:-ninguna}"
+              echo "::error::No se pudo resolver una única D1 productiva por firma de esquema y nombre de entorno (coincidencias: ${#matches[@]}). Configura NUVASTO_D1_DATABASE explícitamente."
               exit 1
             fi
             database="${matches[0]}"
-            echo "D1 Nuvasto resuelta automáticamente por firma de esquema: $database"
+            echo "D1 Nuvasto resuelta automáticamente por firma de esquema y entorno: $database"
           fi
           echo "name=$database" >> "$GITHUB_OUTPUT"
       - name: Export remote D1
