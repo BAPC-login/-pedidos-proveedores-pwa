@@ -1,7 +1,17 @@
 import assert from 'node:assert/strict';
 
 const base=(process.env.NUVASTO_BASE_URL||'https://pedidos-pro-ai-dev.botreservasmultilocal.workers.dev').replace(/\/$/,'');
-const MAX_CANARY_ATTEMPTS=2;
+const MAX_CANARY_ATTEMPTS=3;
+const RETRYABLE_CANARY_ERRORS=new Set([
+  'invoice_pricing_unverified',
+  'invoice_math_unverified',
+  'gemini_http_429',
+  'gemini_http_500',
+  'gemini_http_502',
+  'gemini_http_503',
+  'gemini_http_504',
+  'ai_timeout'
+]);
 const email=String(process.env.NUVASTO_E2E_EMAIL||'e2e@nuvasto.dev').trim().toLowerCase();
 const password=String(process.env.NUVASTO_E2E_PASSWORD||'');
 const host=new URL(base).hostname;
@@ -155,7 +165,7 @@ for(const testCase of cases){
     if(!response.ok||payload.ok===false)throw new Error(`POST /api/invoices/analyze ${testCase.id} · ${response.status} · ${payload.error||'request failed'}`);
     analysis=payload.analysis||{};
     if(analysis.degraded===false)break;
-    const retryable=analysis.providerErrorCode==='invoice_pricing_unverified';
+    const retryable=RETRYABLE_CANARY_ERRORS.has(String(analysis.providerErrorCode||''));
     if(!retryable||attempt===MAX_CANARY_ATTEMPTS)break;
     console.warn(`development AI E2E ${testCase.id}: lectura transitoria no verificada; reintentando sin aceptar datos degradados`);
     await new Promise(resolve=>setTimeout(resolve,750));

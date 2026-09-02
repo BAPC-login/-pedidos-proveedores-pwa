@@ -139,9 +139,10 @@ assert.match(invoiceUi, /function pricingMethodLabel/);
 assert.doesNotMatch(invoiceUi, /Método: \$\{esc\(String\(line\.taxAllocationMethod/);
 assert.match(developmentE2e, /timeZone:'America\/Santiago'/);
 assert.doesNotMatch(developmentE2e, /const today=new Date\(\)\.toISOString\(\)\.slice\(0,10\)/);
-assert.match(aiCanary, /MAX_CANARY_ATTEMPTS=2/);
+assert.match(aiCanary, /MAX_CANARY_ATTEMPTS=3/);
 assert.match(aiCanary, /if\(analysis\.degraded===false\)break/);
-assert.match(aiCanary, /providerErrorCode==='invoice_pricing_unverified'/);
+assert.match(aiCanary, /RETRYABLE_CANARY_ERRORS\.has/);
+assert.match(aiCanary, /'gemini_http_503'/);
 assert.match(release, /"release": "2026\.09\.02\.98"/);
 assert.match(release, /"generation": 98/);
 
