@@ -36,6 +36,25 @@ jobs:
           wranglerVersion: '4.114.0'
           command: deploy --config wrangler.develop.toml --keep-vars
 
+      - name: Ensure private DEV IP hash salt
+        id: ip_hash_salt
+        if: steps.deploy.outcome == 'success'
+        working-directory: professional
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}'
+          CLOUDFLARE_ACCOUNT_ID: f1adc1e73490ce30fe3c1588d2ca57fb
+        run: |
+          set -euo pipefail
+          secrets_file=$(mktemp)
+          npx --yes wrangler@4.114.0 secret list --config wrangler.develop.toml --json > "$secrets_file"
+          if SECRETS_FILE="$secrets_file" node -e "const fs=require('fs');const rows=JSON.parse(fs.readFileSync(process.env.SECRETS_FILE,'utf8'));process.exit(rows.some(row=>row.name==='IP_HASH_SALT')?0:1)"; then
+            echo 'IP_HASH_SALT DEV ya está configurado como secret.'
+          else
+            openssl rand -hex 32 | npx --yes wrangler@4.114.0 secret put IP_HASH_SALT --config wrangler.develop.toml
+            echo 'IP_HASH_SALT DEV privado creado; no se expuso su valor.'
+          fi
+
       - name: Configure Gemini DEV secret
         id: secrets
         if: steps.deploy.outcome == 'success'
@@ -136,7 +155,7 @@ jobs:
         shell: bash
         env: {GH_TOKEN: '${{ github.token }}'}
         run: |
-          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.seed.outcome }}" != "failure" ] && [ "${{ steps.e2e.outcome }}" != "failure" ] && [ "${{ steps.branding_e2e.outcome }}" != "failure" ] && [ "${{ steps.supplier_e2e.outcome }}" != "failure" ] && [ "${{ steps.ai_canary.outcome }}" != "failure" ]; then
+          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.ip_hash_salt.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.seed.outcome }}" != "failure" ] && [ "${{ steps.e2e.outcome }}" != "failure" ] && [ "${{ steps.branding_e2e.outcome }}" != "failure" ] && [ "${{ steps.supplier_e2e.outcome }}" != "failure" ] && [ "${{ steps.ai_canary.outcome }}" != "failure" ]; then
             state=success
             if [ "${{ steps.seed.outputs.configured }}" = "true" ] && [ "${{ steps.secrets.outputs.configured }}" = "true" ]; then description='Nuvasto DEV · current UI + operación + proveedores + logos + IA OK'; else description='Nuvasto DEV current verificado; cobertura opcional incompleta'; fi
           else
