@@ -96,7 +96,7 @@ await assert.rejects(
   error => error?.code === 'ip_hash_salt_missing'
 );
 
-const [combined, rpc, auth, platform, passkeys, access, rootWrangler, productionDeploy, developmentDeploy, backupWorkflow, healthWorkflow, invoiceUi, developmentE2e, release] = await Promise.all([
+const [combined, rpc, auth, platform, passkeys, access, rootWrangler, productionDeploy, developmentDeploy, backupWorkflow, healthWorkflow, invoiceUi, developmentE2e, aiCanary, release] = await Promise.all([
   read('../../worker/src/combined.js'),
   read('../worker/src/integration/r-system-entrypoint.js'),
   read('../worker/src/auth.js'),
@@ -110,6 +110,7 @@ const [combined, rpc, auth, platform, passkeys, access, rootWrangler, production
   read('../../.github/workflows/production-health.yml'),
   read('../web/app-multi-invoice.js'),
   read('./development-e2e-current.mjs'),
+  read('./development-ai-canary-v92.mjs'),
   read('../release.json')
 ]);
 
@@ -138,6 +139,9 @@ assert.match(invoiceUi, /function pricingMethodLabel/);
 assert.doesNotMatch(invoiceUi, /Método: \$\{esc\(String\(line\.taxAllocationMethod/);
 assert.match(developmentE2e, /timeZone:'America\/Santiago'/);
 assert.doesNotMatch(developmentE2e, /const today=new Date\(\)\.toISOString\(\)\.slice\(0,10\)/);
+assert.match(aiCanary, /MAX_CANARY_ATTEMPTS=2/);
+assert.match(aiCanary, /if\(analysis\.degraded===false\)break/);
+assert.match(aiCanary, /providerErrorCode==='invoice_pricing_unverified'/);
 assert.match(release, /"release": "2026\.09\.02\.98"/);
 assert.match(release, /"generation": 98/);
 
