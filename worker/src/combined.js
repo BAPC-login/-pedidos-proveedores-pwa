@@ -4,6 +4,7 @@ import { PLATFORM_RELEASE, ARCHITECTURE_GENERATION } from './release.js';
 import {
   INTEGRATION_CONTRACT_VERSION,
   PHASE14_RELEASE,
+  PHASE15_RELEASE,
   integrationContractResponse
 } from '../../professional/worker/src/phase14-contract.js';
 
@@ -33,7 +34,7 @@ function withPlatformRelease(response) {
   headers.set('X-Nuvasto-Release', PLATFORM_RELEASE);
   headers.set('X-Pedidos-Pro-Release', PLATFORM_RELEASE);
   headers.set('X-Nuvasto-Architecture', String(ARCHITECTURE_GENERATION));
-  headers.set('X-Nuvasto-Phase', '14');
+  headers.set('X-Nuvasto-Phase', '15');
   headers.set('X-Nuvasto-Contract', INTEGRATION_CONTRACT_VERSION);
   return new Response(response.body, {
     status: response.status,
@@ -48,8 +49,8 @@ function releaseResponse() {
     service: 'nuvasto-release',
     release: PLATFORM_RELEASE,
     architectureGeneration: ARCHITECTURE_GENERATION,
-    phase: 14,
-    phaseRelease: PHASE14_RELEASE,
+    phase: 15,
+    phaseRelease: PHASE15_RELEASE,
     integrationContractVersion: INTEGRATION_CONTRACT_VERSION
   }), {
     headers: {
@@ -86,12 +87,14 @@ async function platformHealthResponse(request, env, ctx) {
     ...payload,
     release: PLATFORM_RELEASE,
     architectureGeneration: ARCHITECTURE_GENERATION,
-    phase: 14,
+    phase: 15,
     phase14Release: PHASE14_RELEASE,
     phase14Stabilized: true,
+    phase15Release: PHASE15_RELEASE,
+    phase15NativeIntegration: true,
     integrationContractVersion: INTEGRATION_CONTRACT_VERSION,
     rSystemProcurementRpc: true,
-    operationalRpcBeginsInPhase: 15,
+    operationalRpcReady: true,
     ipHashSaltConfigured: Boolean(env.IP_HASH_SALT),
     defaultIpHashSaltDisabled: true,
     r2Configured,
