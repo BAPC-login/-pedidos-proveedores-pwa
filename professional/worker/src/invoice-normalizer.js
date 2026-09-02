@@ -68,6 +68,8 @@ function conversionText({invoiceQuantity,invoicePack,totalUnits,orderPack,equiva
 function lineNet(line){
   const explicit=numeric(line.netLineTotal??line.netTotal);
   if(explicit>0)return roundPeso(explicit);
+  const classifiedLineTotal=numeric(line.lineTotal),lineTotalKind=String(line.lineTotalKind||'').trim().toLowerCase();
+  if(classifiedLineTotal>0&&lineTotalKind==='net')return roundPeso(classifiedLineTotal);
   const gross=numeric(line.grossLineTotal??line.grossTotal??line.lineTotal??line.total),tax=numeric(line.taxLineTotal??line.vatLine??line.taxTotal),additional=numeric(line.additionalTaxLineTotal??line.additionalTaxLine??line.additionalTax),other=numeric(line.otherLineCharges);
   if(gross>0&&gross>=tax+additional+other)return roundPeso(gross-tax-additional-other);
   return 0;
