@@ -47,7 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           secrets_file=$(mktemp)
-          npx --yes wrangler@4.114.0 secret list --config wrangler.develop.toml --json > "$secrets_file"
+          npx --yes wrangler@4.114.0 secret list --config wrangler.develop.toml --format json > "$secrets_file"
           if SECRETS_FILE="$secrets_file" node -e "const fs=require('fs');const rows=JSON.parse(fs.readFileSync(process.env.SECRETS_FILE,'utf8'));process.exit(rows.some(row=>row.name==='IP_HASH_SALT')?0:1)"; then
             echo 'IP_HASH_SALT DEV ya está configurado como secret.'
           else
