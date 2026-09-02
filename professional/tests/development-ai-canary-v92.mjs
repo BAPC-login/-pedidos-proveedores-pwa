@@ -10,7 +10,8 @@ const RETRYABLE_CANARY_ERRORS=new Set([
   'gemini_http_502',
   'gemini_http_503',
   'gemini_http_504',
-  'ai_timeout'
+  'ai_timeout',
+  'analysis_timeout'
 ]);
 const email=String(process.env.NUVASTO_E2E_EMAIL||'e2e@nuvasto.dev').trim().toLowerCase();
 const password=String(process.env.NUVASTO_E2E_PASSWORD||'');
