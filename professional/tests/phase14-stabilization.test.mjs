@@ -11,6 +11,7 @@ import {
 import {
   INTEGRATION_CONTRACT_VERSION,
   PHASE14_RELEASE,
+  PHASE15_RELEASE,
   integrationContract,
   integrationContractResponse
 } from '../worker/src/phase14-contract.js';
@@ -19,8 +20,9 @@ const read = path => readFile(new URL(path, import.meta.url), 'utf8');
 
 const contract = integrationContract();
 assert.equal(PHASE14_RELEASE, 'phase-14-nuvasto-20260902-r1');
-assert.equal(INTEGRATION_CONTRACT_VERSION, 'r-system-procurement-v1');
-assert.equal(contract.phase, 14);
+assert.equal(PHASE15_RELEASE, 'phase-15-native-procurement-20260902-r1');
+assert.equal(INTEGRATION_CONTRACT_VERSION, 'r-system-procurement-v2');
+assert.equal(contract.phase, 15);
 assert.equal(contract.module, 'procurement');
 assert.equal(contract.source_of_truth.duplicated_in_r_system, false);
 assert.equal(contract.tenancy.r_system_mapping_required, true);
@@ -28,9 +30,13 @@ assert.equal(contract.invariants.reception_is_operational_source_of_closure, tru
 assert.equal(contract.invariants.invoice_required_for_reception_closure, false);
 assert.equal(contract.invariants.payment_required_for_reception_closure, false);
 assert.equal(contract.integration.entrypoint, 'RSystemProcurementEntrypoint');
-assert.deepEqual(contract.integration.current_methods, ['status', 'contract']);
+assert.equal(contract.integration.current_methods.includes('workspace'), true);
+assert.equal(contract.integration.current_methods.includes('createOrder'), true);
+assert.equal(contract.integration.current_methods.includes('createReception'), true);
 assert.equal(contract.integration.operational_rpc_begins_in_phase, 15);
-assert.equal(contract.boundaries.phase15_integration_complete, false);
+assert.equal(contract.integration.operational_rpc_ready, true);
+assert.equal(contract.integration.external_launch, false);
+assert.equal(contract.boundaries.phase15_integration_complete, true);
 assert.equal(JSON.stringify(contract).includes('secret'), false);
 
 const response = integrationContractResponse();
@@ -40,9 +46,9 @@ validateIntegrationContract(await response.json());
 
 validateRelease({
   ok: true,
-  release: '2026.09.02.98',
-  phase: 14,
-  phaseRelease: PHASE14_RELEASE,
+  release: '2026.09.02.99',
+  phase: 15,
+  phaseRelease: PHASE15_RELEASE,
   integrationContractVersion: INTEGRATION_CONTRACT_VERSION
 });
 
@@ -65,10 +71,11 @@ const healthFixture = {
   reservedOrdersAdvancedV91: true,
   transientInvoiceRetryV91: true,
   verifiedAiUsageV91: true,
-  phase: 14,
+  phase: 15,
   phase14Stabilized: true,
   integrationContractVersion: INTEGRATION_CONTRACT_VERSION,
   rSystemProcurementRpc: true,
+  operationalRpcReady: true,
   ipHashSaltConfigured: true,
   defaultIpHashSaltDisabled: true
 };
@@ -118,9 +125,13 @@ const [combined, rpc, auth, platform, passkeys, access, invoiceAi, rootWrangler,
 assert.match(combined, /export \{ RSystemProcurementEntrypoint \}/);
 assert.match(combined, /\/api\/system\/integration-contract/);
 assert.match(combined, /phase14Stabilized: true/);
+assert.match(combined, /phase15NativeIntegration: true/);
 assert.match(rpc, /class RSystemProcurementEntrypoint extends WorkerEntrypoint/);
-assert.match(rpc, /operational_methods_deferred_until_tenant_mapping: true/);
-assert.doesNotMatch(rpc, /async (?:create|update|delete|emit|receive)/);
+assert.match(rpc, /operational_methods_deferred_until_tenant_mapping: false/);
+assert.match(rpc, /async createOrder/);
+assert.match(rpc, /async createReception/);
+assert.match(rpc, /async analyzeInvoice/);
+assert.match(rpc, /provider_scope_validation: true/);
 
 for (const source of [auth, platform, passkeys, access]) {
   assert.doesNotMatch(source, /IP_HASH_SALT\s*\|\|\s*['"]pedidos-pro/);
@@ -152,7 +163,7 @@ assert.match(aiCanary, /'gemini_http_503'/);
 assert.match(aiCanary, /'analysis_timeout'/);
 assert.match(invoiceAi, /code:'ai_timeout'/);
 assert.match(invoiceAi, /error\?\.name==='AbortError'\|\|Number\(error\?\.code\)===20/);
-assert.match(release, /"release": "2026\.09\.02\.98"/);
-assert.match(release, /"generation": 98/);
+assert.match(release, /"release": "2026\.09\.02\.99"/);
+assert.match(release, /"generation": 99/);
 
 console.log('Phase 14 stabilization: OK · contract, private salt, backup, health and hand-off verified');

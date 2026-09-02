@@ -1,13 +1,14 @@
 export const PHASE14_RELEASE = 'phase-14-nuvasto-20260902-r1';
-export const INTEGRATION_CONTRACT_VERSION = 'r-system-procurement-v1';
+export const PHASE15_RELEASE = 'phase-15-native-procurement-20260902-r1';
+export const INTEGRATION_CONTRACT_VERSION = 'r-system-procurement-v2';
 
 export function integrationContract() {
   return {
     ok: true,
     service: 'nuvasto',
     module: 'procurement',
-    phase: 14,
-    release: PHASE14_RELEASE,
+    phase: 15,
+    release: PHASE15_RELEASE,
     contract_version: INTEGRATION_CONTRACT_VERSION,
     source_of_truth: {
       repository: 'BAPC-login/-pedidos-proveedores-pwa',
@@ -65,11 +66,20 @@ export function integrationContract() {
     integration: {
       transport: 'cloudflare-service-binding-rpc',
       entrypoint: 'RSystemProcurementEntrypoint',
-      current_methods: ['status', 'contract'],
+      current_methods: [
+        'status', 'contract', 'discoverTenants', 'mappingStatus', 'workspace',
+        'catalog', 'orders', 'order', 'createSupplier', 'createOrder',
+        'transitionOrder', 'createReception', 'invoices', 'analyzeInvoice',
+        'createInvoice'
+      ],
       public_contract_path: '/api/system/integration-contract',
       operational_rpc_begins_in_phase: 15,
+      operational_rpc_ready: true,
       phase15_mapping_required: true,
-      caller_authorization_required: true
+      caller_authorization_required: true,
+      provider_scope_validation: true,
+      native_r_system_route: '/procurement.html',
+      external_launch: false
     },
     boundaries: {
       production_mutations_in_smoke: false,
@@ -77,7 +87,7 @@ export function integrationContract() {
       official_supplier_api_required_for_automatic_purchase: true,
       sii_source_of_truth: false,
       payment_processor_settlement_source_of_truth: false,
-      phase15_integration_complete: false,
+      phase15_integration_complete: true,
       commercial_manual_acceptance_tracked_separately: true
     }
   };
