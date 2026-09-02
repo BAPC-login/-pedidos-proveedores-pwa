@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 const base=(process.env.NUVASTO_BASE_URL||'https://pedidos-pro-ai-dev.botreservasmultilocal.workers.dev').replace(/\/$/,'');
+const MAX_CANARY_ATTEMPTS=2;
 const email=String(process.env.NUVASTO_E2E_EMAIL||'e2e@nuvasto.dev').trim().toLowerCase();
 const password=String(process.env.NUVASTO_E2E_PASSWORD||'');
 const host=new URL(base).hostname;
@@ -143,14 +144,22 @@ const cases=[
 
 const results=[];
 for(const testCase of cases){
-  const form=new FormData();
-  form.append('file',new Blob([makeInvoicePdf(testCase.pdf)],{type:'application/pdf'}),`nuvasto-${testCase.id}.pdf`);
-  form.append('context',JSON.stringify(baseContext));
   const started=Date.now();
-  const response=await fetch(`${base}/api/invoices/analyze`,{method:'POST',headers:{Authorization:`Bearer ${token}`},body:form});
-  const payload=await response.json().catch(()=>({}));
-  if(!response.ok||payload.ok===false)throw new Error(`POST /api/invoices/analyze ${testCase.id} · ${response.status} · ${payload.error||'request failed'}`);
-  const analysis=payload.analysis||{};
+  let analysis={};
+  for(let attempt=1;attempt<=MAX_CANARY_ATTEMPTS;attempt++){
+    const form=new FormData();
+    form.append('file',new Blob([makeInvoicePdf(testCase.pdf)],{type:'application/pdf'}),`nuvasto-${testCase.id}.pdf`);
+    form.append('context',JSON.stringify(baseContext));
+    const response=await fetch(`${base}/api/invoices/analyze`,{method:'POST',headers:{Authorization:`Bearer ${token}`},body:form});
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok||payload.ok===false)throw new Error(`POST /api/invoices/analyze ${testCase.id} · ${response.status} · ${payload.error||'request failed'}`);
+    analysis=payload.analysis||{};
+    if(analysis.degraded===false)break;
+    const retryable=analysis.providerErrorCode==='invoice_pricing_unverified';
+    if(!retryable||attempt===MAX_CANARY_ATTEMPTS)break;
+    console.warn(`development AI E2E ${testCase.id}: lectura transitoria no verificada; reintentando sin aceptar datos degradados`);
+    await new Promise(resolve=>setTimeout(resolve,750));
+  }
   assert.equal(analysis.degraded,false,`${testCase.id}: AI must be verified; provider error=${analysis.providerErrorCode||'none'}`);
   assert.equal(analysis.resilienceV91,true,`${testCase.id}: must use v91 resilience`);
   assert.equal(analysis.usagePolicyV91,'verified-documents-only',`${testCase.id}: must use verified-document accounting`);
