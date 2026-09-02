@@ -29,7 +29,7 @@ Cloudflare tenía un único proyecto conectado al directorio `worker/`. Para con
 - Dashboard, proveedores, catálogo, equipo, auditoría y configuración.
 - PWA responsive, modo claro/oscuro, caché y cola offline.
 - Límites de plan aplicados desde el backend.
-- Contrato Fase 14 `r-system-procurement-v1` y RPC privado preparado para la integración autorizada de Fase 15.
+- Contrato Fase 15 `r-system-procurement-v2` y RPC operacional privado para el módulo Compras nativo de R-System, con mapeo tenant y autorización en ambos servicios.
 
 ## Contrato de rendimiento
 
