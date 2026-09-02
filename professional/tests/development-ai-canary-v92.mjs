@@ -138,7 +138,7 @@ const cases=[
     id:'freight-split-additional-taxes',folio:'E2E-AI-TAX-0004',expectedTotal:139950,expectedLines:2,
     pdf:[
       'FACTURA ELECTRONICA','Proveedor: Proveedor E2E','RUT: 76.123.456-7','Folio: E2E-AI-TAX-0004','Fecha: 20-08-2026','',
-      'CANT  DESCRIPCION                       PRECIO UNITARIO NETO   VALOR TOTAL',
+      'CANT  DESCRIPCION                       PRECIO UNITARIO NETO   VALOR TOTAL NETO',
       '1     MISTRAL 35 E2E 1000CC X 12       50000                  50000',
       '2     Producto E2E                      25000                  50000','',
       'NETO                                    100000','FLETE                                     5000','IABA                                      10000','ILA                                        5000','IVA 19%                                   19950','TOTAL                                    139950'
