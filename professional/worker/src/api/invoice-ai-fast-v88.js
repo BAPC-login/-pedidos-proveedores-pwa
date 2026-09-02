@@ -105,7 +105,17 @@ function candidateMath(raw,nature='invoice'){
   return{ok,reason:ok?'sum-reconciles':'line-sum-does-not-reconcile',sum:sumLines,componentSum,documentTotal,targets:[...targets].filter(Boolean),printedFinalPrices:printed.length};
 }
 function parseCandidate(payload){const textValue=payload?.candidates?.[0]?.content?.parts?.map(part=>part.text||'').join('')||'';if(!textValue)throw new Error('Gemini no devolvió contenido estructurado');return JSON.parse(textValue)}
-async function callModel(env,{model,mime,data,prompt,thinkingLevel,timeoutMs}){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);try{const response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},body:JSON.stringify({system_instruction:{parts:[{text:extractionInstruction}]},contents:[{role:'user',parts:[{inline_data:{mime_type:mime,data}},{text:prompt}]}],generationConfig:{thinkingConfig:{thinkingLevel},responseMimeType:'application/json',responseSchema:schema,maxOutputTokens:8192}})}),payload=await response.json().catch(()=>({}));if(!response.ok)throw Object.assign(new Error(payload?.error?.message||`Gemini HTTP ${response.status}`),{status:response.status,code:`gemini_http_${response.status}`});return{raw:parseCandidate(payload),usage:payload.usageMetadata||null}}finally{clearTimeout(timer)}}
+async function callModel(env,{model,mime,data,prompt,thinkingLevel,timeoutMs}){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
+  try{
+    const response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},body:JSON.stringify({system_instruction:{parts:[{text:extractionInstruction}]},contents:[{role:'user',parts:[{inline_data:{mime_type:mime,data}},{text:prompt}]}],generationConfig:{thinkingConfig:{thinkingLevel},responseMimeType:'application/json',responseSchema:schema,maxOutputTokens:8192}})}),payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw Object.assign(new Error(payload?.error?.message||`Gemini HTTP ${response.status}`),{status:response.status,code:`gemini_http_${response.status}`});
+    return{raw:parseCandidate(payload),usage:payload.usageMetadata||null};
+  }catch(error){
+    if(error?.name==='AbortError'||Number(error?.code)===20)throw Object.assign(new Error('Gemini superó el tiempo de espera de lectura.'),{status:408,code:'ai_timeout'});
+    throw error;
+  }finally{clearTimeout(timer)}
+}
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function transient(error){const status=Number(error?.status||0);if(TRANSIENT_STATUSES.has(status))return true;const message=String(error?.message||'').toLowerCase();return /\b(429|500|502|503|504)\b|temporar|unavailable|overload|rate.?limit/.test(message)}
 async function callModelResilient(env,args,{attempts,stage,startedAt,maxRetries=2}={}){let lastError;for(let retry=0;retry<=maxRetries;retry++){try{return await callModel(env,args)}catch(error){lastError=error;attempts?.push({model:args.model,stage,retry,status:Number(error?.status||0),error:String(error?.message||error)});const withinBudget=Date.now()-Number(startedAt||Date.now())<RETRY_BUDGET_MS;if(retry>=maxRetries||!transient(error)||!withinBudget||error?.name==='AbortError')throw error;await sleep(RETRY_DELAYS_MS[Math.min(retry,RETRY_DELAYS_MS.length-1)])}}throw lastError}

@@ -29,8 +29,7 @@
     "GEMINI_MODEL": "gemini-3.5-flash",
     "ENVIRONMENT": "production",
     "AI_ENDPOINT": "https://pedidos-pro-ai.botreservasmultilocal.workers.dev",
-    "ALLOWED_ORIGINS": "https://bapc-login.github.io,https://pedidos-pro-ai.botreservasmultilocal.workers.dev,http://localhost:8787,http://127.0.0.1:8787,http://localhost:8788,http://127.0.0.1:8788",
-    "IP_HASH_SALT": "MTkZnnb3EIwXwE7sN3ts8GfIl6alJJ9fKyOJYk5i4dc"
+    "ALLOWED_ORIGINS": "https://bapc-login.github.io,https://pedidos-pro-ai.botreservasmultilocal.workers.dev,http://localhost:8787,http://127.0.0.1:8787,http://localhost:8788,http://127.0.0.1:8788"
   },
   "d1_databases": [
     {

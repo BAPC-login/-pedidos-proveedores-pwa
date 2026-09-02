@@ -26,6 +26,23 @@ jobs:
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "::error::Falta CLOUDFLARE_API_TOKEN"; exit 1; fi
 
+      - name: Ensure private IP hash salt
+        working-directory: professional
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}'
+          CLOUDFLARE_ACCOUNT_ID: f1adc1e73490ce30fe3c1588d2ca57fb
+        run: |
+          set -euo pipefail
+          secrets_file=$(mktemp)
+          npx --yes wrangler@4.114.0 secret list --config wrangler.toml --format json > "$secrets_file"
+          if SECRETS_FILE="$secrets_file" node -e "const fs=require('fs');const rows=JSON.parse(fs.readFileSync(process.env.SECRETS_FILE,'utf8'));process.exit(rows.some(row=>row.name==='IP_HASH_SALT')?0:1)"; then
+            echo 'IP_HASH_SALT ya está configurado como secret.'
+          else
+            openssl rand -hex 32 | npx --yes wrangler@4.114.0 secret put IP_HASH_SALT --config wrangler.toml
+            echo 'IP_HASH_SALT privado creado; no se expuso su valor.'
+          fi
+
       - name: Deploy Worker, assets, D1 and R2 bindings
         id: deploy
         uses: cloudflare/wrangler-action@v3
@@ -43,6 +60,14 @@ jobs:
           NUVASTO_BASE_URL: 'https://pedidos-pro-ai.botreservasmultilocal.workers.dev'
           NUVASTO_EXPECT_ENV: production
         run: node scripts/verify-live-current.mjs
+
+      - name: Verify Phase 14 production contract
+        id: phase14
+        if: steps.verify.outcome == 'success'
+        working-directory: professional
+        env:
+          NUVASTO_BASE_URL: 'https://pedidos-pro-ai.botreservasmultilocal.workers.dev'
+        run: node scripts/verify-production-health.mjs
 
       - name: Production authenticated read-only smoke
         id: authenticated
@@ -69,7 +94,7 @@ jobs:
         shell: bash
         env: {GH_TOKEN: '${{ github.token }}'}
         run: |
-          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.authenticated.outcome }}" != "failure" ]; then
+          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.phase14.outcome }}" = "success" ] && [ "${{ steps.authenticated.outcome }}" != "failure" ]; then
             state=success
             if [ "${{ steps.e2e_coverage.outputs.authenticated }}" = "true" ]; then description='Nuvasto current publicado + smoke autenticado read-only OK'; else description='Nuvasto current publicado; contrato live verificado'; fi
           else

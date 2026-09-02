@@ -9,6 +9,7 @@ Pedidos Pro Platform es la nueva PWA profesional de compras y abastecimiento. Es
 - Salud de la plataforma y D1: `/platform/health`
 - API profesional: `/api/*`
 - Análisis Gemini existente: `/v1/*`
+- Contrato R-System de abastecimiento: `/api/system/integration-contract`
 
 Cloudflare tenía un único proyecto conectado al directorio `worker/`. Para conservar el análisis de facturas y evitar una intervención manual con credenciales de cuenta, ambos servicios se ejecutan en el mismo Worker con rutas aisladas:
 
@@ -28,6 +29,7 @@ Cloudflare tenía un único proyecto conectado al directorio `worker/`. Para con
 - Dashboard, proveedores, catálogo, equipo, auditoría y configuración.
 - PWA responsive, modo claro/oscuro, caché y cola offline.
 - Límites de plan aplicados desde el backend.
+- Contrato Fase 14 `r-system-procurement-v1` y RPC privado preparado para la integración autorizada de Fase 15.
 
 ## Contrato de rendimiento
 

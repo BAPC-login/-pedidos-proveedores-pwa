@@ -1,4 +1,4 @@
-import {HttpError,normalizeEmail,nowIso,randomToken,readJson,sha256,uuid} from '../core.js';
+import {HttpError,hashRequestIp,normalizeEmail,nowIso,randomToken,readJson,sha256,uuid} from '../core.js';
 import {writeAudit} from '../auth.js';
 
 const CHALLENGE_TTL_MS=5*60*1000;
@@ -100,7 +100,7 @@ async function activeIdentityByEmail(env,email){
   return{userId:row.user_id,orgId:row.org_id,email:row.email,displayName:row.display_name,role:row.role,locationScope:safeJson(row.location_scope,[]),organization:{id:row.org_id,name:row.org_name,slug:row.org_slug,plan:row.plan}};
 }
 async function createPasskeySession(env,request,identity){
-  const token=randomToken(36),tokenHash=await sha256(token),ip=request.headers.get('CF-Connecting-IP')||request.headers.get('X-Forwarded-For')||'',ipHash=ip?await sha256(`${env.IP_HASH_SALT||'pedidos-pro'}:${ip}`):'',createdAt=nowIso(),sessionId=uuid();
+  const token=randomToken(36),tokenHash=await sha256(token),ipHash=await hashRequestIp(request,env),createdAt=nowIso(),sessionId=uuid();
   await env.DB.prepare('INSERT INTO sessions(id,user_id,org_id,token_hash,user_agent,ip_hash,created_at,last_seen_at) VALUES(?,?,?,?,?,?,?,?)').bind(sessionId,identity.userId,identity.orgId,tokenHash,String(request.headers.get('User-Agent')||'').slice(0,300),ipHash,createdAt,createdAt).run();
   return{token,sessionId};
 }

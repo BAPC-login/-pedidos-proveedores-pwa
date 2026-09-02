@@ -17,6 +17,14 @@ Nuvasto es una plataforma PWA para gestionar pedidos, proveedores, centros de co
 - Almacenamiento de facturas, logos e imágenes en Cloudflare R2 cuando el binding `FILES` está activo.
 - Conectores asistidos para portales de proveedores y preparación futura de APIs oficiales.
 
+## Fase 14 · R-System
+
+Nuvasto es la fuente de verdad del dominio de abastecimiento que R-System integrará en su Fase 15. La estabilización publica el contrato `r-system-procurement-v1` y el named entrypoint privado `RSystemProcurementEntrypoint`, sin duplicar pedidos, recepciones, facturas ni pagos dentro del core.
+
+El RPC de Fase 14 expone solo `status` y `contract`. Las operaciones se habilitan en Fase 15 después de mapear tenancy y permisos del Core, evitando convertir el Service Binding en un bypass de autorización.
+
+Documento técnico: [`docs/PHASE14_STABILIZATION.md`](docs/PHASE14_STABILIZATION.md).
+
 ## Rendimiento y estabilidad
 
 - Una sola restauración de sesión y una sola ruta inicial por apertura.
