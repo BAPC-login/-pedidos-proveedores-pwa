@@ -96,13 +96,14 @@ await assert.rejects(
   error => error?.code === 'ip_hash_salt_missing'
 );
 
-const [combined, rpc, auth, platform, passkeys, access, rootWrangler, productionDeploy, developmentDeploy, backupWorkflow, healthWorkflow, invoiceUi, developmentE2e, aiCanary, release] = await Promise.all([
+const [combined, rpc, auth, platform, passkeys, access, invoiceAi, rootWrangler, productionDeploy, developmentDeploy, backupWorkflow, healthWorkflow, invoiceUi, developmentE2e, aiCanary, release] = await Promise.all([
   read('../../worker/src/combined.js'),
   read('../worker/src/integration/r-system-entrypoint.js'),
   read('../worker/src/auth.js'),
   read('../worker/src/platform.js'),
   read('../worker/src/api/passkeys.js'),
   read('../worker/src/access-sso-v20.js'),
+  read('../worker/src/api/invoice-ai-fast-v88.js'),
   read('../../worker/wrangler.jsonc'),
   read('../../.github/workflows/deploy-cloudflare.yml'),
   read('../../.github/workflows/deploy-development.yml'),
@@ -143,6 +144,9 @@ assert.match(aiCanary, /MAX_CANARY_ATTEMPTS=3/);
 assert.match(aiCanary, /if\(analysis\.degraded===false\)break/);
 assert.match(aiCanary, /RETRYABLE_CANARY_ERRORS\.has/);
 assert.match(aiCanary, /'gemini_http_503'/);
+assert.match(aiCanary, /'analysis_timeout'/);
+assert.match(invoiceAi, /code:'ai_timeout'/);
+assert.match(invoiceAi, /error\?\.name==='AbortError'\|\|Number\(error\?\.code\)===20/);
 assert.match(release, /"release": "2026\.09\.02\.98"/);
 assert.match(release, /"generation": 98/);
 
