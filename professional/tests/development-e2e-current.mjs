@@ -11,6 +11,12 @@ assert.ok(email&&password,'DEV E2E credentials are required');
 const canonical=JSON.parse(fs.readFileSync('release.json','utf8'));
 assert.ok(canonical.release&&canonical.generation,'canonical current release must be readable');
 
+function dateInSantiago(offsetDays=0){
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santiago',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(Date.now()+offsetDays*86400000));
+  const value=Object.fromEntries(parts.filter(part=>part.type!=='literal').map(part=>[part.type,part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
 async function publicJson(path){
   const response=await fetch(`${base}${path}${path.includes('?')?'&':'?'}e2e=${Date.now()}`,{headers:{'Cache-Control':'no-cache'}});
   assert.equal(response.ok,true,`public endpoint ${path}`);
@@ -35,9 +41,9 @@ async function call(path,{method='GET',json,headers={}}={}){
 
 const login=await call('/api/auth/login',{method:'POST',json:{email,password}});token=login.token;assert.ok(token,'DEV login token');
 const stamp=Date.now().toString(36).toUpperCase();
-const today=new Date().toISOString().slice(0,10);
-const delivery=new Date(Date.now()+86400000).toISOString().slice(0,10);
-const chequeDate=new Date(Date.now()+7*86400000).toISOString().slice(0,10);
+const today=dateInSantiago();
+const delivery=dateInSantiago(1);
+const chequeDate=dateInSantiago(7);
 
 const autosaveKey=`development-e2e-${stamp}`;
 const draftMarker={marker:stamp,idempotencyKey:`dev-e2e-${stamp}`,selections:[{productId:'synthetic',quantity:'12'}]};
