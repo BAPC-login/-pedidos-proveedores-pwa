@@ -59,7 +59,7 @@ SLO inicial:
 
 `window.NuvastoTelemetry.requestBudget()` expone p50, p95, tasa de error, consumo diario y estado SLO para diagnóstico.
 
-El workflow `.github/workflows/production-health.yml` revisa producción dos veces por hora y falla si el contrato público de salud deja de cumplir almacenamiento, runtime, biometría, matriz de factura, pagos o cierre, o si la consulta de salud supera 5 segundos.
+El workflow `.github/workflows/production-health.yml` revisa producción dos veces por hora y falla si release, contrato R-System o capacidades públicas dejan de cumplir almacenamiento, runtime, biometría, matriz de factura, pagos, cierre o seguridad. Conserva un presupuesto de 5 segundos sobre la mediana de tres muestras: una muestra fría queda informada como degradada, mientras la latencia sostenida o la pérdida de mayoría saludable bloquean el gate.
 
 ## 5. Matriz de dispositivos obligatoria
 
@@ -87,7 +87,7 @@ Resultado esperado: cero controles bajo barra de estado/home indicator, cero scr
 
 ## 7. Recuperación e incidentes
 
-El workflow `.github/workflows/d1-backup.yml` deja preparado el backup remoto de D1, una validación de restauración sobre una base SQLite desechable y conservación del export como artifact durante 30 días. Para activar la ejecución diaria se debe configurar una única variable de repositorio: `NUVASTO_D1_DATABASE`, con el nombre exacto de la base D1 de producción. El token de Cloudflare ya es el mismo secreto utilizado por el deploy.
+El workflow `.github/workflows/d1-backup.yml` ejecuta el backup remoto de D1, valida la restauración sobre una base SQLite desechable y conserva el export como artifact durante 30 días. `NUVASTO_D1_DATABASE` puede fijar el nombre exacto; si no existe, el workflow resuelve una única D1 mediante la firma de esquema Nuvasto y falla ante cero o múltiples coincidencias. El token de Cloudflare es el mismo secreto utilizado por el deploy.
 
 No se intenta restaurar automáticamente sobre producción: un restore real siempre debe ser una acción deliberada y revisada.
 

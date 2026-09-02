@@ -247,6 +247,20 @@ export async function sha256(value) {
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+export async function hashRequestIp(request, env = {}) {
+  const ip = request?.headers?.get?.('CF-Connecting-IP') || request?.headers?.get?.('X-Forwarded-For') || '';
+  if (!ip) return '';
+  const salt = String(env.IP_HASH_SALT || '').trim();
+  if (!salt) {
+    const environment = String(env.ENVIRONMENT || 'development').trim().toLowerCase();
+    if (environment === 'production') {
+      throw new HttpError(503, 'La configuración de seguridad de sesión no está disponible', 'ip_hash_salt_missing');
+    }
+    return '';
+  }
+  return sha256(`${salt}:${ip}`);
+}
+
 export async function hashPassword(password, salt = randomToken(18)) {
   const normalized = String(password || '');
   if (normalized.length < 10) {

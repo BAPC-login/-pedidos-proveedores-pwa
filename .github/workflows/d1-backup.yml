@@ -15,7 +15,6 @@ concurrency:
   cancel-in-progress: false
 jobs:
   backup:
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.NUVASTO_D1_DATABASE != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -36,8 +35,24 @@ jobs:
           database="${MANUAL_DATABASE:-}"
           if [ -z "$database" ]; then database="${CONFIGURED_DATABASE:-}"; fi
           if [ -z "$database" ]; then
-            echo '::error::Configura la variable de repositorio NUVASTO_D1_DATABASE o ejecuta manualmente indicando database_name.'
-            exit 1
+            list_file=$(mktemp)
+            npx --yes wrangler@4.114.0 d1 list --json --config professional/wrangler.toml > "$list_file"
+            mapfile -t candidates < <(D1_LIST_FILE="$list_file" node -e "const fs=require('fs');const value=JSON.parse(fs.readFileSync(process.env.D1_LIST_FILE,'utf8'));const rows=Array.isArray(value)?value:(value.result||value.databases||[]);for(const row of rows){if(row&&row.name)console.log(row.name)}")
+            matches=()
+            for candidate in "${candidates[@]}"; do
+              probe_file=$(mktemp)
+              if npx --yes wrangler@4.114.0 d1 execute "$candidate" --remote --json --config professional/wrangler.toml --command "SELECT COUNT(*) AS matched FROM sqlite_master WHERE type='table' AND name IN ('organizations','suppliers','products','orders','receptions','invoices','payment_documents','audit_logs');" > "$probe_file" 2>/dev/null; then
+                if PROBE_FILE="$probe_file" node -e "const fs=require('fs');const value=JSON.parse(fs.readFileSync(process.env.PROBE_FILE,'utf8'));let found=false;const walk=node=>{if(found||node==null)return;if(Array.isArray(node))return node.forEach(walk);if(typeof node==='object'){if(Number(node.matched)===8)found=true;Object.values(node).forEach(walk)}};walk(value);process.exit(found?0:1)"; then
+                  matches+=("$candidate")
+                fi
+              fi
+            done
+            if [ "${#matches[@]}" -ne 1 ]; then
+              echo "::error::No se pudo resolver una única D1 de Nuvasto por firma de esquema (coincidencias: ${#matches[@]}). Configura NUVASTO_D1_DATABASE explícitamente."
+              exit 1
+            fi
+            database="${matches[0]}"
+            echo "D1 Nuvasto resuelta automáticamente por firma de esquema: $database"
           fi
           echo "name=$database" >> "$GITHUB_OUTPUT"
       - name: Export remote D1

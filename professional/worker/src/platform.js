@@ -1,4 +1,4 @@
-import {HttpError, ROLES, normalizeEmail, nowIso, randomToken, readJson, requireText, sha256, slugify, uuid} from './core.js';
+import {HttpError, ROLES, hashRequestIp, normalizeEmail, nowIso, randomToken, readJson, requireText, sha256, slugify, uuid} from './core.js';
 import {writeAudit} from './auth.js';
 
 function assertPlatformOwner(actor) {
@@ -8,8 +8,7 @@ function assertPlatformOwner(actor) {
 async function createSession(env, request, userId, orgId) {
   const token = randomToken(36);
   const tokenHash = await sha256(token);
-  const ip = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || '';
-  const ipHash = ip ? await sha256(`${env.IP_HASH_SALT || 'pedidos-pro'}:${ip}`) : '';
+  const ipHash = await hashRequestIp(request, env);
   const id = uuid();
   const timestamp = nowIso();
   await env.DB.prepare(`

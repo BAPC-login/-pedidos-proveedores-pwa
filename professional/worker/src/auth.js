@@ -2,6 +2,7 @@ import {
   HttpError,
   ROLES,
   assertMinimumRole,
+  hashRequestIp,
   monthKey,
   normalizeEmail,
   nowIso,
@@ -30,13 +31,13 @@ async function validateLocationScope(env, actor, requested, role) {
   return values;
 }
 async function createSession(env, request, {userId, orgId}) {
-  const token = randomToken(36),tokenHash = await sha256(token),ip = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || '',ipHash = ip ? await sha256(`${env.IP_HASH_SALT || 'pedidos-pro'}:${ip}`) : '',createdAt=nowIso();
+  const token = randomToken(36),tokenHash = await sha256(token),ipHash = await hashRequestIp(request,env),createdAt=nowIso();
   const session = {id: uuid(),userId,orgId,tokenHash,userAgent: String(request.headers.get('User-Agent') || '').slice(0, 300),ipHash,createdAt};
   await env.DB.prepare(`INSERT INTO sessions (id, user_id, org_id, token_hash, user_agent, ip_hash, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).bind(session.id, userId, orgId, tokenHash, session.userAgent, ipHash, createdAt, createdAt).run();
   return {token, sessionId: session.id};
 }
 export async function writeAudit(env, actor, request, action, entityType, entityId = '', metadata = {}) {
-  try {const ip = request?.headers?.get?.('CF-Connecting-IP') || '',ipHash = ip ? await sha256(`${env.IP_HASH_SALT || 'pedidos-pro'}:${ip}`) : '';await env.DB.prepare(`INSERT INTO audit_logs (id, org_id, actor_user_id, actor_email, action, entity_type, entity_id, metadata_json, ip_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(uuid(), actor?.orgId || null, actor?.userId || null, actor?.email || '', action,entityType, entityId || '', JSON.stringify(metadata || {}), ipHash, nowIso()).run();}
+  try {const ipHash = await hashRequestIp(request,env);await env.DB.prepare(`INSERT INTO audit_logs (id, org_id, actor_user_id, actor_email, action, entity_type, entity_id, metadata_json, ip_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(uuid(), actor?.orgId || null, actor?.userId || null, actor?.email || '', action,entityType, entityId || '', JSON.stringify(metadata || {}), ipHash, nowIso()).run();}
   catch (error) {console.error('audit_failed', action, error);}
 }
 
