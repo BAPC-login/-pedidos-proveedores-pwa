@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {reconcileInvoicePricing} from '../worker/src/invoice-pricing-matrix.js';
+import {normalizeInvoiceAnalysis} from '../worker/src/invoice-normalizer.js';
 
 // Matriz por línea: Neto + Flete + IVA + impuesto adicional ya viene por producto.
 const warnings=[];
@@ -61,6 +62,18 @@ const globalResult=reconcileInvoicePricing(globalTax,{net:300,vat:57,total:357},
 assert.equal(globalResult.verified,true);
 assert.equal(globalResult.method,'printed-line-sum-matrix');
 assert.equal(Math.round(globalTax.reduce((sum,line)=>sum+line.finalQuantity*line.finalUnitPrice,0)),357);
+
+// La IA puede transcribir una columna explícita como lineTotal + lineTotalKind=net.
+// El normalizador debe conservar esa semántica para asignar impuestos/flete globales.
+const classifiedNet=normalizeInvoiceAnalysis({invoice:{totals:{net:100000,freight:5000,additionalTax:15000,vat:19950,total:139950},items:[
+  {description:'Mistral 35 1000CC X12',quantity:1,packSize:12,lineTotal:50000,lineTotalKind:'net'},
+  {description:'Producto E2E',quantity:2,packSize:1,lineTotal:50000,lineTotalKind:'net'}
+]}},{products:[]});
+assert.equal(classifiedNet.invoice.lines[0].netLineTotal,50000);
+assert.equal(classifiedNet.invoice.lines[1].netLineTotal,50000);
+assert.equal(classifiedNet.invoice.pricingSummary.verified,true);
+assert.equal(classifiedNet.invoice.pricingSummary.method,'printed-line-sum-matrix');
+assert.equal(classifiedNet.invoice.pricingSummary.formulaExtendedTotal,139950);
 
 // Un residuo grande sin respaldo en el resumen se puede balancear para costo, pero NO se valida como lectura fidedigna.
 const reviewWarnings=[];
