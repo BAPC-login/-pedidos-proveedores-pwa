@@ -96,7 +96,7 @@ await assert.rejects(
   error => error?.code === 'ip_hash_salt_missing'
 );
 
-const [combined, rpc, auth, platform, passkeys, access, rootWrangler, productionDeploy, developmentDeploy, backupWorkflow, healthWorkflow, invoiceUi, release] = await Promise.all([
+const [combined, rpc, auth, platform, passkeys, access, rootWrangler, productionDeploy, developmentDeploy, backupWorkflow, healthWorkflow, invoiceUi, developmentE2e, release] = await Promise.all([
   read('../../worker/src/combined.js'),
   read('../worker/src/integration/r-system-entrypoint.js'),
   read('../worker/src/auth.js'),
@@ -109,6 +109,7 @@ const [combined, rpc, auth, platform, passkeys, access, rootWrangler, production
   read('../../.github/workflows/d1-backup.yml'),
   read('../../.github/workflows/production-health.yml'),
   read('../web/app-multi-invoice.js'),
+  read('./development-e2e-current.mjs'),
   read('../release.json')
 ]);
 
@@ -135,6 +136,8 @@ assert.doesNotMatch(backupWorkflow, /if:\s*\$\{\{[^\n]*NUVASTO_D1_DATABASE/);
 assert.match(healthWorkflow, /verify-production-health\.mjs/);
 assert.match(invoiceUi, /function pricingMethodLabel/);
 assert.doesNotMatch(invoiceUi, /Método: \$\{esc\(String\(line\.taxAllocationMethod/);
+assert.match(developmentE2e, /timeZone:'America\/Santiago'/);
+assert.doesNotMatch(developmentE2e, /const today=new Date\(\)\.toISOString\(\)\.slice\(0,10\)/);
 assert.match(release, /"release": "2026\.09\.02\.98"/);
 assert.match(release, /"generation": 98/);
 
