@@ -49,7 +49,9 @@ assert.match(invoiceUi,/extraAccepted/,'accepted extras must travel with the inv
 assert.match(invoiceUi,/Leyendo tabla y totales/,'legacy review must expose staged processing progress');
 assert.match(invoiceUi,/Validando sumas/,'legacy review must distinguish deterministic verification from extraction');
 assert.match(invoiceUi,/Cotejando catálogo/,'legacy review must distinguish catalog matching from extraction');
-assert.match(invoiceUi,/timeout:68000/,'browser analysis timeout must be bounded below the legacy 124 seconds');
+assert.match(invoiceUi,/\/api\/invoices\/analyze\/async/,'browser must queue invoice processing instead of waiting for a synchronous AI response');
+assert.match(invoiceUi,/timeout:45000/,'initial background upload request must use a bounded timeout');
+assert.match(invoiceUi,/waitInvoiceAnalysisV96/,'background analysis must support status polling and resuming');
 
 assert.match(schema,/CREATE TABLE IF NOT EXISTS reception_extra_items/,'accepted extras need auditable receipt persistence without editing the issued order');
 assert.match(reception,/extraItems/,'canonical reception must accept supplier-catalog extras');
