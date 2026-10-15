@@ -79,10 +79,11 @@ function checkboxNode(){
     closest(){return{querySelector(){return{textContent:''}}}}};
 }
 const checkboxes=[checkboxNode(),checkboxNode(),checkboxNode()],master=checkboxNode();
-const selectionCode=selection.replace(/^import .*?;\\s*/m,'')
+const selectionCode=selection.slice(selection.indexOf(String.fromCharCode(10))+1)
   .replace('export function initializeOrderSelection()','function initializeOrderSelection()');
-const selectAllFactory=new Function('
-,'$','document','MutationObserver','Event','requestAnimationFrame',selectionCode+'\\nreturn {enhance}');
+const twoDollar=String.fromCharCode(36,36);
+const selectAllFactory=new Function('$',twoDollar,'document','MutationObserver','Event','requestAnimationFrame',
+  selectionCode+String.fromCharCode(10)+'return {enhance}');
 const dom={querySelectorAll:selector=>selector==='[data-v67-select]'?checkboxes:[]};
 const wrapper={querySelector:()=>master},bulkBar={querySelector:()=>wrapper};
 const {enhance}=selectAllFactory(sel=>sel==='.v67-bulkbar'?bulkBar:null,sel=>sel==='[data-v67-select]'?checkboxes:[],
