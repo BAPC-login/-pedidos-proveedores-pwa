@@ -3,6 +3,7 @@ import {authenticate} from './auth.js';
 import {ensureSchema} from './schema.js';
 import {corsHeaders,errorResponse,ok,securityHeaders} from './core.js';
 import {analyzeInvoiceV91} from './api/invoice-analysis-v91.js';
+import {getSupplierCostPolicy,saveSupplierCostPolicy} from './api/supplier-cost-policies-v96.js';
 
 const VERSION='91';
 const RELEASE_VERSION='2.0.0-v91';
@@ -26,7 +27,12 @@ export default{
   async fetch(request,env,ctx){
     const url=new URL(request.url),method=request.method.toUpperCase();
     try{
-      if(method==='POST'&&url.pathname==='/api/invoices/analyze'){
+      const costRule=url.pathname.match(/^\/api\/suppliers\/([^/]+)\/cost-policy$/);
+       if(costRule&&(method==='GET'||method==='PUT')){
+         await ensureSchema(env);const actor=await authenticate(request,env),supplierId=decodeURIComponent(costRule[1]);
+         return decorate(ok({policy:method==='PUT'?await saveSupplierCostPolicy(request,env,actor,supplierId):await getSupplierCostPolicy(env,actor,supplierId)},request,env),request,env);
+       }
+       if(method==='POST'&&url.pathname==='/api/invoices/analyze'){
         await ensureSchema(env);const actor=await authenticate(request,env);
         return decorate(ok({analysis:await analyzeInvoiceV91(request,env,actor)},request,env),request,env);
       }
