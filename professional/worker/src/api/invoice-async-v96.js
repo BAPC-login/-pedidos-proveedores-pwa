@@ -43,7 +43,12 @@ async function runOne(env,job){
     const file=new File([original.bytes],original.name,{type:original.contentType}),form=new FormData();
     form.set('file',file,file.name);form.set('context',job.context_json);
     const req=new Request('https://internal.local/api/invoices/analyze',{method:'POST',body:form});
-    const analysis=await analyzeInvoiceV91(req,env,actor);
+    const sourceRecord=await env.DB.prepare('SELECT id,storage_key,file_name,content_type FROM files WHERE org_id=? AND storage_key=?')
+      .bind(actor.orgId,job.source_key).first();
+    if(!sourceRecord)throw new Error('Fuente de factura no encontrada');
+    const analysis=await analyzeInvoiceV91(req,env,actor,{preStoredSource:{
+      id:sourceRecord.id,key:sourceRecord.storage_key,name:sourceRecord.file_name,contentType:sourceRecord.content_type
+    }});
     let originalDteCheck=null;
     if(job.xml_key){
       try{
@@ -83,7 +88,7 @@ export async function processInvoiceAnalysisJobs(env,{limit=2}={}){
   await env.DB.prepare(`UPDATE invoice_analysis_jobs_v96 SET status='retry',available_at=?,updated_at=?
     WHERE status='processing' AND julianday(started_at)<julianday('now','-4 minutes') AND attempts<3`).bind(now(),now()).run();
   await env.DB.prepare(`UPDATE invoice_analysis_jobs_v96 SET status='failed',error_message='Se agotaron los intentos'
-    WHERE status='processing' AND started_at<datetime('now','-4 minutes') AND attempts>=3`).run();
+    WHERE status='processing' AND julianday(started_at)<julianday('now','-4 minutes') AND attempts>=3`).run();
   const pending=(await env.DB.prepare(`SELECT * FROM invoice_analysis_jobs_v96
     WHERE status IN ('queued','retry') AND available_at<=?
     ORDER BY created_at LIMIT ?`).bind(now(),Math.max(1,Math.min(3,limit))).all()).results||[];
