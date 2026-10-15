@@ -1,3 +1,5 @@
+import {supplierWeights,integerCostShares,validateSupplierCostPolicy} from './supplier-cost-allocation.js';
+
 const num = value => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
   let raw = String(value ?? '').trim().replace(/\s|\$/g, '');
@@ -182,7 +184,9 @@ function applyFinalPricing(lines, lineTotals, options) {
   };
 }
 
-export function reconcileInvoicePricing(inputLines, rawTotals, warnings = []) {
+export function reconcileInvoicePricing(inputLines, rawTotals, warnings = [], supplierCostPolicy = null) {
+  const policy=supplierCostPolicy?validateSupplierCostPolicy(supplierCostPolicy):null;
+  let allocationNeedsReview=false;
   const totals = normalizeInvoiceTotals(rawTotals);
   const documentFormula = inferDocumentFormula(totals);
   const lines = inputLines.filter(line => !line.isFree && (lineInvoiceQuantity(line) > 0 || linePhysicalQuantity(line) > 0));
@@ -233,10 +237,20 @@ export function reconcileInvoicePricing(inputLines, rawTotals, warnings = []) {
     const netSum = sum(nets);
     if (nets.every(value => value > 0) && totals.net && Math.abs(netSum - totals.net) <= tolerance && documentFormula.verified) {
       const freightOutside = /\+ flete /.test(` ${documentFormula.formula} `);
-      const freightShares = freightOutside ? integerShares(totals.freight, nets) : nets.map(() => 0);
-      const vatShares = integerShares(totals.vat, nets.map((value, index) => value + freightShares[index]));
-      const additionalShares = integerShares(totals.additionalTax, nets);
-      const otherShares = integerShares(totals.other, nets);
+      // Keep explicit printed charges separate from allocation assumptions.
+      const allocate=(amount,kind,fallback)=>{
+        if(!amount)return nets.map(()=>0);
+        if(!policy)return integerShares(amount,fallback);
+        const weights=supplierWeights(lines,nets,policy[kind]);
+        if(weights&&weights.some(value=>value>0))return integerCostShares(amount,weights);
+        allocationNeedsReview=true;
+        warnings.push('El proveedor no tiene evidencia suficiente para distribuir '+kind+'; revisar costos antes de confirmar.');
+        return integerShares(amount,fallback);
+      };
+      const freightShares = freightOutside ? allocate(totals.freight,'freight',nets) : nets.map(() => 0);
+      const vatShares = allocate(totals.vat,'vat',nets.map((value,index)=>value+freightShares[index]));
+      const additionalShares = allocate(totals.additionalTax,'additionalTax',nets);
+      const otherShares = allocate(totals.other,'other',nets);
       let adjusted = nets.map((value, index) => value + freightShares[index] + vatShares[index] + additionalShares[index] + otherShares[index]);
       adjusted = allocateResidual(adjusted, target, nets);
       lines.forEach((line, index) => {
@@ -245,11 +259,12 @@ export function reconcileInvoicePricing(inputLines, rawTotals, warnings = []) {
         line.allocatedAdditionalTax = additionalShares[index];
         line.allocatedOtherCharges = otherShares[index] + (adjusted[index] - (nets[index] + freightShares[index] + vatShares[index] + additionalShares[index] + otherShares[index]));
         line.allocatedDocumentCharges = adjusted[index] - nets[index];
-        line.taxAllocationMethod = 'document-total-sum-check';
+        line.taxAllocationMethod = policy?'supplier-cost-policy-v96':'document-total-sum-check';
+        if(policy)line.supplierCostPolicy={...policy};
       });
       const explicitLineTotal = lines.some(line => /\b(?:VALOR\s+TOTAL|TOTAL\s+(?:LINEA|LÍNEA|ITEM)|IMPORTE\s+TOTAL|TOTAL)\b/i.test(String(line.lineTotalHeader || line.totalHeader || '')));
       const method = lines.length > 1 || explicitLineTotal ? 'printed-line-sum-matrix' : 'invoice-column-matrix-reconciled';
-      return applyFinalPricing(lines, adjusted, {targetTotal: target, basis: 'invoice_quantity', method, linePriceSource: method === 'invoice-column-matrix-reconciled' ? 'invoice-total-tax-allocation' : method, verified: true, sourceBase: nets, warnings, documentFormula, totals});
+      return applyFinalPricing(lines, adjusted, {targetTotal: target, basis: 'invoice_quantity', method, linePriceSource: method === 'invoice-column-matrix-reconciled' ? 'invoice-total-tax-allocation' : method, verified: !allocationNeedsReview, sourceBase: nets, warnings, documentFormula, totals});
     }
 
     const componentEvidence = componentSum > 0 ? components : null;
