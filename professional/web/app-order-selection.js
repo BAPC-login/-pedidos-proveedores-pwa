@@ -23,7 +23,7 @@ function enhance(){
       // Preserve the user's intended state: per-item change handlers also
       // recalculate the master checkbox while this bulk operation is running.
       const targetChecked=control.checked;
-      const currentInputs=$('[data-v67-select]');
+      const currentInputs=Array.from(document.querySelectorAll('[data-v67-select]'));
       const changed=currentInputs.filter(input=>input.checked!==targetChecked);
       for(const input of changed)input.checked=targetChecked;
       for(const input of changed)input.dispatchEvent(new Event('change',{bubbles:true}));
