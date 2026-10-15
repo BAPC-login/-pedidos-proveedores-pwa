@@ -71,8 +71,8 @@ async function runOne(env,job){
       WHERE id=? AND status='processing'`).bind(state,JSON.stringify(result),ended,ended,job.id).run();
   }catch(error){
     const next=Number(job.attempts||0)+1>=3?'failed':'retry';
-    await env.DB.prepare(`UPDATE invoice_analysis_jobs_v96 SET status=?,error_message=?,updated_at=?,available_at=datetime('now','+2 minutes')
-      WHERE id=? AND status='processing'`).bind(next,String(error.message||error).slice(0,500),now(),job.id).run();
+    await env.DB.prepare(`UPDATE invoice_analysis_jobs_v96 SET status=?,error_message=?,updated_at=?,available_at=?
+      WHERE id=? AND status='processing'`).bind(next,String(error.message||error).slice(0,500),now(),new Date(Date.now()+120000).toISOString(),job.id).run();
     console.error('invoice_async_processing_failed',job.id,String(error.message||error));
   }
   return true;
@@ -81,7 +81,7 @@ export async function processInvoiceAnalysisJobs(env,{limit=2}={}){
   await prepare(env);
   // Reclaim abandoned leases (worker interruption), then process pending work.
   await env.DB.prepare(`UPDATE invoice_analysis_jobs_v96 SET status='retry',available_at=?,updated_at=?
-    WHERE status='processing' AND started_at<datetime('now','-4 minutes') AND attempts<3`).bind(now(),now()).run();
+    WHERE status='processing' AND julianday(started_at)<julianday('now','-4 minutes') AND attempts<3`).bind(now(),now()).run();
   await env.DB.prepare(`UPDATE invoice_analysis_jobs_v96 SET status='failed',error_message='Se agotaron los intentos'
     WHERE status='processing' AND started_at<datetime('now','-4 minutes') AND attempts>=3`).run();
   const pending=(await env.DB.prepare(`SELECT * FROM invoice_analysis_jobs_v96
