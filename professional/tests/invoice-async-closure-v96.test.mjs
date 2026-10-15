@@ -70,4 +70,30 @@ assert.match(invoice,/Retomar lectura previa/);
 assert.match(selection,/const targetChecked=control.checked/);
 assert.match(selection,/for\(const input of changed\)input.checked=targetChecked/);
 
+// Execute the actual checkbox binding logic with a minimal DOM double. This
+// specifically catches a one-element selector masquerading as a collection.
+function checkboxNode(){
+  return{checked:false,dataset:{},listeners:{},
+    addEventListener(type,fn){(this.listeners[type]??=[]).push(fn)},
+    dispatchEvent(event){for(const fn of this.listeners[event.type]||[])fn.call(this,event)},
+    closest(){return{querySelector(){return{textContent:''}}}}};
+}
+const checkboxes=[checkboxNode(),checkboxNode(),checkboxNode()],master=checkboxNode();
+const selectionCode=selection.replace(/^import .*?;\\s*/m,'')
+  .replace('export function initializeOrderSelection()','function initializeOrderSelection()');
+const selectAllFactory=new Function('
+,'$','document','MutationObserver','Event','requestAnimationFrame',selectionCode+'\\nreturn {enhance}');
+const dom={querySelectorAll:selector=>selector==='[data-v67-select]'?checkboxes:[]};
+const wrapper={querySelector:()=>master},bulkBar={querySelector:()=>wrapper};
+const {enhance}=selectAllFactory(sel=>sel==='.v67-bulkbar'?bulkBar:null,sel=>sel==='[data-v67-select]'?checkboxes:[],
+  dom,class {},class {constructor(type){this.type=type}},handler=>handler());
+enhance();
+master.checked=true;master.dispatchEvent({type:'change'});
+assert.deepEqual(checkboxes.map(node=>node.checked),[true,true,true],
+  'one select-all event must select all items exactly once');
+master.checked=false;master.dispatchEvent({type:'change'});
+assert.deepEqual(checkboxes.map(node=>node.checked),[false,false,false]);
+checkboxes[0].checked=true;checkboxes[0].dispatchEvent({type:'change'});
+assert.equal(master.indeterminate,true,'partial selections must preserve indeterminate control');
+
 console.log('Invoice async XML, supplier allocation, selection, and closure contracts: OK');
