@@ -19,7 +19,7 @@ export function parseOriginalDteXml(xml){
   const dte=first(parsed?.DTE||first(parsed?.EnvioDTE?.SetDTE)?.DTE||first(parsed?.SetDTE)?.DTE);
   const document=first(dte?.Documento),header=document?.Encabezado;
   const id=header?.IdDoc||{},issuer=header?.Emisor||{},totals=header?.Totales||{};
-  if(!document||!s(id.Folio)||!s(issuer.RUTEmisor)||!Number.isFinite(n(totals.MntTotal)))throw new Error('El archivo no corresponde a un DTE chileno con folio, emisor y total');
+  if(!document||!s(id.Folio)||!s(issuer.RUTEmisor)||!s(totals.MntTotal)||n(totals.MntTotal)<=0)throw new Error('El archivo no corresponde a un DTE chileno con folio, emisor y total');
   const lines=(Array.isArray(document.Detalle)?document.Detalle:[document.Detalle]).filter(Boolean).map(row=>({
     code:s(first(row.CdgItem)?.VlrCodigo),description:s(row.NmbItem||row.DscItem),quantity:n(row.QtyItem),
     unitNet:n(row.PrcItem),lineNet:n(row.MontoItem),exempt:Boolean(s(row.IndExe))
@@ -36,5 +36,9 @@ export function verifyPhotoAgainstDte(analysis,dte){
   if(inv.supplierRut&&normalizeRut(inv.supplierRut)!==normalizeRut(dte.rut))issues.push('rut_emisor');
   if(total>0&&Math.abs(total-dte.total)>2)issues.push('total');
   if(inv.invoiceDate&&s(inv.invoiceDate).slice(0,10)!==dte.date)issues.push('fecha');
-  return{verified:issues.length===0&&Boolean(inv.invoiceNumber)&&total>0,discrepancies:issues,originalDte:dte};
+  if(!inv.supplierRut)issues.push('rut_emisor_no_visible');
+  if(!inv.invoiceDate)issues.push('fecha_no_visible');
+  if(!inv.invoiceNumber)issues.push('folio_no_visible');
+  if(total<=0)issues.push('total_no_visible');
+  return{verified:issues.length===0,discrepancies:issues,originalDte:dte};
 }
