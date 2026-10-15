@@ -15,11 +15,11 @@ function applyLearning(analysis,context,rules,policyConfig){
 }
 function safeMultipartRequest(request,original,enriched){const form=new FormData();for(const[key,value]of original.entries()){if(key==='context')continue;if(value instanceof File)form.append(key,value,value.name||'documento');else form.append(key,value)}form.append('context',JSON.stringify(enriched));const headers=new Headers(request.headers);headers.delete('content-type');headers.delete('content-length');return new Request(request.url,{method:'POST',headers,body:form})}
 
-export async function analyzeInvoiceV39(request,env,actor){
+export async function analyzeInvoiceV39(request,env,actor,options={}){
   const original=await request.formData(),contextRaw=String(original.get('context')||'{}');let context={};try{context=JSON.parse(contextRaw)}catch{throw new HttpError(400,'El contexto del pedido no es válido','invalid_context')}
   const supplierId=await supplierForContext(env,actor,context).catch(error=>{console.warn('v39_invoice_supplier_context_failed',error?.message||error);return''});
   const [rules,policyConfig]=await Promise.all([rulesForSupplier(env,actor,supplierId).catch(error=>{console.warn('v39_invoice_rules_failed',error?.message||error);return[]}),policy(env,actor).catch(error=>{console.warn('v39_invoice_policy_failed',error?.message||error);return{extraItemsMode:'review',requireInvoicePreview:true,learnFromCorrections:true,priceVarianceWarningPct:12,updatedAt:null}})]);
   const enriched={...context,supplierId,flowVersion:39,learnedCorrections:rules.map(rule=>({productId:rule.productId,sourceDescription:rule.sourceDescription,packSize:rule.learnedPackSize,expectedUnitPrice:rule.lastConfirmedUnitPrice,confidence:rule.confidence,correctionCount:rule.correctionCount})),extraItemsMode:policyConfig.extraItemsMode,priceVarianceWarningPct:policyConfig.priceVarianceWarningPct};
-  const analysis=await analyzeInvoiceCoreV39(safeMultipartRequest(request,original,enriched),env,actor);
+  const analysis=await analyzeInvoiceCoreV39(safeMultipartRequest(request,original,enriched),env,actor,options);
   try{return applyLearning(analysis,enriched,rules,policyConfig)}catch(error){console.warn('v39_invoice_learning_apply_failed',error?.message||error);return{...analysis,flowVersion:39,multipartBoundaryFixed:true,maxFileBytes:MAX_INVOICE_FILE_BYTES_V39,warnings:[...(analysis.warnings||[]),'El documento fue leído; el aprendizaje histórico no pudo aplicarse en esta ocasión.']}}
 }
