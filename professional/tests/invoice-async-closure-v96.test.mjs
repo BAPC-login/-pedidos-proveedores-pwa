@@ -64,6 +64,7 @@ assert.match(queue,/processInvoiceAnalysisJobs/);
 assert.match(worker,/invoice_order_links/);
 assert.match(worker,/receptions WHERE order_id=\? AND org_id=\? AND status='completed'/);
 assert.match(worker,/\/api\/orders\/:id\/finalize/);
+assert.match(worker,/transitionUrl\.pathname=.*transition/,'finalize must delegate to the canonical transition URL');
 assert.match(detail,/name="notes" maxlength="500"/);
 assert.match(invoice,/\/api\/invoices\/analyze\/async/);
 assert.match(invoice,/Retomar lectura previa/);
