@@ -31,7 +31,9 @@ assert.match(detail,/Recepción registrada · el pedido ya puede cerrarse/,'rece
 assert.match(detail,/id="v30CloseOrder"/,'order detail must expose direct closure after reception');
 assert.match(detail,/id="v30NoShow"/,'order detail must expose supplier no-show');
 assert.match(detail,/REVISIÓN DE DIFERENCIAS/,'reconciliation must be presented as optional review');
-assert.match(detail,/La factura, la conciliación y el pago pueden gestionarse después/,'close confirmation must preserve financial independence');
+assert.match(detail,/CIERRE DE PEDIDO/,'finalization must have a dedicated, simplified screen');
+assert.match(detail,/name="notes" maxlength="500"/,'finalization supports optional note');
+assert.match(detail,/\/finalize/,'finalization routes through invoice-and-reception guarded API');
 
 assert.match(invoice,/name="markReceived"/,'invoice UI must keep the explicit receive-from-invoice choice');
 assert.match(invoice,/receptionDate/,'invoice UI must let the user choose reception date');
