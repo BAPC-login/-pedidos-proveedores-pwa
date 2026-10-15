@@ -117,6 +117,8 @@ async function deleteDraft(order){
 async function detailAction(id,selector){await openOrderDetail(id);setTimeout(()=>document.querySelector(selector)?.click(),70)}
 async function transitionState(order,to){
   if(!order||!to)return;
+  // All order closures use the auditable one-step finalize modal.
+  if(to==='closed')return openOrderDetail(order.id);
   const destructive=to==='closed'||to==='cancelled';
   if(destructive&&!confirm(to==='closed'?`¿Cerrar ${order.folio}? La recepción quedará finalizada y el pedido pasará a Historial. La factura y el pago pueden registrarse después.`:`¿Anular ${order.folio}? Pasará a Historial como anulado.`))return;
   await api(`/api/orders/${encodeURIComponent(order.id)}/transition`,{method:'POST',json:{status:to,reason:to==='closed'?'Cierre operativo posterior a recepción':to==='cancelled'?'Anulación desde Pedidos':'Actualización de estado desde Pedidos'}});
