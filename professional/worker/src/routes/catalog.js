@@ -1,4 +1,5 @@
 export function matchCatalogDomain(path,method){
+  if(['GET','PUT'].includes(method)&&/^\/api\/suppliers\/[^/]+\/cost-policy$/.test(path))return{implementation:'core',layer:'supplier-cost-allocation'};
   if(method==='GET'&&/^\/api\/products\/[^/]+\/insights$/.test(path))return{implementation:'procurement',layer:'product-insights'};
   if(method==='PUT'&&/^\/api\/products\/[^/]+\/suppliers\/[^/]+\/manual-price$/.test(path))return{implementation:'procurement',layer:'product-price'};
   if(method==='PUT'&&/^\/api\/products\/[^/]+\/suppliers$/.test(path))return{implementation:'procurement',layer:'catalog'};
