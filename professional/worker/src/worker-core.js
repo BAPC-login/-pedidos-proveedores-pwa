@@ -33,7 +33,11 @@ async function finalizeOrderV96(request,env,actor,orderId,ctx){
   const notes=String(body.notes||'').trim();
   if(notes.length>500)throw new HttpError(400,'La observación supera los 500 caracteres','notes_too_long');
   const reason=notes?'Cierre simplificado · Observación: '+notes:'Cierre simplificado · Factura vinculada y recepción confirmada';
-  const delegated=requestWithBody(request,{status:'closed',reason});
+  const transitionUrl=new URL(request.url);
+  transitionUrl.pathname='/api/orders/'+encodeURIComponent(orderId)+'/transition';
+  const headers=new Headers(request.headers);
+  headers.set('Content-Type','application/json');
+  const delegated=new Request(transitionUrl.toString(),{method:'POST',headers,body:JSON.stringify({status:'closed',reason})});
   const response=await platformWorker.fetch(delegated,env,ctx);
   if(!response.ok){const data=await response.clone().json().catch(()=>({}));throw new HttpError(response.status,data.error||'No se pudo cerrar el pedido',data.code||'close_failed')}
   return{orderId,status:'closed',invoiceCount:Number(invoices.total),receptionId:receipt.id,archived:true,notes};
