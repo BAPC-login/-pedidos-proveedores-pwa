@@ -93,5 +93,9 @@ assert.doesNotMatch(qa,/request\(SOURCE,'\/health'\)/,'avoid Gemini AI /health f
 assert.match(qa,/targetHealth\.environment!=='development'/,'target environment guarded');
 assert.match(qa,/me\.organization\?\.name!=='Nuvasto QA'/,'target must be QA account');
 assert.match(qa,/mode:'merge'/,'never wipe QA seed catalog');
+assert.match(qa,/QA_IMPORT_BATCH_SIZE=5/,'catalog import must be bounded per Worker invocation');
+assert.match(qa,/for\(let start=0;start<rows\.length;start\+=QA_IMPORT_BATCH_SIZE\)/,'batch loop covers source catalog');
+assert.match(qa,/if\(missing\)fail\('Validación final DEV incompleta/,'must verify full destination after last batch');
+
 assert.doesNotMatch(qa,/contactName|supplierRut|sourceInvoice/,'contacts and financial documents are excluded');
 console.log('invoice logistics + XML round-trip + one-way QA catalog v98: OK');
