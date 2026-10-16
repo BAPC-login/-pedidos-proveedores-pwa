@@ -54,7 +54,7 @@ assert.ok(!invoice.receptionError,'invoice reception must not return a partial-s
 assert.ok(invoice.reception?.id,'invoice-derived reception persisted');
 assert.equal(Number(invoice.reception?.extraItemCount??invoice.extraReceivedCount),1,'extra product must be recorded independently from ordered items');
 const detail=(await call('/api/orders/'+encodeURIComponent(orderId))).order;
-assert.equal(detail.status,'received','order becomes received with its confirmed quantity');
+assert.ok(['received','reconciled'].includes(detail.status),'order records reception and may automatically reconcile a balanced invoice');
 assert.equal(Number(detail.items.find(x=>x.productId===ordered.id)?.quantityReceived),1,'invoice accepted physical units normalized to order units');
 const linked=await call('/api/orders/'+encodeURIComponent(orderId)+'/invoices');
 assert.ok(linked.invoices?.some(x=>x.id===invoice.invoice.id),'linked invoice visible in order');
