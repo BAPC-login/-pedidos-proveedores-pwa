@@ -18,6 +18,10 @@ const schema={type:'OBJECT',properties:{
     printedFinalUnitPrice:money,finalUnitPriceHeader:{type:'STRING'},sourcePrintedFinalUnitPrice:money,sourceFinalUnitPriceHeader:{type:'STRING'},finalUnitPriceBasis:{type:'STRING'},
     isFree:{type:'BOOLEAN'},freeReason:{type:'STRING'},readConfidence:{type:'NUMBER'},uncertainFields:{type:'ARRAY',items:{type:'STRING'}}
   },required:['code','description','quantity','quantityHeader','unit','packSize','packEvidence','unitPriceNet','unitPriceHeader','discountPct','discountAmountLine','lineTotal','lineTotalHeader','lineTotalKind','netLineTotal','freightLine','vatLine','additionalTaxLine','otherLineCharges','grossLineTotal','printedFinalUnitPrice','finalUnitPriceHeader','sourcePrintedFinalUnitPrice','sourceFinalUnitPriceHeader','finalUnitPriceBasis','isFree','freeReason','readConfidence','uncertainFields']}},
+  logisticsEvidence:{type:'OBJECT',properties:{
+    freightBasis:{type:'STRING'},otherBasis:{type:'STRING'},freightIncludedInNet:{type:'STRING'},
+    evidenceHeader:{type:'STRING'},evidenceText:{type:'STRING'},confidence:{type:'NUMBER'}
+  },required:['freightBasis','otherBasis','freightIncludedInNet','evidenceHeader','evidenceText','confidence']},
   warnings:{type:'ARRAY',items:{type:'STRING'}}
 },required:['supplierName','supplierRut','invoiceNumber','invoiceDate','currency','documentType','documentTypeCode','totals','payment','items','warnings']};
 
@@ -46,7 +50,9 @@ REGLAS OBLIGATORIAS:
 15. Folio y fecha solo se informan cuando son visibles. Nunca uses fecha actual ni datos del pedido como sustituto.
 16. payment solo refleja evidencia visible en el documento; no infieras que está pagado por el texto del pedido.
 17. readConfidence va de 0 a 1 y debe bajar si una celda está borrosa, cortada, inclinada o parcialmente tapada.
-18. Devuelve solo JSON conforme al schema. La aplicación cotejará catálogo, distribuirá cargos cuando corresponda y aplicará la regla final Σ(cantidad × precio final)=total factura.`;
+18. Devuelve solo JSON conforme al schema.
+19. COSTO LOGÍSTICO: identifica si el documento declara cómo se distribuyen flete, recargos u otros cargos por cada producto. Reporta logisticsEvidence: freightBasis y otherBasis SOLO entre 'net_value', 'invoice_quantity', 'physical_units' o 'unknown', y freightIncludedInNet entre 'yes', 'no' o 'unknown'. Usa 'unknown' salvo evidencia literal del encabezado, notas o columnas. Copia evidenceHeader y evidenceText exactamente como aparecen; confidence de 0 a 1. NUNCA inventes una prorrata o ajustes importes para cuadrar.
+20. El objetivo operativo de Nuvasto es llegar al costo unitario BRUTO FINAL impreso por producto. Si existe precio final unitario explícito, transcríbelo intacto y conserva su base por caja/unidad física; NO le agregues IVA, IABA/ILA o flete nuevamente. Nuvasto comparará varias hipótesis de reparto, pero SOLO aceptará una que supere el cálculo determinístico; si no hay evidencia, requerirá revisión. La aplicación cotejará catálogo, distribuirá cargos cuando corresponda y aplicará la regla final Σ(cantidad × precio final)=total factura.`;
 
 function toBase64(buffer){const bytes=new Uint8Array(buffer);let binary='';for(let offset=0;offset<bytes.length;offset+=0x8000)binary+=String.fromCharCode(...bytes.subarray(offset,offset+0x8000));return btoa(binary)}
 function num(value){const n=Number(value);return Number.isFinite(n)?Math.max(0,n):0}
@@ -56,8 +62,20 @@ function natureFor(context={}){return String(context.documentNature||'').toLower
 function quantityFor(item,basis){const invoice=num(item?.quantity),pack=Math.max(1,num(item?.packSize)||1);return basis==='physical_units'?invoice*pack:invoice}
 function explicitFinalPrice(item){return num(item?.sourcePrintedFinalUnitPrice)||num(item?.printedFinalUnitPrice)}
 
+function normalizeLogisticsEvidence(raw){
+  const allowed=new Set(['net_value','invoice_quantity','physical_units','unknown']);
+  const evidence=raw?.logisticsEvidence;
+  if(!evidence||typeof evidence!=='object')return {freightBasis:'unknown',otherBasis:'unknown',freightIncludedInNet:'unknown',evidenceHeader:'',evidenceText:'',confidence:0};
+  const method=value=>allowed.has(String(value))?String(value):'unknown';
+  const inclusion=['yes','no','unknown'].includes(String(evidence.freightIncludedInNet))?String(evidence.freightIncludedInNet):'unknown';
+  const confidence=Math.max(0,Math.min(1,Number(evidence.confidence)||0));
+  return {freightBasis:method(evidence.freightBasis),otherBasis:method(evidence.otherBasis),
+    freightIncludedInNet:inclusion,evidenceHeader:String(evidence.evidenceHeader||'').slice(0,160),
+    evidenceText:String(evidence.evidenceText||'').slice(0,500),confidence};
+}
 function canonicalizeExtractedTotals(raw){
   if(!raw||typeof raw!=='object')return raw;
+  raw.logisticsEvidence=normalizeLogisticsEvidence(raw);
   const totals=raw.totals&&typeof raw.totals==='object'?raw.totals:(raw.totals={});
   const breakdown=Array.isArray(totals.additionalTaxes)?totals.additionalTaxes:[];
   const breakdownTotal=breakdown.reduce((sum,item)=>sum+num(item?.value),0);
