@@ -295,7 +295,7 @@ export function reconcileInvoicePricing(inputLines, rawTotals, warnings = [], su
         line.allocatedAdditionalTax = additionalShares[index];
         line.allocatedOtherCharges = otherShares[index] + (adjusted[index] - (nets[index] + freightShares[index] + vatShares[index] + additionalShares[index] + otherShares[index]));
         line.allocatedDocumentCharges = adjusted[index] - nets[index];
-        line.taxAllocationMethod = policy?'supplier-cost-policy-v96':(freightPrinted||vatPrinted||additionalPrinted||otherPrinted)?'printed-line-component-evidence-v98':'document-total-sum-check';
+        line.taxAllocationMethod = (freightPrinted||vatPrinted||additionalPrinted||otherPrinted)?'printed-line-component-evidence-v98':policy?'supplier-cost-policy-v96':'document-total-sum-check';
         if(policy)line.supplierCostPolicy={...policy};
       });
       const explicitLineTotal = lines.some(line => /\b(?:VALOR\s+TOTAL|TOTAL\s+(?:LINEA|LÍNEA|ITEM)|IMPORTE\s+TOTAL|TOTAL)\b/i.test(String(line.lineTotalHeader || line.totalHeader || '')));
