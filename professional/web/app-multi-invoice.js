@@ -1,6 +1,7 @@
 import {$,$$,esc,state,api,toast,money,date,clearResponseCache} from './app-core.js';
 import {openModal,closeModal} from './app-modal.js';
 import {openRoute} from './app-router-v14.js';
+import {showInvoiceCompletionV104} from './app-invoice-completion-v104.js';
 
 const VERSION='38';
 const MAX_DOCUMENTS=5;
@@ -256,7 +257,7 @@ function showQueueError(error,item,analysis=null){
 }
 
 async function finishQueue(){
-  if(!queue)return;const completed=queue.saved.length,skipped=queue.skipped.length,queueSaved=[...queue.saved],returnOrderId=queue.orderId,summary=completed===1?'1 documento guardado y vinculado':`${completed} documentos guardados y vinculados`,hadSaved=completed>0;queue.active=false;window.NuvastoInvoiceQueue=null;queue=null;endAnalysisTransition();closeModal(hadSaved?'saved':'cancelled');if(hadSaved){const pendingReceipt=queueSaved.filter(item=>item.receptionError).length;toast(pendingReceipt?summary+'; '+pendingReceipt+' recepción(es) requieren revisión':skipped?`${summary}; ${skipped} omitido${skipped===1?'':'s'}`:summary,pendingReceipt?'error':undefined)}else toast('No se guardó ningún documento','error');if(returnOrderId)await (await import('./app-order-detail-v30.js')).openOrderDetail(returnOrderId);else await openRoute('invoices','',{replace:true});
+  if(!queue)return;const completed=queue.saved.length,skipped=queue.skipped.length,queueSaved=[...queue.saved],queueSkipped=[...queue.skipped],returnOrderId=queue.orderId,summary=completed===1?'1 documento guardado y vinculado':`${completed} documentos guardados y vinculados`,hadSaved=completed>0;queue.active=false;window.NuvastoInvoiceQueue=null;queue=null;endAnalysisTransition();closeModal(hadSaved?'saved':'cancelled');if(hadSaved){const pendingReceipt=queueSaved.filter(item=>item.receptionError).length;toast(pendingReceipt?summary+'; '+pendingReceipt+' recepción(es) requieren revisión':skipped?`${summary}; ${skipped} omitido${skipped===1?'':'s'}`:summary,pendingReceipt?'error':undefined)}else toast('No se guardó ningún documento','error');if(hadSaved)await showInvoiceCompletionV104({saved:queueSaved,skipped:queueSkipped,orderId:returnOrderId});else if(returnOrderId)await (await import('./app-order-detail-v30.js')).openOrderDetail(returnOrderId);else await openRoute('finance','',{replace:true});
 }
 
 function revokePreviews(){previewUrls.forEach(url=>URL.revokeObjectURL(url));previewUrls=[]}
