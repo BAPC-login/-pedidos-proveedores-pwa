@@ -12,9 +12,9 @@ async function request(base,path,{token='',method='GET',data}={}){
   const url=new URL(path,base);
   if(url.origin!==new URL(base).origin)fail('URL fuera de dominio autorizado');
   const response=await fetch(url,{method,headers:{...(token?{Authorization:'Bearer '+token}:{}),...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined,redirect:'error'});
-  if(!response.ok)fail('Error '+response.status+' en '+(base===SOURCE?'lectura producción':'operación DEV')+' '+url.pathname);
+  if(!response.ok){const safe=await response.clone().json().catch(()=>({}));fail('HTTP '+response.status+' '+url.pathname+' · '+String(safe.code||safe.error||'server_error').slice(0,220));}
   const body=await response.json().catch(()=>fail('Respuesta JSON inválida de '+url.pathname));
-  if(body.ok===false)fail(body.error||'Error de API');
+  if(body.ok===false)fail('API '+url.pathname+' · '+String(body.code||body.error||'Error de API').slice(0,220));
   return body;
 }
 const sourceHealth=await request(SOURCE,'/platform/health'),targetHealth=await request(TARGET,'/platform/health');
@@ -83,7 +83,46 @@ for(const location of locations){
   }
 }
 // Merge, never replace: QA seed fixtures and other unrelated DEV data remain intact.
-const outcome=await request(TARGET,'/api/catalog/import',{token:devToken,method:'POST',data:{mode:'merge',rows}});
-const actual=outcome.result||outcome;
-if(Number(actual.rows||0)!==rows.length)fail('La importación DEV no confirma todas las filas');
-console.log('Copia de catálogo COMPLETA en DEV: '+JSON.stringify({...summary,imported:actual.rows,products:actual.productCount,suppliers:actual.supplierCount}));
+// One request for the entire catalog performs many sequential D1 queries in one
+// Worker invocation. Bound each invocation, permit safe reruns with merge mode.
+const QA_IMPORT_BATCH_SIZE=8;
+let imported=0;
+const batches=Math.ceil(rows.length/QA_IMPORT_BATCH_SIZE);
+for(let start=0;start<rows.length;start+=QA_IMPORT_BATCH_SIZE){
+  const slice=rows.slice(start,start+QA_IMPORT_BATCH_SIZE);
+  const index=Math.floor(start/QA_IMPORT_BATCH_SIZE)+1;
+  let outcome;
+  try{
+    outcome=await request(TARGET,'/api/catalog/import',{token:devToken,method:'POST',data:{mode:'merge',rows:slice}});
+  }catch(error){
+    fail('Falló importación DEV lote '+index+'/'+batches+' (filas '+(start+1)+'-'+(start+slice.length)+'). Ya confirmadas '+imported+'/'+rows.length+' filas. Se puede reintentar en modo merge. '+String(error.message||error));
+  }
+  const actual=outcome.result||outcome;
+  if(Number(actual.rows||0)!==slice.length)fail('El lote '+index+'/'+batches+' no confirmó todas las filas');
+  imported+=slice.length;
+  console.log('QA import DEV · lote '+index+'/'+batches+' · '+imported+'/'+rows.length+' filas confirmadas');
+}
+// The catalog is not considered copied until the API returns every supplier,
+// product, supplier-product relation and location/center assignment.
+const [dstSupResponse,dstProdResponse]=await Promise.all([
+  request(TARGET,'/api/suppliers?active=all',{token:devToken}),
+  request(TARGET,'/api/products',{token:devToken})
+]);
+const sourceNames=new Set(suppliers.map(item=>String(item.name).trim().toUpperCase()));
+const destNames=new Set((dstSupResponse.suppliers||[]).map(item=>String(item.name).trim().toUpperCase()));
+const missingSuppliers=[...sourceNames].filter(name=>!destNames.has(name));
+if(missingSuppliers.length)fail('Faltan '+missingSuppliers.length+' proveedores del catálogo en DEV');
+const destProducts=dstProdResponse.products||[];
+const norm=value=>String(value||'').trim().toUpperCase();
+let missing=0;
+for(const row of rows){
+  const dest=destProducts.find(product=>norm(product.name)===norm(row.product)
+    && Number(product.contentValue||0)===Number(row.contentValue||0)
+    && norm(product.contentUnit||'ml')===norm(row.contentUnit||'ml'));
+  const supplier=(dest?.suppliers||[]).some(relation=>norm(relation.supplierName)===norm(row.supplier));
+  const center=(dest?.costCenters||[]).some(loc=>norm(loc.name)===norm(row.costCenter)&&norm(loc.locationName)===norm(row.location));
+  if(!dest||!supplier||!center)missing++;
+}
+if(missing)fail('Validación final DEV incompleta: '+missing+'/'+rows.length+' relaciones pendientes. Se puede reintentar sin modificar producción.');
+console.log('CATALOGO QA VERIFICADO EN DEV: '+JSON.stringify({...summary,imported,
+ verifiedSuppliers:sourceNames.size,verifiedProducts:products.length,verifiedRelations:rows.length}));
