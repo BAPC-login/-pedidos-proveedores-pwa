@@ -96,3 +96,19 @@ export function validateInternalInvoiceXml(xml,analysis){
   return {valid:true,origin:parsed.origin,lineCount:parsed.invoice.lines.length,total:parsed.invoice.totals.total,
     documentMathVerified:analysis?.documentMathVerified===true&&parsed.pricingAudit.verified===true};
 }
+
+export function processInternalInvoiceXml(analysis,xml){
+  // XML is the serialized hand-off to the Nuvasto invoice processor;
+  // retain server-side product matches and audit fields, but take amounts
+  // and received quantities from the round-trip parsed XML evidence.
+  const validation=validateInternalInvoiceXml(xml,analysis);
+  const parsed=parseInternalInvoiceXml(xml);
+  const source=analysis?.invoice||{},originalLines=source.lines||source.items||[];
+  const lines=parsed.invoice.lines.map((row,index)=>{
+    const original=originalLines[index]||{};
+    return {...original,...row};
+  });
+  const invoice={...source,...parsed.invoice,lines,items:lines,pricingSummary:source.pricingSummary,
+    logisticsEvidence:{...source.logisticsEvidence,...parsed.invoice.logisticsEvidence}};
+  return {...analysis,invoice,internalXmlProcessed:true,internalXmlValidation:validation};
+}
