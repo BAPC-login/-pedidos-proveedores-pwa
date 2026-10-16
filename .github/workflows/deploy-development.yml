@@ -4,6 +4,12 @@ on:
     branches: [develop]
     paths: ['professional/**','worker/**','wrangler.jsonc','.github/workflows/deploy-development.yml']
   workflow_dispatch:
+    inputs:
+      copy_catalog:
+        description: 'Optional: copy real operational catalog production (GET-only) -> isolated DEV QA'
+        type: choice
+        options: [none, dry_run, apply]
+        default: none
 permissions: {contents: read, statuses: write}
 concurrency: {group: deploy-nuvasto-development, cancel-in-progress: true}
 jobs:
@@ -144,6 +150,28 @@ jobs:
           NUVASTO_E2E_PASSWORD: '${{ secrets.NUVASTO_DEV_E2E_PASSWORD }}'
         run: node tests/development-supplier-profile-e2e-v94.mjs
 
+      - name: Preview real catalog copy without writing
+        id: qa_catalog_preview
+        if: github.event_name == 'workflow_dispatch' && (inputs.copy_catalog == 'dry_run' || inputs.copy_catalog == 'apply') && steps.seed.outputs.configured == 'true'
+        working-directory: professional
+        env:
+          NUVASTO_QA_SOURCE_TOKEN: '${{ secrets.NUVASTO_QA_SOURCE_TOKEN }}'
+          NUVASTO_DEV_E2E_PASSWORD: '${{ secrets.NUVASTO_DEV_E2E_PASSWORD }}'
+          NUVASTO_QA_COPY_CONFIRM: COPIAR_CATALOGO_A_DEV
+          NUVASTO_QA_DRY_RUN: 'true'
+        run: node scripts/qa-copy-catalog-v98.mjs
+
+      - name: Copy catalog into isolated DEV after valid preview
+        id: qa_catalog_import
+        if: github.event_name == 'workflow_dispatch' && inputs.copy_catalog == 'apply' && steps.qa_catalog_preview.outcome == 'success'
+        working-directory: professional
+        env:
+          NUVASTO_QA_SOURCE_TOKEN: '${{ secrets.NUVASTO_QA_SOURCE_TOKEN }}'
+          NUVASTO_DEV_E2E_PASSWORD: '${{ secrets.NUVASTO_DEV_E2E_PASSWORD }}'
+          NUVASTO_QA_COPY_CONFIRM: COPIAR_CATALOGO_A_DEV
+          NUVASTO_QA_DRY_RUN: 'false'
+        run: node scripts/qa-copy-catalog-v98.mjs
+
       - name: Real invoice AI canary on DEV
         id: ai_canary
         if: steps.seed.outputs.configured == 'true' && steps.secrets.outputs.configured == 'true'
@@ -159,7 +187,7 @@ jobs:
         shell: bash
         env: {GH_TOKEN: '${{ github.token }}'}
         run: |
-          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.ip_hash_salt.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.seed.outcome }}" != "failure" ] && [ "${{ steps.e2e.outcome }}" != "failure" ] && [ "${{ steps.branding_e2e.outcome }}" != "failure" ] && [ "${{ steps.supplier_e2e.outcome }}" != "failure" ] && [ "${{ steps.ai_canary.outcome }}" != "failure" ]; then
+          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.ip_hash_salt.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.seed.outcome }}" != "failure" ] && [ "${{ steps.e2e.outcome }}" != "failure" ] && [ "${{ steps.branding_e2e.outcome }}" != "failure" ] && [ "${{ steps.supplier_e2e.outcome }}" != "failure" ] && [ "${{ steps.qa_catalog_preview.outcome }}" != "failure" ] && [ "${{ steps.qa_catalog_import.outcome }}" != "failure" ] && [ "${{ steps.ai_canary.outcome }}" != "failure" ]; then
             state=success
             if [ "${{ steps.seed.outputs.configured }}" = "true" ] && [ "${{ steps.secrets.outputs.configured }}" = "true" ]; then description='Nuvasto DEV · current UI + operación + proveedores + logos + IA OK'; else description='Nuvasto DEV current verificado; cobertura opcional incompleta'; fi
           else
