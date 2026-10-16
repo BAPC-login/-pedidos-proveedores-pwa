@@ -1,7 +1,7 @@
 name: Deploy Nuvasto development
 on:
   push:
-    branches: [develop]
+    branches: [develop, 'fix/invoice-xml-costs-order-closure-20261015']
     paths: ['professional/**','worker/**','wrangler.jsonc','.github/workflows/deploy-development.yml']
   workflow_dispatch:
     inputs:
