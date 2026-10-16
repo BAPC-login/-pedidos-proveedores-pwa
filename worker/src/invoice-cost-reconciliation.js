@@ -184,6 +184,29 @@ function applyFinalPricing(lines, lineTotals, options) {
   };
 }
 
+// Printed final unit prices take precedence over inferred/allocated prices.
+// If a printed value cannot reproduce a saved gross line total on either documented
+// quantity basis, stop automatic cost approval instead of hiding the disagreement.
+function applyGuardedFinalPricing(lines,amounts,options){
+  const outcome=applyFinalPricing(lines,amounts,options),mismatches=[];
+  for(const [index,line] of lines.entries()){
+    const printed=positive(line.sourcePrintedFinalUnitPrice);
+    if(!printed)continue;
+    const billed=lineInvoiceQuantity(line),physical=linePhysicalQuantity(line),amount=positive(line.finalLineTotal);
+    const allowance=Math.max(2,Math.ceil(Math.max(billed,physical)/2));
+    if(Math.min(Math.abs(amount-printed*billed),Math.abs(amount-printed*physical))>allowance){
+      line.priceVerified=false;
+      mismatches.push(index+1);
+    }
+  }
+  if(mismatches.length){
+    outcome.verified=false;
+    outcome.printedFinalPriceMismatches=mismatches;
+    options.warnings?.push('Precio final unitario impreso incompatible con el total bruto calculado en líneas '+mismatches.join(', ')+'. Se requiere revisión; no se acepta prorrata automática.');
+  }
+  return outcome;
+}
+
 export function reconcileInvoicePricing(inputLines, rawTotals, warnings = [], supplierCostPolicy = null) {
   const policy=supplierCostPolicy?validateSupplierCostPolicy(supplierCostPolicy):null;
   let allocationNeedsReview=false;
@@ -223,14 +246,14 @@ export function reconcileInvoicePricing(inputLines, rawTotals, warnings = [], su
     const grossSum = sum(readGross);
     if (readGross.every(value => value > 0) && Math.abs(target - grossSum) <= tolerance) {
       const adjusted = allocateResidual(readGross, target, readGross);
-      return applyFinalPricing(lines, adjusted, {targetTotal: target, basis: 'invoice_quantity', method: 'printed-final-line-totals', verified: true, sourceBase: readGross, warnings, documentFormula, totals});
+      return applyGuardedFinalPricing(lines, adjusted, {targetTotal: target, basis: 'invoice_quantity', method: 'printed-final-line-totals', verified: true, sourceBase: readGross, warnings, documentFormula, totals});
     }
 
     const components = lines.map(componentTotal);
     const componentSum = sum(components);
     if (components.every(value => value > 0) && Math.abs(target - componentSum) <= tolerance) {
       const adjusted = allocateResidual(components, target, components);
-      return applyFinalPricing(lines, adjusted, {targetTotal: target, basis: 'invoice_quantity', method: 'printed-line-sum-matrix', verified: true, sourceBase: components, warnings, documentFormula, totals});
+      return applyGuardedFinalPricing(lines, adjusted, {targetTotal: target, basis: 'invoice_quantity', method: 'printed-line-sum-matrix', verified: true, sourceBase: components, warnings, documentFormula, totals});
     }
 
     const nets = lines.map(rawNet);
@@ -264,7 +287,7 @@ export function reconcileInvoicePricing(inputLines, rawTotals, warnings = [], su
       });
       const explicitLineTotal = lines.some(line => /\b(?:VALOR\s+TOTAL|TOTAL\s+(?:LINEA|LÍNEA|ITEM)|IMPORTE\s+TOTAL|TOTAL)\b/i.test(String(line.lineTotalHeader || line.totalHeader || '')));
       const method = lines.length > 1 || explicitLineTotal ? 'printed-line-sum-matrix' : 'invoice-column-matrix-reconciled';
-      return applyFinalPricing(lines, adjusted, {targetTotal: target, basis: 'invoice_quantity', method, linePriceSource: method === 'invoice-column-matrix-reconciled' ? 'invoice-total-tax-allocation' : method, verified: !allocationNeedsReview, sourceBase: nets, warnings, documentFormula, totals});
+      return applyGuardedFinalPricing(lines, adjusted, {targetTotal: target, basis: 'invoice_quantity', method, linePriceSource: method === 'invoice-column-matrix-reconciled' ? 'invoice-total-tax-allocation' : method, verified: !allocationNeedsReview, sourceBase: nets, warnings, documentFormula, totals});
     }
 
     const componentEvidence = componentSum > 0 ? components : null;
@@ -278,10 +301,10 @@ export function reconcileInvoicePricing(inputLines, rawTotals, warnings = [], su
       const ratio = Math.abs(residual) / Math.max(1, target);
       const plausiblyExplained = documentFormula.verified || ratio <= 0.01;
       if (!plausiblyExplained) warnings.push(`La lectura base difiere del total oficial en ${Math.round(residual)}. Se calculó un costo efectivo para cuadratura, pero la extracción requiere revisión.`);
-      return applyFinalPricing(lines, adjusted, {targetTotal: target, basis: 'invoice_quantity', method: plausiblyExplained ? 'adaptive-document-total-allocation' : 'unexplained-total-allocation', verified: plausiblyExplained, sourceBase: base, warnings, documentFormula, totals});
+      return applyGuardedFinalPricing(lines, adjusted, {targetTotal: target, basis: 'invoice_quantity', method: plausiblyExplained ? 'adaptive-document-total-allocation' : 'unexplained-total-allocation', verified: plausiblyExplained, sourceBase: base, warnings, documentFormula, totals});
     }
   }
 
   const fallback = lines.map(line => rawGross(line) || componentTotal(line) || rawNet(line));
-  return applyFinalPricing(lines, fallback, {targetTotal: target, basis: 'invoice_quantity', method: 'unverified-line-values', verified: false, sourceBase: fallback, warnings, documentFormula, totals});
+  return applyGuardedFinalPricing(lines, fallback, {targetTotal: target, basis: 'invoice_quantity', method: 'unverified-line-values', verified: false, sourceBase: fallback, warnings, documentFormula, totals});
 }
