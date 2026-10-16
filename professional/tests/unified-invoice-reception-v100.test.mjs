@@ -1,0 +1,48 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const file=path=>readFileSync(new URL(path,import.meta.url),'utf8');
+const orders=file('../web/app-orders.js');
+const detail=file('../web/app-order-detail-v30.js');
+const review=file('../web/app-multi-invoice.js');
+const worker=file('../worker/src/worker-core.js');
+const css=file('../web/unified-layout-v100.css');
+const masterCss=file('../web/master-order.css');
+const appCss=file('../web/app-current.css');
+
+assert.match(orders,/Ingresar factura \/ recepcionar/,'card primary CTA must enter invoice-first reception');
+assert.match(orders,/data-v32-order-share/,'card always provides share');
+assert.match(orders,/data-v32-order-preview/,'card always provides preview');
+assert.doesNotMatch(orders,/Control opcional ·/,'no approval/send/confirm workflow in menu');
+assert.doesNotMatch(detail,/actions\.push\('<button class="btn primary" id="v30Reception"/,'no duplicate reception CTA in detail');
+assert.match(detail,/NuvastoMultiInvoice\?\.open/,'detail invoice button uses current invoice queue');
+
+assert.match(review,/function supplierItems\(/,'invoice lines use full supplier catalog');
+assert.match(review,/Otro[s]? productos de este proveedor/,'out-of-order invoice lines can link to supplier catalog');
+assert.match(review,/async function openReview/);
+assert.match(review,/function renderUnifiedInvoiceLines/);
+assert.match(review,/data-invoice-line/);
+assert.match(review,/name="accepted"/);
+assert.match(review,/name="rejected"/);
+assert.match(review,/data-v100-invoice-toggle/);
+assert.match(review,/name="qualityType"/);
+assert.match(review,/Crear y vincular/);
+assert.match(review,/\/api\/products/,'missing products can be created');
+assert.match(review,/\/suppliers/,'created products can be linked to this supplier');
+assert.match(review,/markReceived:shouldReceive/,'invoice save requests canonical reception');
+assert.match(review,/receivedUnits:shouldReceive/,'accepted quantities are submitted explicitly');
+assert.match(review,/rejectedUnits:shouldReceive/,'rejections are submitted explicitly');
+assert.match(review,/canRegisterInvoiceReception\(queue\.order\)/,'already received orders do not double receive');
+assert.match(review,/if\(saved\.receptionError\)/,'saved invoice and failed reception are distinct statuses');
+
+assert.match(worker,/receivedUnits\?\?line\?\.units/,'backend uses accepted amount, not all invoiced units');
+assert.match(worker,/rejectedUnits/,'backend persists reported rejections');
+assert.match(worker,/createReceptionV13/,'only canonical reception creates a record');
+assert.match(worker,/record\.qualityNote/,'incident detail flows into reception notes');
+assert.match(css,/\.modal:has\(\.modal-frame\[data-size="order"\]\)/,'desktop Master Order fits viewport');
+assert.match(css,/\.order-file-product small\{white-space:normal/,'full descriptions visible in desktop');
+assert.match(css,/@media\(max-width:760px\)/,'mobile shortcuts adapt');
+assert.match(css,/@media\(max-width:650px\)/,'compact invoice receiving remains usable on phones');
+assert.match(css,/\.v100-invoice-extra\[hidden\]\{display:none!important\}/,'incidents collapsed by default');
+assert.match(masterCss,/@media\(max-width:460px\)/,'legacy very narrow phone layout retained');
+assert.match(appCss,/unified-layout-v100\.css/,'CSS imported by canonical entry');
+console.log('unified invoice receipt & responsive desktop v100: OK · no duplicate reception action, supplier extras and editable incidents');

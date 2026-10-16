@@ -68,3 +68,14 @@
 .v100-invoice-reception .v38-price-breakdown{font-size:12px}
 @media(min-width:980px){.v100-invoice-row{grid-template-columns:minmax(0,1.3fr) minmax(230px,.9fr) 104px 44px;grid-template-areas:"identity link quantity toggle" "create create create create" "extra extra extra extra";gap:12px}.v100-line-link{grid-template-columns:minmax(0,1fr) auto}.v100-invoice-title p{font-size:13px}}
 @media(max-width:650px){.v100-invoice-title{display:block}.v100-counter{display:block;margin-top:8px}.v100-invoice-row{grid-template-columns:minmax(0,1fr) 88px 42px;gap:8px;padding:11px}.v100-line-description strong{font-size:13px}.v100-line-link{grid-template-columns:1fr}.v100-line-link .btn{justify-self:start}.v100-new-product{grid-template-columns:repeat(2,minmax(0,1fr))}.v100-new-product .field:first-child{grid-column:1/-1}.v100-new-product .btn{grid-column:1/-1}.v100-invoice-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Consistent card spacing and clipping for all dashboard/detail views. */
+.v32-grid,.v32-card,.v30-summary-card,.v30-section,.v30-item-list{min-width:0;max-width:100%}
+.v32-card-head,.v30-summary-top,.v30-section-head{min-width:0;gap:12px}
+.v32-card-head>div,.v30-summary-top>div,.v30-section-head>div{min-width:0;flex:1}
+.v32-card-head :is(h3,p),.v30-summary-top :is(h3,p),.v30-section-head :is(h3,p){overflow-wrap:anywhere}
+.v32-metrics,.v30-metrics{min-width:0;max-width:100%;grid-template-columns:repeat(auto-fit,minmax(min(100%,110px),1fr))}
+.v32-metric,.v30-metric{min-width:0}
+.v32-metric strong,.v30-metric strong{overflow-wrap:anywhere}
+.v30-action-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}
+@media(max-width:560px){.v32-metrics,.v30-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.v100-counter{white-space:normal}}

@@ -22,7 +22,7 @@ assert.doesNotMatch(detail,/if\(!invoiceCount\)\{[\s\S]{0,300}openInvoiceAnalysi
 assert.match(detail,/invoices\.length===0\)actions\.push/);
 assert.doesNotMatch(detail,/await navigate\('dashboard'\)/);
 assert.doesNotMatch(detail,/await navigate\('history'\)/);
-assert.match(orders,/Control opcional · \$\{label\}/);
+assert.doesNotMatch(orders,/Control opcional · \$\{label\}/,'manual approval transitions do not appear in the operational menu');
 assert.match(orders,/if\(to==='closed'\)return openOrderDetail\(order\.id\)/);
 assert.match(orders,/Adjuntar factura pendiente/);
 assert.match(invoice,/if\(orderId\)await \(await import\('\.\/app-order-detail-v30\.js'\)\)\.openOrderDetail\(orderId\)/);
