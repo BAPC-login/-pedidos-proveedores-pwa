@@ -2,7 +2,7 @@ import {HttpError,ROLES,assertMinimumRole,nowIso} from '../core.js';
 import {getOrder} from './orders.js';
 import {storeFile,storeBytes,readStoredBytes} from '../storage.js';
 import {analyzeInvoiceV91} from './invoice-analysis-v91.js';
-import {buildInternalInvoiceXml,parseOriginalDteXml,verifyPhotoAgainstDte} from '../invoice-xml-evidence-v96.js';
+import {buildInternalInvoiceXml,validateInternalInvoiceXml,parseOriginalDteXml,verifyPhotoAgainstDte} from '../invoice-xml-evidence-v96.js';
 
 const MAX_SOURCE=20*1024*1024,MAX_XML=5*1024*1024;
 const now=()=>nowIso();
@@ -65,10 +65,11 @@ async function runOne(env,job){
       }
     }
     const xml=buildInternalInvoiceXml(analysis);
+    const xmlValidation=validateInternalInvoiceXml(xml,analysis);
     const structured=await storeBytes(env,actor,{bytes:new TextEncoder().encode(xml),
       fileName:'factura-estructurada-'+job.id+'.xml',contentType:'application/xml',
       purpose:'invoice-internal-xml',entityType:'order',entityId:job.order_id,documentKind:'invoice_extraction_v96'});
-    const result={analysis:{...analysis,structuredXml:{id:structured.id,key:structured.key,origin:'photo-derived-not-sii-dte'},
+    const result={analysis:{...analysis,structuredXml:{id:structured.id,key:structured.key,origin:'photo-derived-not-sii-dte',...xmlValidation},
       originalDteCheck:originalDteCheck?{verified:originalDteCheck.verified,discrepancies:originalDteCheck.discrepancies,
         folio:originalDteCheck.originalDte.folio,total:originalDteCheck.originalDte.total}:null}};
     const state=analysis.degraded?'needs_review':'completed',ended=now();
