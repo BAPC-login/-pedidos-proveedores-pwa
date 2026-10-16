@@ -69,7 +69,7 @@ const normalizer=readFileSync(new URL('../worker/src/invoice-normalizer.js',impo
 const qa=readFileSync(new URL('../scripts/qa-copy-catalog-v98.mjs',import.meta.url),'utf8');
 assert.match(fast,/logisticsEvidence/);
 assert.match(fast,/No inventes productos/);
-assert.match(fast,/no distribuyas cargos/i);
+assert.match(fast,/No distribuyas impuestos ni fletes/i);
 assert.match(asyncCode,/processInternalInvoiceXml/,'async worker consumes parsed XML before publishing');
 assert.match(normalizer,/auditLogisticsAllocation/);
 assert.match(qa,/method!=='GET'&&base===SOURCE/,'production-side writes prohibited');
