@@ -139,7 +139,7 @@ function showQueueError(error,item,analysis=null){
 }
 
 async function finishQueue(){
-  if(!queue)return;const completed=queue.saved.length,skipped=queue.skipped.length,target=queue.returnToHistory||queue.orderId?'history':'invoices',summary=completed===1?'1 documento guardado y vinculado':`${completed} documentos guardados y vinculados`,hadSaved=completed>0;queue.active=false;window.NuvastoInvoiceQueue=null;queue=null;endAnalysisTransition();closeModal(hadSaved?'saved':'cancelled');if(hadSaved)toast(skipped?`${summary}; ${skipped} omitido${skipped===1?'':'s'}`:summary);else toast('No se guardó ningún documento','error');await openRoute(target,'',{replace:true});
+  if(!queue)return;const completed=queue.saved.length,skipped=queue.skipped.length,returnOrderId=queue.orderId,summary=completed===1?'1 documento guardado y vinculado':`${completed} documentos guardados y vinculados`,hadSaved=completed>0;queue.active=false;window.NuvastoInvoiceQueue=null;queue=null;endAnalysisTransition();closeModal(hadSaved?'saved':'cancelled');if(hadSaved)toast(skipped?`${summary}; ${skipped} omitido${skipped===1?'':'s'}`:summary);else toast('No se guardó ningún documento','error');if(returnOrderId)await (await import('./app-order-detail-v30.js')).openOrderDetail(returnOrderId);else await openRoute('invoices','',{replace:true});
 }
 
 function revokePreviews(){previewUrls.forEach(url=>URL.revokeObjectURL(url));previewUrls=[]}

@@ -81,9 +81,9 @@ async function loadOrdersPage(history,filters,cursor=''){
     const legacy=await api('/api/orders',{fresh:true,timeout:30000}),all=legacy.orders||[],orders=all.filter(order=>clientMatch(order,filters,history));return{orders,meta:fallbackMeta(all),page:{hasMore:false,nextCursor:''},fallback:true};
   }
 }
-function transitionOptions(order,cap){return(STATE_ACTIONS[order.status]||[]).filter(([to])=>canTransition(cap.role,to)).map(([to,label])=>[`state:${to}`,`Estado · ${label}`])}
+function transitionOptions(order,cap){return(STATE_ACTIONS[order.status]||[]).filter(([to])=>canTransition(cap.role,to)).map(([to,label])=>[`state:${to}`,`Control opcional · ${label}`])}
 function actionOptions(order,{history=false,cap={}}={}){
-  if(history)return[['view','Ver detalle'],['preview','Vista previa PDF'],['documents','Documentos'],['share','Compartir PDF']];
+  if(history)return[['view','Ver detalle'],...(order.status==='closed'&&Number(order.invoiceCount||0)===0&&cap.invoices?.upload?[['invoice','Adjuntar factura pendiente']]:[]),['preview','Vista previa PDF'],['documents','Documentos'],['share','Compartir PDF']];
   if(order.status==='draft')return[['view','Ver pedido'],['edit','Editar'],['preview','Vista previa PDF'],['emit','Emitir'],['duplicate','Duplicar'],['collaboration','Colaboración interna'],['delete-draft','Eliminar borrador']];
   const options=[['view','Ver detalle'],['preview','Vista previa PDF']];
   if(Number(order.invoiceCount||0)===0&&cap.invoices?.upload)options.push(['invoice','Subir factura']);
@@ -119,16 +119,16 @@ async function transitionState(order,to){
   if(!order||!to)return;
   // All order closures use the auditable one-step finalize modal.
   if(to==='closed')return openOrderDetail(order.id);
-  const destructive=to==='closed'||to==='cancelled';
-  if(destructive&&!confirm(to==='closed'?`¿Cerrar ${order.folio}? La recepción quedará finalizada y el pedido pasará a Historial. La factura y el pago pueden registrarse después.`:`¿Anular ${order.folio}? Pasará a Historial como anulado.`))return;
+  const destructive=to==='cancelled';
+  if(destructive&&!confirm(`¿Anular ${order.folio}? Pasará a Historial como anulado.`))return;
   await api(`/api/orders/${encodeURIComponent(order.id)}/transition`,{method:'POST',json:{status:to,reason:to==='closed'?'Cierre operativo posterior a recepción':to==='cancelled'?'Anulación desde Pedidos':'Actualización de estado desde Pedidos'}});
-  clearResponseCache();state.cache.orders=[];toast(to==='closed'?'Pedido cerrado · enviado a Historial':to==='cancelled'?'Pedido anulado':`Estado actualizado: ${statusLabel(to)}`);await openRoute(TERMINAL.has(to)?'history':'orders','',{replace:true});
+  clearResponseCache();state.cache.orders=[];toast(to==='closed'?'Pedido cerrado · enviado a Historial':to==='cancelled'?'Pedido anulado':`Estado actualizado: ${statusLabel(to)}`);await openOrderDetail(order.id);
 }
 async function markNotPresented(order){
   if(!order)return;
   if(!confirm(`¿Marcar ${order.folio} como “Proveedor no presentado”? Se archivará sin recepción y quedará identificado en Historial.`))return;
   await api(`/api/orders/${encodeURIComponent(order.id)}/transition`,{method:'POST',json:{status:'cancelled',reason:'Proveedor no presentado · pedido archivado sin recepción'}});
-  clearResponseCache();state.cache.orders=[];toast('Pedido archivado como no presentado');await openRoute('history','',{replace:true});
+  clearResponseCache();state.cache.orders=[];toast('Pedido archivado como no presentado');await openOrderDetail(order.id);
 }
 async function collaboration(order){const button=document.querySelector(`[data-v41-collaboration="${CSS.escape(String(order?.id||''))}"]`);if(button)return button.click();return openOrderDetail(order.id)}
 async function runNativeAction(order,action,{history=false}={}){if(!order||!action)return;if(action==='view')return openOrderDetail(order.id);if(action==='edit')return detailAction(order.id,'#v30EditOrder');if(action==='preview')return previewOrder(order);if(action==='emit')return detailAction(order.id,'#v30EmitOrder');if(action==='duplicate')return detailAction(order.id,'#v30Duplicate');if(action==='delete-draft')return deleteDraft(order);if(action==='collaboration')return collaboration(order);if(action==='invoice')return detailAction(order.id,'#v30AttachInvoice');if(action==='receive')return detailAction(order.id,'#v30Reception');if(action==='reconcile')return detailAction(order.id,'#v30Reconcile');if(action==='no-show')return markNotPresented(order);if(action==='documents'){if(window.NuvastoMultiInvoice?.open)return window.NuvastoMultiInvoice.open({orderId:order.id,returnToHistory:history});return openOrderDetail(order.id)}if(action==='share')return sharePreparedOrderNow(order);if(action.startsWith('state:'))return transitionState(order,action.slice(6))}
