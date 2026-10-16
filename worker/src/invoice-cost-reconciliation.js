@@ -270,10 +270,23 @@ export function reconcileInvoicePricing(inputLines, rawTotals, warnings = [], su
         warnings.push('El proveedor no tiene evidencia suficiente para distribuir '+kind+'; revisar costos antes de confirmar.');
         return integerShares(amount,fallback);
       };
-      const freightShares = freightOutside ? allocate(totals.freight,'freight',nets) : nets.map(() => 0);
-      const vatShares = allocate(totals.vat,'vat',nets.map((value,index)=>value+freightShares[index]));
-      const additionalShares = allocate(totals.additionalTax,'additionalTax',nets);
-      const otherShares = allocate(totals.other,'other',nets);
+      // Line-level charges printed on the document override proration methods.
+      // This matters whenever a provider spreads logistics non-proportionally.
+      const explicitComponent=(amount,fields)=>{
+        if(!amount)return null;
+        const visible=lines.map(line=>fields.map(key=>line[key]).find(value=>value!==undefined&&value!==null&&String(value).trim()!==''));
+        if(!visible.some(value=>positive(value)>0))return null;
+        const values=visible.map(value=>Math.max(0,peso(value)));
+        return Math.abs(sum(values)-amount)<=tolerance?allocateResidual(values,amount,values):null;
+      };
+      const freightPrinted=freightOutside?explicitComponent(totals.freight,['freightLine','freightLineTotal']):null;
+      const vatPrinted=explicitComponent(totals.vat,['vatLine','taxLineTotal']);
+      const additionalPrinted=explicitComponent(totals.additionalTax,['additionalTaxLine','additionalTaxLineTotal']);
+      const otherPrinted=explicitComponent(totals.other,['otherLineCharges']);
+      const freightShares = freightOutside ? (freightPrinted||allocate(totals.freight,'freight',nets)) : nets.map(() => 0);
+      const vatShares = vatPrinted||allocate(totals.vat,'vat',nets.map((value,index)=>value+freightShares[index]));
+      const additionalShares = additionalPrinted||allocate(totals.additionalTax,'additionalTax',nets);
+      const otherShares = otherPrinted||allocate(totals.other,'other',nets);
       let adjusted = nets.map((value, index) => value + freightShares[index] + vatShares[index] + additionalShares[index] + otherShares[index]);
       adjusted = allocateResidual(adjusted, target, nets);
       lines.forEach((line, index) => {
@@ -282,7 +295,7 @@ export function reconcileInvoicePricing(inputLines, rawTotals, warnings = [], su
         line.allocatedAdditionalTax = additionalShares[index];
         line.allocatedOtherCharges = otherShares[index] + (adjusted[index] - (nets[index] + freightShares[index] + vatShares[index] + additionalShares[index] + otherShares[index]));
         line.allocatedDocumentCharges = adjusted[index] - nets[index];
-        line.taxAllocationMethod = policy?'supplier-cost-policy-v96':'document-total-sum-check';
+        line.taxAllocationMethod = policy?'supplier-cost-policy-v96':(freightPrinted||vatPrinted||additionalPrinted||otherPrinted)?'printed-line-component-evidence-v98':'document-total-sum-check';
         if(policy)line.supplierCostPolicy={...policy};
       });
       const explicitLineTotal = lines.some(line => /\b(?:VALOR\s+TOTAL|TOTAL\s+(?:LINEA|LÍNEA|ITEM)|IMPORTE\s+TOTAL|TOTAL)\b/i.test(String(line.lineTotalHeader || line.totalHeader || '')));
