@@ -17,8 +17,10 @@ async function request(base,path,{token='',method='GET',data}={}){
   if(body.ok===false)fail(body.error||'Error de API');
   return body;
 }
-const sourceHealth=await request(SOURCE,'/health'),targetHealth=await request(TARGET,'/health');
-if(sourceHealth.environment!=='production'||targetHealth.environment!=='development')fail('Entornos mal identificados; abortado');
+const sourceHealth=await request(SOURCE,'/platform/health'),targetHealth=await request(TARGET,'/platform/health');
+// /health belongs to the Gemini AI Worker, not the NUVASTO platform runtime.
+// Use the canonical platform endpoint already verified by deploy-development.
+if(sourceHealth.environment!=='production'||sourceHealth.developmentEnvironment===true||targetHealth.environment!=='development'||targetHealth.developmentEnvironment!==true)fail('Entornos mal identificados; abortado');
 if(new URL(SOURCE).hostname===new URL(TARGET).hostname)fail('Fuente y destino no pueden coincidir');
 const login=await request(TARGET,'/api/auth/login',{method:'POST',data:{email:'e2e@nuvasto.dev',password:devPassword}});
 const devToken=String(login.token||'');
