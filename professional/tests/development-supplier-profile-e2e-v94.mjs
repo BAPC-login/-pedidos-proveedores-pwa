@@ -9,11 +9,28 @@ assert.ok(!/pedidos-pro-ai\.botreservasmultilocal\.workers\.dev$/.test(host),'su
 assert.ok(password,'supplier profile E2E requires the DEV QA password');
 
 let token='';
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function json(path,{method='GET',body}={}){
-  const response=await fetch(`${base}${path}`,{method,headers:{...(token?{Authorization:`Bearer ${token}`}:{ }),...(body!==undefined?{'Content-Type':'application/json'}:{})},body:body===undefined?undefined:JSON.stringify(body)});
-  const payload=await response.json().catch(()=>({}));
-  if(!response.ok||payload.ok===false)throw new Error(`${method} ${path} · ${response.status} · ${payload.error||'request failed'}`);
-  return payload;
+  const retryableMethod=method==='GET'||method==='PATCH';
+  for(let attempt=1;attempt<=3;attempt++){
+    let response,payload;
+    try{
+      response=await fetch(`${base}${path}`,{method,headers:{...(token?{Authorization:`Bearer ${token}`}:{ }),...(body!==undefined?{'Content-Type':'application/json'}:{})},body:body===undefined?undefined:JSON.stringify(body)});
+      payload=await response.json().catch(()=>({}));
+    }catch(error){
+      if(!retryableMethod||attempt===3)throw error;
+      console.warn('DEV supplier E2E transient request failure, retry '+attempt+'/3');
+      await delay(700*attempt);continue;
+    }
+    if(response.ok&&payload.ok!==false)return payload;
+    // Cloudflare D1 can return a transient network disconnect during requests.
+    // The GET/PATCH requests used here are repeatable/idempotent.
+    const transient=retryableMethod&&[500,502,503,504].includes(response.status)
+      &&/D1_ERROR: Network connection lost|network connection lost/i.test(String(payload.error||''));
+    if(!transient||attempt===3)throw new Error(`${method} ${path} · ${response.status} · ${payload.error||'request failed'}`);
+    console.warn('DEV D1 network reconnect, retry '+attempt+'/3');
+    await delay(700*attempt);
+  }
 }
 
 const login=await json('/api/auth/login',{method:'POST',body:{email,password}});token=login.token;assert.ok(token,'DEV supplier profile login token');

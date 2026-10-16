@@ -94,6 +94,10 @@ assert.match(qa,/targetHealth\.environment!=='development'/,'target environment 
 assert.match(qa,/me\.organization\?\.name!=='Nuvasto QA'/,'target must be QA account');
 assert.match(qa,/mode:'merge'/,'never wipe QA seed catalog');
 assert.match(qa,/QA_IMPORT_BATCH_SIZE=5/,'catalog import must be bounded per Worker invocation');
+const supplierE2E=readFileSync(new URL('../tests/development-supplier-profile-e2e-v94.mjs',import.meta.url),'utf8');
+assert.match(supplierE2E,/D1_ERROR: Network connection lost/,'supplier E2E retries transient DB disconnects');
+const deploy=readFileSync(new URL('../../.github/workflows/deploy-development.yml',import.meta.url),'utf8');
+assert.match(deploy,/if: always\(\) && steps.verify.outcome == 'success' && steps.seed.outcome == 'success' && steps.qa_catalog_preview.outcome == 'success'/,'QA import can proceed even if unrelated E2E failed');
 assert.match(qa,/for\(let start=0;start<rows\.length;start\+=QA_IMPORT_BATCH_SIZE\)/,'batch loop covers source catalog');
 assert.match(qa,/if\(missing\)fail\('Validación final DEV incompleta/,'must verify full destination after last batch');
 
