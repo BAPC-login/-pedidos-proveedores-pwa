@@ -28,7 +28,7 @@ assert.match(multi,/saved:queueSaved/,'completion receives persisted documents')
 assert.match(finish,/PROCESO FINALIZADO/,'completion modal has explicit success heading');
 assert.match(finish,/Mismo proveedor/,'same supplier comparison visible');
 assert.match(finish,/Otros proveedores/,'competitor supplier comparison visible');
-assert.match(finish,/if\(hadSaved\)/,'batch distinguishes saved from omitted files');
+assert.match(multi,/if\(hadSaved\)/,'batch distinguishes saved from omitted files');
 assert.match(finance,/v104InvoiceNumber/,'invoice number filter is in new finance view');
 assert.match(finance,/v104From/,'date start filter');
 assert.match(finance,/v104To/,'date end filter');
