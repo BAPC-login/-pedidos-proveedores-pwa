@@ -17,8 +17,8 @@ async function prepareOrders(){return null}
 async function ensureReleaseDataV67(env){if(releaseDataPromise)return releaseDataPromise;releaseDataPromise=(async()=>{const organizations=rows(await env.DB.prepare('SELECT id FROM organizations ORDER BY created_at,id').all()),results=[];for(const organization of organizations){const migration=await withFolioWriteLockV34(env,organization.id,()=>migrateLegacyFoliosV67(env,organization.id));results.push({orgId:organization.id,...migration})}const migrated=results.reduce((sum,item)=>sum+Number(item.migrated||0),0),skipped=results.reduce((sum,item)=>sum+Number(item.skipped||0),0);return{ready:skipped===0,organizations:results.length,migrated,skipped,results}})().catch(error=>{releaseDataPromise=null;throw error});return releaseDataPromise}
 async function schemaStatusV67(env){try{const[ordersInfo,tablesResult]=await Promise.all([env.DB.prepare('PRAGMA table_info(orders)').all(),env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('order_cost_centers','invoice_order_links','payment_schedules','notification_events')").all()]),columns=new Set(rows(ordersInfo).map(item=>item.name)),tables=new Set(rows(tablesResult).map(item=>item.name)),requiredColumns=['batch_id','emitted_at','closed_at'],requiredTables=['order_cost_centers','invoice_order_links','payment_schedules','notification_events'],missingColumns=requiredColumns.filter(name=>!columns.has(name)),missingTables=requiredTables.filter(name=>!tables.has(name));return{ready:!missingColumns.length&&!missingTables.length,missingColumns,missingTables,costCenterSource:'order_cost_centers'}}catch(error){return{ready:false,error:String(error?.message||error),missingColumns:[],missingTables:[]}}}
 async function enforceClosure(env,actor,request,orderId){const body=await request.clone().json().catch(()=>({}));if(String(body.status||'')!=='closed')return;const order=await env.DB.prepare('SELECT status,folio FROM orders WHERE id=? AND org_id=?').bind(orderId,actor.orgId).first();if(!order)throw new HttpError(404,'Pedido no encontrado','not_found');const reception=await env.DB.prepare("SELECT id FROM receptions WHERE order_id=? AND org_id=? AND status='completed' ORDER BY created_at DESC LIMIT 1").bind(orderId,actor.orgId).first();if(!reception)throw new HttpError(409,`Antes de cerrar ${order.folio} debes registrar al menos una recepción.`,'reception_required',{status:order.status})}
-// One-step, audited operational closure. Invoice and receipt must be linked
-// to this exact order; payment/reconciliation deliberately remain independent.
+// One-step, audited operational closure. Completed reception required; invoice may follow after closure.
+// Payment and reconciliation remain independent.
 async function finalizeOrderV96(request,env,actor,orderId,ctx){
   const order=await getOrder(env,actor,orderId);
   if(order.status==='closed')return{orderId,status:'closed',alreadyClosed:true};
@@ -26,13 +26,13 @@ async function finalizeOrderV96(request,env,actor,orderId,ctx){
   const invoices=await env.DB.prepare(`SELECT COUNT(*) total FROM invoice_order_links l
     JOIN invoices i ON i.id=l.invoice_id AND i.org_id=l.org_id
     WHERE l.order_id=? AND l.org_id=? AND i.status<>'void'`).bind(orderId,actor.orgId).first();
-  if(!Number(invoices?.total))throw new HttpError(409,'Vincula una factura al pedido antes de finalizar','invoice_required');
+  const invoiceCount=Number(invoices?.total||0); // Informational only; invoice can remain pending.
   const receipt=await env.DB.prepare("SELECT id FROM receptions WHERE order_id=? AND org_id=? AND status='completed' LIMIT 1").bind(orderId,actor.orgId).first();
   if(!receipt)throw new HttpError(409,'Registra o confirma la recepción antes de finalizar','reception_required');
   const body=await request.clone().json().catch(()=>({}));
   const notes=String(body.notes||'').trim();
   if(notes.length>500)throw new HttpError(400,'La observación supera los 500 caracteres','notes_too_long');
-  const reason=notes?'Cierre simplificado · Observación: '+notes:'Cierre simplificado · Factura vinculada y recepción confirmada';
+  const reason=notes?'Cierre operativo · '+(invoiceCount?'Factura vinculada':'Factura pendiente')+' · Observación: '+notes:'Cierre operativo · '+(invoiceCount?'Factura vinculada':'Factura pendiente')+' · Recepción confirmada';
   const transitionUrl=new URL(request.url);
   transitionUrl.pathname='/api/orders/'+encodeURIComponent(orderId)+'/transition';
   const headers=new Headers(request.headers);
@@ -40,7 +40,7 @@ async function finalizeOrderV96(request,env,actor,orderId,ctx){
   const delegated=new Request(transitionUrl.toString(),{method:'POST',headers,body:JSON.stringify({status:'closed',reason})});
   const response=await platformWorker.fetch(delegated,env,ctx);
   if(!response.ok){const data=await response.clone().json().catch(()=>({}));throw new HttpError(response.status,data.error||'No se pudo cerrar el pedido',data.code||'close_failed')}
-  return{orderId,status:'closed',invoiceCount:Number(invoices.total),receptionId:receipt.id,archived:true,notes};
+  return{orderId,status:'closed',invoiceCount,invoicePending:invoiceCount===0,receptionId:receipt.id,archived:true,notes};
 }
 async function enforceDraftDelete(env,actor,orderId){const order=await env.DB.prepare('SELECT status,folio FROM orders WHERE id=? AND org_id=?').bind(orderId,actor.orgId).first();if(!order)throw new HttpError(404,'Pedido no encontrado','not_found');if(String(order.status)!=='draft')throw new HttpError(409,`El pedido ${order.folio} ya fue emitido y no puede eliminarse. Anúlalo para conservar el folio y la trazabilidad.`,'issued_order_must_cancel',{status:order.status})}
 function requestWithBody(request,body){const headers=new Headers(request.headers);headers.set('Content-Type','application/json');return new Request(request.url,{method:'POST',headers,body:JSON.stringify(body)})}
