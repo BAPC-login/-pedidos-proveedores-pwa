@@ -70,7 +70,10 @@ const currentLocations=[...(targetLoc.locations||[])],currentCenters=[...(target
 for(const location of locations){
   let matched=currentLocations.find(x=>String(x.code||'').toLowerCase()===String(location.code||'').toLowerCase());
   if(!matched){const payload=await request(TARGET,'/api/locations',{token:devToken,method:'POST',data:{name:location.name,code:location.code,timezone:location.timezone||'America/Santiago'}});
-    matched=payload.location||payload;currentLocations.push(matched);}
+    matched=payload.location||payload;currentLocations.push(matched);
+    // Crear un local crea automáticamente Barra/Salón/Cocina: refrescar antes de comparar.
+    const refreshed=await request(TARGET,'/api/cost-centers',{token:devToken});
+    currentCenters.splice(0,currentCenters.length,...(refreshed.costCenters||[]));}
   for(const center of centers.filter(item=>item.locationId===location.id)){
     if(currentCenters.some(item=>String(item.locationId)===String(matched.id)&&String(item.code||'').toLowerCase()===String(center.code||'').toLowerCase()))continue;
     const payload=await request(TARGET,'/api/cost-centers',{token:devToken,method:'POST',data:{locationId:matched.id,name:center.name,code:center.code}});
