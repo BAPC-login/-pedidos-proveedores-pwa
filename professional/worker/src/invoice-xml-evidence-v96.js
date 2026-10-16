@@ -7,8 +7,10 @@ export function buildInternalInvoiceXml(analysis){
   const invoice=analysis?.invoice||{},totals=invoice.totals||{},items=invoice.lines||invoice.items||[];
   const header=['supplierName','supplierRut','invoiceNumber','invoiceDate','currency','documentType','documentTypeCode'].map(k=>field(k,invoice[k])).join('');
   const amount=['subtotal','discount','net','freight','vat','additionalTax','other','exempt','total'].map(k=>field(k,totals[k]??0)).join('');
-  const lines=items.map((item,index)=>`<Line number="${index+1}">${['code','sourceDescription','description','invoiceQuantity','packSize','netLineTotal','grossLineTotal','finalUnitPrice','sourcePrintedFinalUnitPrice','priceSource','readConfidence'].map(k=>field(k,item[k])).join('')}</Line>`).join('');
-  return `<?xml version="1.0" encoding="UTF-8"?><NuvastoInvoiceEvidence origin="photo-derived" authenticatedDTE="false" version="1">${header}<Totals>${amount}</Totals><Lines>${lines}</Lines></NuvastoInvoiceEvidence>`;
+  const evidence=invoice.logisticsEvidence||{},logistics=['freightBasis','otherBasis','freightIncludedInNet','evidenceHeader','evidenceText','confidence','reviewStatus','recommendation'].map(k=>field(k,evidence[k]??'')).join('');
+  const audit=['verified','balanced','method','checksumDelta','sourceFinalPriceBasis'].map(k=>field(k,invoice.pricingSummary?.[k]??'')).join('');
+  const lines=items.map((item,index)=>`<Line number="${index+1}">${['code','sourceDescription','description','invoiceQuantity','packSize','totalUnits','netLineTotal','grossLineTotal','finalLineTotal','finalUnitPrice','sourcePrintedFinalUnitPrice','printedFinalUnitPrice','priceSource','readConfidence','allocatedFreight','allocatedOtherCharges','allocatedVat','allocatedAdditionalTax','taxAllocationMethod'].map(k=>field(k,item[k])).join('')}</Line>`).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?><NuvastoInvoiceEvidence origin="photo-derived" authenticatedDTE="false" version="2">${header}<Totals>${amount}</Totals><LogisticsEvidence>${logistics}</LogisticsEvidence><PricingAudit>${audit}</PricingAudit><Lines>${lines}</Lines></NuvastoInvoiceEvidence>`;
 }
 const first=x=>Array.isArray(x)?x[0]:x;
 const n=value=>Number(String(value??'0').replace(',','.'))||0;
@@ -41,4 +43,56 @@ export function verifyPhotoAgainstDte(analysis,dte){
   if(!inv.invoiceNumber)issues.push('folio_no_visible');
   if(total<=0)issues.push('total_no_visible');
   return{verified:issues.length===0,discrepancies:issues,originalDte:dte};
+}
+
+const xmlNode=root=>first(root?.NuvastoInvoiceEvidence);
+const xmlNumber=value=>{
+  if(value===undefined||value===null||String(value).trim()==='')return 0;
+  const n=Number(String(value).trim().replace(',','.'));
+  if(!Number.isFinite(n)||n<0)throw new Error('XML interno contiene un monto o cantidad inválida');
+  return n;
+};
+export function parseInternalInvoiceXml(xml){
+  if(typeof xml!=='string'||xml.length>5*1024*1024||/<!DOCTYPE|<!ENTITY/i.test(xml))throw new Error('XML interno inválido o de tamaño excesivo');
+  const node=xmlNode(new XMLParser({removeNSPrefix:false,ignoreAttributes:false,parseTagValue:false,processEntities:false}).parse(xml));
+  if(!node||node['@_origin']!=='photo-derived'||node['@_authenticatedDTE']!=='false'||String(node['@_version'])!=='2')
+    throw new Error('El archivo no es un XML interno Nuvasto v2 generado desde documento');
+  const totals={},numericFields=['subtotal','discount','net','freight','vat','additionalTax','other','exempt','total'];
+  for(const name of numericFields)totals[name]=xmlNumber(node.Totals?.[name]);
+  const itemsNode=node.Lines?.Line,items=itemsNode===undefined?[]:(Array.isArray(itemsNode)?itemsNode:[itemsNode]);
+  if(items.length>1000)throw new Error('XML interno tiene demasiadas líneas');
+  const fields=['invoiceQuantity','packSize','totalUnits','netLineTotal','grossLineTotal','finalLineTotal','finalUnitPrice','sourcePrintedFinalUnitPrice','printedFinalUnitPrice','readConfidence','allocatedFreight','allocatedOtherCharges','allocatedVat','allocatedAdditionalTax'];
+  const lines=items.map((row,index)=>{
+    if(Number(row['@_number'])!==index+1)throw new Error('XML interno contiene numeración de líneas inválida');
+    const line={code:s(row.code),sourceDescription:s(row.sourceDescription),description:s(row.description),priceSource:s(row.priceSource),taxAllocationMethod:s(row.taxAllocationMethod)};
+    for(const k of fields)line[k]=xmlNumber(row[k]);
+    return line;
+  });
+  const logisticsKeys=['freightBasis','otherBasis','freightIncludedInNet','evidenceHeader','evidenceText','confidence','reviewStatus','recommendation'];
+  const logisticsEvidence={};
+  for(const k of logisticsKeys)logisticsEvidence[k]=k==='confidence'?xmlNumber(node.LogisticsEvidence?.[k]):s(node.LogisticsEvidence?.[k]);
+  return {origin:'photo-derived',authenticatedDTE:false,version:2,
+    invoice:{supplierName:s(node.supplierName),supplierRut:s(node.supplierRut),invoiceNumber:s(node.invoiceNumber),
+      invoiceDate:s(node.invoiceDate),currency:s(node.currency),documentType:s(node.documentType),
+      documentTypeCode:s(node.documentTypeCode),totals,lines,logisticsEvidence},
+    pricingAudit:{verified:s(node.PricingAudit?.verified)==='true',balanced:s(node.PricingAudit?.balanced)==='true',
+      method:s(node.PricingAudit?.method),checksumDelta:Number(node.PricingAudit?.checksumDelta)||0}};
+}
+export function validateInternalInvoiceXml(xml,analysis){
+  const parsed=parseInternalInvoiceXml(xml),original=analysis?.invoice||{},lines=original.lines||original.items||[];
+  const sameNumber=(a,b)=>Math.abs(Number(a||0)-Number(b||0))<0.000001;
+  if(parsed.invoice.invoiceNumber!==s(original.invoiceNumber)||parsed.invoice.supplierRut!==s(original.supplierRut)
+    ||parsed.invoice.lines.length!==lines.length)throw new Error('XML interno perdió folio, emisor o líneas');
+  for(const name of ['total','net','vat','freight','additionalTax','other']){
+    if(!sameNumber(parsed.invoice.totals[name],original.totals?.[name]))throw new Error('XML interno difiere del total '+name);
+  }
+  for(let i=0;i<lines.length;i++){
+    const originalLine=lines[i],parsedLine=parsed.invoice.lines[i];
+    if(parsedLine.description!==s(originalLine.description)||!sameNumber(parsedLine.invoiceQuantity,originalLine.invoiceQuantity)
+      ||!sameNumber(parsedLine.grossLineTotal,originalLine.grossLineTotal)
+      ||!sameNumber(parsedLine.sourcePrintedFinalUnitPrice,originalLine.sourcePrintedFinalUnitPrice))
+      throw new Error('XML interno difiere de cantidades o costos en línea '+(i+1));
+  }
+  return {valid:true,origin:parsed.origin,lineCount:parsed.invoice.lines.length,total:parsed.invoice.totals.total,
+    documentMathVerified:analysis?.documentMathVerified===true&&parsed.pricingAudit.verified===true};
 }
