@@ -40,7 +40,7 @@ export async function listFinanceInvoicesV104(env,actor,url){
   });
   return{invoices,page,limit,total:num(count?.total),grossTotal:num(count?.gross),hasMore:page*limit<num(count?.total)};
 }
-function variation(current,prior){
+export function priceVariationV104(current,prior){
   if(!prior)return{previousPrice:0,delta:0,percent:0,hasHistory:false,supplierId:'',supplierName:''};
   const previousPrice=num(prior.gross_unit_price),delta=Number((current-previousPrice).toFixed(2));
   return{previousPrice,delta,percent:previousPrice?Number((delta/previousPrice*100).toFixed(2)):0,
@@ -63,7 +63,7 @@ export async function getInvoicePriceImpactV104(env,actor,id){
       other=await env.DB.prepare(select+'ph.supplier_id<>?'+suffix).bind(actor.orgId,pid,i.supplier_id,id,i.created_at).first();
     }
     results.push({id:line.id,productId:pid,description:line.product_name||line.source_description,sourceDescription:line.source_description,
-      currentPrice,unit:'unidad física',sameSupplier:variation(currentPrice,same),otherSupplier:variation(currentPrice,other)});
+      currentPrice,unit:'unidad física',sameSupplier:priceVariationV104(currentPrice,same),otherSupplier:priceVariationV104(currentPrice,other)});
   }
   return{invoiceId:id,invoiceNumber:i.invoice_number,supplierId:i.supplier_id,supplierName:i.supplier_name,invoiceDate:i.invoice_date,
     grossTotal:num(i.gross_total),lines:results};
