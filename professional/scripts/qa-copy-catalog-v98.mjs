@@ -85,7 +85,7 @@ for(const location of locations){
 // Merge, never replace: QA seed fixtures and other unrelated DEV data remain intact.
 // One request for the entire catalog performs many sequential D1 queries in one
 // Worker invocation. Bound each invocation, permit safe reruns with merge mode.
-const QA_IMPORT_BATCH_SIZE=8;
+const QA_IMPORT_BATCH_SIZE=5;
 let imported=0;
 const batches=Math.ceil(rows.length/QA_IMPORT_BATCH_SIZE);
 for(let start=0;start<rows.length;start+=QA_IMPORT_BATCH_SIZE){
