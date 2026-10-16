@@ -80,8 +80,7 @@ assert.match(liveVerifier,/release\.json/,'live verifier must use the same canon
 assert.match(liveVerifier,/Pago pactado/,'live verifier must prove the current supplier UI is actually served');
 assert.match(liveVerifier,/app-suppliers-v94\.js/,'live verifier must prove stale supplier URLs are only aliases to current code');
 for(const workflow of [devWorkflow,prodWorkflow])assert.match(workflow,/node scripts\/verify-live-current\.mjs/,'DEV and production must share one live current-generation verification gate');
-assert.match(devWorkflow,/branches: \[develop, 'fix\/invoice-xml-costs-order-closure-20261015'\]/,'single explicit QA branch may trigger DEV only');
-assert.match(devWorkflow,/contains\(github\.event\.head_commit\.message, '\[qa-sync\]'\)/,'QA branch automatic copy must require a one-off commit marker');
+assert.match(devWorkflow,/branches: \[develop\]/,'only develop may trigger the DEV deployment');
 assert.match(prodWorkflow,/branches: \[main\]/,'only main may trigger the production deployment');
 assert.doesNotMatch(verifyWorkflow,/push:\s*[\s\S]*branches: \[develop\]/,'develop must not run a redundant second verification workflow');
 assert.match(verifyWorkflow,/pull_request:\s*[\s\S]*branches: \[main\]/,'main promotion must still run the candidate verification workflow');

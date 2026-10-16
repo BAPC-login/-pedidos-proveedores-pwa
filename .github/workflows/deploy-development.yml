@@ -1,7 +1,7 @@
 name: Deploy Nuvasto development
 on:
   push:
-    branches: [develop, 'fix/invoice-xml-costs-order-closure-20261015']
+    branches: [develop]
     paths: ['professional/**','worker/**','wrangler.jsonc','.github/workflows/deploy-development.yml']
   workflow_dispatch:
     inputs:
@@ -152,7 +152,7 @@ jobs:
 
       - name: Preview real catalog copy without writing
         id: qa_catalog_preview
-        if: always() && steps.verify.outcome == 'success' && steps.seed.outcome == 'success' && steps.seed.outputs.configured == 'true' && ((github.event_name == 'workflow_dispatch' && (inputs.copy_catalog == 'dry_run' || inputs.copy_catalog == 'apply')) || (github.event_name == 'push' && github.ref_name == 'fix/invoice-xml-costs-order-closure-20261015' && contains(github.event.head_commit.message, '[qa-sync]')))
+        if: github.event_name == 'workflow_dispatch' && (inputs.copy_catalog == 'dry_run' || inputs.copy_catalog == 'apply') && steps.seed.outputs.configured == 'true'
         working-directory: professional
         env:
           NUVASTO_QA_SOURCE_TOKEN: '${{ secrets.NUVASTO_QA_SOURCE_TOKEN }}'
@@ -163,7 +163,7 @@ jobs:
 
       - name: Copy catalog into isolated DEV after valid preview
         id: qa_catalog_import
-        if: always() && steps.verify.outcome == 'success' && steps.seed.outcome == 'success' && steps.qa_catalog_preview.outcome == 'success' && ((github.event_name == 'workflow_dispatch' && inputs.copy_catalog == 'apply') || (github.event_name == 'push' && github.ref_name == 'fix/invoice-xml-costs-order-closure-20261015' && contains(github.event.head_commit.message, '[qa-sync]')))
+        if: github.event_name == 'workflow_dispatch' && inputs.copy_catalog == 'apply' && steps.qa_catalog_preview.outcome == 'success'
         working-directory: professional
         env:
           NUVASTO_QA_SOURCE_TOKEN: '${{ secrets.NUVASTO_QA_SOURCE_TOKEN }}'

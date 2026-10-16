@@ -35,8 +35,7 @@ assert.match(worker,/DEV_QA_SLUG='nuvasto-qa'/,'QA provisioning must stay scoped
 assert.match(devSeed,/\/api\/dev\/qa\/ensure/,'DEV seed must provision or repair QA without manual DB reset');
 assert.match(prodWorkflow,/branches: \[main\]/,'production deployment must remain main-only');
 assert.doesNotMatch(prodWorkflow,/branches: \[develop\]/,'production workflow must never deploy develop');
-assert.match(devWorkflow,/branches: \[develop, 'fix\/invoice-xml-costs-order-closure-20261015'\]/,'only develop and the explicit QA XML branch may deploy to isolated DEV');
-assert.match(devWorkflow,/contains\(github\.event\.head_commit\.message, '\[qa-sync\]'\)/,'QA import must require explicit one-off marker');
+assert.match(devWorkflow,/branches: \[develop\]/,'development deployment must remain develop-only');
 assert.match(devWorkflow,/wrangler\.develop\.toml/,'development workflow must use isolated Cloudflare config');
 assert.match(verifyWorkflow,/branches: \[main\]/,'PR verification must continue to target main');
 assert.doesNotMatch(verifyWorkflow,/agent\/\*\*/,'temporary agent branches must not create verification noise');
