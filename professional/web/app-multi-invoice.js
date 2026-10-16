@@ -87,10 +87,10 @@ function renderUnifiedInvoiceLines(lines,order,kind,manual){
 }
 
 function reconcileLines(source,order,nature){
-  const products=order.items.map(item=>({id:item.productId,name:item.description,pack:Number(item.unitsPerOrderUnit||1)}));
+  const groups=supplierItems(order),products=[...groups.ordered,...groups.others].map(item=>({id:item.id,name:item.name,pack:item.pack,ordered:item.ordered}));
   return (Array.isArray(source)?source:[]).map((line,index)=>{
     let resolved={...line};
-    if(!resolved.productId||!products.some(product=>String(product.id)===String(resolved.productId))){const best=products.map(product=>({product,score:similarity(lineSource(resolved,index),product.name)})).sort((a,b)=>b.score-a.score)[0];if(best?.score>=.42)resolved={...resolved,productId:best.product.id,description:best.product.name,orderPackSize:best.product.pack,confidence:Math.max(Number(resolved.confidence||0),best.score),matchMethod:'nuvasto_local_catalog'}}
+    if(!resolved.productId||!products.some(product=>String(product.id)===String(resolved.productId))){const best=products.map(product=>({product,score:similarity(lineSource(resolved,index),product.name)})).sort((a,b)=>b.score-a.score)[0];if(best?.score>=.83)resolved={...resolved,productId:best.product.id,description:best.product.name,orderPackSize:best.product.pack,confidence:Math.max(Number(resolved.confidence||0),best.score),matchMethod:best.product.ordered?'nuvasto_order_match':'nuvasto_supplier_catalog'}}
     if(nature==='free')resolved={...resolved,isFree:true,grossLineTotal:0,netLineTotal:0,grossUnitPrice:0,freeReason:resolved.freeReason||'Documento sin cargo'};
     return resolved;
   });

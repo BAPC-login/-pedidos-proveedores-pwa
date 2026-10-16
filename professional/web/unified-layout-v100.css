@@ -33,3 +33,38 @@
 }
 @media(max-width:380px){.v100-order-shortcuts{grid-template-columns:minmax(0,1fr) 40px 40px 40px!important;gap:4px!important}.v100-order-shortcuts :is(.v100-order-share,.v100-order-preview,.v67-order-actions){width:40px;min-width:40px}}
 @media(min-width:761px){.modal-frame[data-size='large']{width:100%!important}.modal:has(.modal-frame[data-size='large']){width:min(960px,calc(100dvw - 32px));margin:auto}.v30-field-grid,.v30-reconcile-fields{grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px}}
+
+/* Recepción de factura: una única lista compacta, legible en escritorio y móvil. */
+.v100-invoice-reception{display:grid;gap:12px;margin-top:14px;min-width:0}
+.v100-invoice-title{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;min-width:0}
+.v100-invoice-title h3{margin:3px 0;font-size:18px}
+.v100-invoice-title p{font-size:12px;line-height:1.5;color:var(--muted);margin:0}
+.v100-counter{flex:none;color:var(--muted);font-size:11px;white-space:nowrap}
+.v100-receive-switch{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--soft)}
+.v100-receive-switch input{width:21px;height:21px;accent-color:var(--primary);flex:none}
+.v100-receive-switch strong,.v100-receive-switch small{display:block;overflow-wrap:anywhere}
+.v100-receive-switch strong{font-size:13px}.v100-receive-switch small{margin-top:3px;font-size:11px;color:var(--muted)}
+.v100-invoice-list{border:1px solid var(--line);border-radius:15px;overflow:hidden;background:var(--card)}
+.v100-invoice-row{display:grid;grid-template-columns:minmax(0,1fr) 96px 44px;grid-template-areas:"identity quantity toggle" "link link link" "create create create" "extra extra extra";align-items:center;gap:8px 12px;padding:14px;border-bottom:1px solid var(--line);min-width:0}
+.v100-invoice-row:last-child{border-bottom:0}
+.v100-line-description{grid-area:identity;min-width:0;display:grid;gap:4px}
+.v100-line-description strong{font-size:14px;line-height:1.38;overflow-wrap:anywhere}
+.v100-line-description small{font-size:11px;line-height:1.4;color:var(--muted);overflow-wrap:anywhere}
+.v100-match-state{color:var(--primary)!important;font-weight:650}
+.v100-extra .v100-match-state{color:var(--warning)!important}
+.v100-quantity{grid-area:quantity;min-width:0}.v100-quantity span{white-space:nowrap}.v100-quantity input{width:100%;min-width:0;text-align:center;font-size:16px;font-weight:750;font-variant-numeric:tabular-nums}
+.v100-invoice-toggle{grid-area:toggle}
+.v100-line-link{grid-area:link;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
+.v100-line-link .field{min-width:0}.v100-line-link select{width:100%;min-width:0}
+.v100-line-link .btn{min-height:42px;align-self:end}
+.v100-new-product{grid-area:create;display:grid;grid-template-columns:minmax(0,2fr) minmax(110px,1fr) 110px auto;gap:8px;align-items:end;padding:12px;border:1px dashed var(--primary);border-radius:12px;background:var(--soft)}
+.v100-new-product[hidden],.v100-invoice-extra[hidden]{display:none!important}
+.v100-new-product .field{min-width:0}.v100-new-product .btn{min-height:42px}
+.v100-invoice-extra{grid-area:extra;min-width:0;padding:12px;border-top:1px solid var(--line);margin-top:4px}
+.v100-invoice-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,155px),1fr));gap:10px;align-items:end}
+.v100-invoice-fields>*{min-width:0}
+.v100-invoice-fields :is(input,select){width:100%;min-width:0}
+.v100-invoice-fields .v38-price-breakdown{grid-column:1/-1}
+.v100-invoice-reception .v38-price-breakdown{font-size:12px}
+@media(min-width:980px){.v100-invoice-row{grid-template-columns:minmax(0,1.3fr) minmax(230px,.9fr) 104px 44px;grid-template-areas:"identity link quantity toggle" "create create create create" "extra extra extra extra";gap:12px}.v100-line-link{grid-template-columns:minmax(0,1fr) auto}.v100-invoice-title p{font-size:13px}}
+@media(max-width:650px){.v100-invoice-title{display:block}.v100-counter{display:block;margin-top:8px}.v100-invoice-row{grid-template-columns:minmax(0,1fr) 88px 42px;gap:8px;padding:11px}.v100-line-description strong{font-size:13px}.v100-line-link{grid-template-columns:1fr}.v100-line-link .btn{justify-self:start}.v100-new-product{grid-template-columns:repeat(2,minmax(0,1fr))}.v100-new-product .field:first-child{grid-column:1/-1}.v100-new-product .btn{grid-column:1/-1}.v100-invoice-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
