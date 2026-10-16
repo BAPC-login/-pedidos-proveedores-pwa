@@ -1,4 +1,5 @@
 import {reconcileInvoicePricing} from './invoice-pricing-matrix.js';
+import {auditLogisticsAllocation} from '../../../worker/src/invoice-logistics-audit-v98.js';
 const round3=value=>Math.round((Number(value)||0)*1000)/1000;
 const roundPeso=value=>Math.round(Number(value)||0);
 const numeric=value=>{if(typeof value==='number')return Number.isFinite(value)?value:0;let raw=String(value??'').trim().replace(/\s|\$/g,'');if(!raw)return 0;if(raw.includes(',')&&raw.includes('.'))raw=raw.lastIndexOf(',')>raw.lastIndexOf('.')?raw.replace(/\./g,'').replace(',','.'):raw.replace(/,/g,'');else if(raw.includes(','))raw=raw.replace(',','.');else if(/^\d{1,3}(?:\.\d{3})+$/.test(raw))raw=raw.replace(/\./g,'');const result=Number(raw);return Number.isFinite(result)?result:0};
@@ -91,7 +92,7 @@ function allocateIntegerPool(total,weights){
 
 function invoiceTotals(raw={}){return{net:Math.max(0,roundPeso(raw.net)),freight:Math.max(0,roundPeso(raw.freight)),vat:Math.max(0,roundPeso(raw.vat??raw.tax)),additionalTax:Math.max(0,roundPeso(raw.additionalTax)),other:Math.max(0,roundPeso(raw.other)),total:Math.max(0,roundPeso(raw.total))}}
 
-function allocateInvoicePricing(lines,rawTotals,warnings){return reconcileInvoicePricing(lines,rawTotals,warnings)}
+function allocateInvoicePricing(lines,rawTotals,warnings,policy=null){return reconcileInvoicePricing(lines,rawTotals,warnings,policy)}
 
 function normalizeLine(line,products,aliasMap,warnings,index){
   const source=lineSource(line)||`Línea ${index+1}`,match=findProduct(line,products,aliasMap),product=match.product,orderPack=Math.max(1,numeric(product?.unitsPerOrderUnit)||packFromUnit(product?.unit)),invoiceQuantity=Math.max(0,numeric(line.invoiceQuantity??line.packageQty??line.quantity)),detectedPack=explicitPack(source);
@@ -113,6 +114,8 @@ export function normalizeInvoiceAnalysis(analysis,context={}){
   if(!sourceLines.length)return analysis;
   const products=Array.isArray(context.products)?context.products.map(product=>({...product,description:String(product.description||product.catalogName||product.supplierProductName||''),unitsPerOrderUnit:Math.max(1,numeric(product.unitsPerOrderUnit)||packFromUnit(product.unit)),orderedQty:Math.max(0,numeric(product.orderedQty))})):[],aliasMap=new Map();
   for(const raw of Array.isArray(context.aliases)?context.aliases:[]){const productId=String(raw.productId||'');if(!productId||!raw.alias)continue;if(!aliasMap.has(productId))aliasMap.set(productId,[]);aliasMap.get(productId).push({alias:String(raw.alias),confidence:numeric(raw.confidence),usageCount:numeric(raw.usageCount)})}
-  const warnings=[...(Array.isArray(invoice.warnings)?invoice.warnings:[]),...(Array.isArray(analysis.warnings)?analysis.warnings:[])],lines=sourceLines.map((line,index)=>normalizeLine(line,products,aliasMap,warnings,index)),pricingSummary=allocateInvoicePricing(lines,invoice.totals||{},warnings),uniqueWarnings=[...new Set(warnings.map(value=>String(value||'').trim()).filter(Boolean))],matched=lines.filter(line=>line.productId).length,exact=lines.filter(line=>line.quantityStatus==='exact').length,review=lines.filter(line=>['partial','excess'].includes(line.quantityStatus)).length,priceVerified=lines.filter(line=>line.priceVerified).length;
-  return{...analysis,normalizationVersion:78,reconciliationEngine:'adaptive-price-matrix-v78',priceReconciliation:pricingSummary.method,invoice:{...invoice,lines,items:lines,warnings:uniqueWarnings,pricingSummary,matchSummary:{...(invoice.matchSummary||{}),matched,unmatched:lines.length-matched,exactQuantities:exact,quantityReview:review,priceVerified,total:lines.length,engine:'adaptive-price-matrix-v78'}},warnings:uniqueWarnings};
+  const warnings=[...(Array.isArray(invoice.warnings)?invoice.warnings:[]),...(Array.isArray(analysis.warnings)?analysis.warnings:[])],lines=sourceLines.map((line,index)=>normalizeLine(line,products,aliasMap,warnings,index)),pricingSummary=allocateInvoicePricing(lines,invoice.totals||{},warnings,context.supplierCostPolicy||null),
+  logisticsEvidence=auditLogisticsAllocation(lines,invoice.totals||{},invoice.logisticsEvidence||{},context.supplierCostPolicy||null),
+  uniqueWarnings=[...new Set(warnings.map(value=>String(value||'').trim()).filter(Boolean))],matched=lines.filter(line=>line.productId).length,exact=lines.filter(line=>line.quantityStatus==='exact').length,review=lines.filter(line=>['partial','excess'].includes(line.quantityStatus)).length,priceVerified=lines.filter(line=>line.priceVerified).length;
+  return{...analysis,normalizationVersion:78,reconciliationEngine:'adaptive-price-matrix-v98-logistics-audited',priceReconciliation:pricingSummary.method,invoice:{...invoice,lines,items:lines,warnings:uniqueWarnings,pricingSummary,logisticsEvidence,matchSummary:{...(invoice.matchSummary||{}),matched,unmatched:lines.length-matched,exactQuantities:exact,quantityReview:review,priceVerified,total:lines.length,engine:'adaptive-price-matrix-v78'}},warnings:uniqueWarnings};
 }

@@ -4,6 +4,7 @@ import {hydrateProtectedImages,protectedAssetUrl} from './app-assets-v13.js';
 
 let busy=false;
 const canManage=()=>['owner','admin','purchaser'].includes(String(state.me?.user?.role||''));
+const canConfigureCosts=()=>['owner','admin'].includes(String(state.me?.user?.role||''));
 const normalize=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 
 function injectStyles(){
@@ -59,7 +60,7 @@ function supplierCard(supplier,data){
     <div class="supplier-v94-head">${supplierLogo(supplier,asset)}<span class="status ${supplier.active?'active':'inactive'}">${supplier.active?'Activo':'Inactivo'}</span></div>
     <div class="supplier-v94-copy"><h3>${esc(supplier.name)}</h3><p>${esc(supplier.legalName||supplier.contactName||supplier.email||supplier.rut||'Completa el perfil comercial del proveedor')}</p></div>
     <div class="supplier-v94-meta"><div><span>Productos</span><strong>${Number(supplier.productCount||0)}</strong></div><div><span>Entrega</span><strong>${Number(supplier.leadDays||0)} días</strong></div><div><span>Pago pactado</span><strong>${esc(paymentSummary(supplier))}</strong></div><div><span>Última factura</span><strong>${esc(lastInvoice)}</strong></div></div>
-    <div class="supplier-v94-actions"><button class="btn small primary" type="button" data-supplier-profile="${esc(supplier.id)}">${canManage()?'Editar perfil':'Ver perfil'}</button>${canManage()?`<button class="btn small danger" type="button" data-supplier-delete-v94="${esc(supplier.id)}">Papelera</button>`:''}</div>
+    <div class="supplier-v94-actions"><button class="btn small primary" type="button" data-supplier-profile="${esc(supplier.id)}">${canManage()?'Editar perfil':'Ver perfil'}</button>${canConfigureCosts()?`<button class="btn small" type="button" data-supplier-cost="${esc(supplier.id)}">Reglas de costo</button>`:''}${canManage()?`<button class="btn small danger" type="button" data-supplier-delete-v94="${esc(supplier.id)}">Papelera</button>`:''}</div>
   </article>`;
 }
 function cards(suppliers,data){return suppliers.length?suppliers.map(supplier=>supplierCard(supplier,data)).join(''):'<div class="panel empty-state"><h3>Sin proveedores</h3><p>Crea el primero para comenzar a configurar abastecimiento, pagos e identidad.</p></div>'}
@@ -115,8 +116,25 @@ async function openSupplierProfile(supplier,data){
   $('#supplierProfileRemoveLogo')?.addEventListener('click',()=>{removeLogo=true;pendingLogo=null;if($('#supplierProfileLogoFile'))$('#supplierProfileLogoFile').value='';$('#supplierProfileLogoPreview').innerHTML=`<b>${esc(initials(supplier?.name||'Proveedor'))}</b>`});
 }
 
+const costMethods=[['manual_review','Revisión manual: sin evidencia suficiente'],['net_value','Proporcional al valor neto de línea'],['invoice_quantity','Proporcional a cantidad facturada'],['physical_units','Proporcional a unidades físicas del formato']];
+function costMethodOptions(selected){return costMethods.map(([code,label])=>`<option value="${code}" ${code===selected?'selected':''}>${esc(label)}</option>`).join('')}
+async function openSupplierCostPolicy(supplier){
+  if(!supplier||!canConfigureCosts())throw new Error('Solo un administrador puede modificar estas reglas');
+  const response=await api('/api/suppliers/'+encodeURIComponent(supplier.id)+'/cost-policy',{fresh:true});
+  const current=response.policy||{},configured=Boolean(response.policy);
+  openModal({eyebrow:'COSTEO POR PROVEEDOR',title:supplier.name,
+    subtitle:'Configura solo reglas justificadas por facturas reales del proveedor. Una cuadratura no valida automáticamente el reparto.',
+    body:`<section class="supplier-profile-section"><h3>${configured?'Reglas configuradas':'Sin reglas previamente verificadas'}</h3><p>Los impuestos y el flete explícitos se mantienen separados. Si no hay evidencia, selecciona revisión manual.</p>
+    ${[['freight','Flete y distribución logística'],['vat','IVA cuando sea distribuible'],['additionalTax','Impuestos adicionales / específicos'],['other','Otros cargos documentados']].map(([key,label])=>`<label class="field full"><span>${label}</span><select name="${key}">${costMethodOptions(current[key]||'manual_review')}</select></label>`).join('')}</section>`,
+    submitLabel:'Guardar reglas de costo',onSubmit:async form=>{
+      const policy=Object.fromEntries(['freight','vat','additionalTax','other'].map(k=>[k,String(form.get(k)||'manual_review')]));
+      await api('/api/suppliers/'+encodeURIComponent(supplier.id)+'/cost-policy',{method:'PUT',json:policy});
+      toast('Reglas del proveedor actualizadas; futuras facturas serán recalculadas según esta política.');
+    }});
+}
 function bindCards(data){
-  $$('[data-supplier-profile]').forEach(button=>button.onclick=()=>openSupplierProfile(data.suppliers.find(item=>String(item.id)===String(button.dataset.supplierProfile)),data).catch(error=>toast(error.message,'error')));
+  $('[data-supplier-cost]').forEach(button=>button.onclick=()=>openSupplierCostPolicy(data.suppliers.find(item=>String(item.id)===String(button.dataset.supplierCost))).catch(error=>toast(error.message,'error')));
+  $('[data-supplier-profile]').forEach(button=>button.onclick=()=>openSupplierProfile(data.suppliers.find(item=>String(item.id)===String(button.dataset.supplierProfile)),data).catch(error=>toast(error.message,'error')));
   $$('[data-supplier-delete-v94]').forEach(button=>button.onclick=async()=>{const supplier=data.suppliers.find(item=>String(item.id)===String(button.dataset.supplierDeleteV94));if(!supplier||!confirm(`¿Enviar “${supplier.name}” a la papelera?`))return;try{await api(`/api/suppliers/${encodeURIComponent(supplier.id)}`,{method:'DELETE'});toast('Proveedor enviado a la papelera');await renderSuppliersWorkspaceV94()}catch(error){toast(error.message,'error')}});
   hydrateProtectedImages($('#supplierV94Grid')||document).catch(()=>{});
 }

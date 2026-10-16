@@ -1,0 +1,81 @@
+/* Un solo sistema de alineación de paneles, sin scroll horizontal oculto. */
+:where(.modal,.modal-frame,.modal-head,.modal-body,.modal-foot,.v32-card,.v30-item-card,.v30-reconcile-row,.v32-actions,.v30-field-grid,.v30-reconcile-fields,.form-grid,.order-file-builder,.order-file-row){min-width:0;max-width:100%}
+:where(.modal-body,.v32-card,.v30-item-card,.v30-reconcile-row){overflow-wrap:anywhere}
+:where(.modal-body,.v30-item-card,.v30-reconcile-row) :is(input,select,textarea){max-width:100%;min-width:0}
+:where(.v32-card,.v30-item-card,.v30-reconcile-row) :is(h3,h4,p,strong,small){overflow-wrap:anywhere}
+.v100-order-shortcuts{display:grid!important;grid-template-columns:minmax(0,1fr) auto auto 44px!important;gap:8px!important;align-items:center}
+.v100-order-shortcuts .btn{min-width:0;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:normal;text-align:center}
+.v100-order-shortcuts svg{width:18px;height:18px;flex:none}
+.v100-order-shortcuts .v67-order-actions{height:44px;width:44px;min-width:44px}
+@media(min-width:761px){
+  .modal:has(.modal-frame[data-size="order"]){width:min(1460px,calc(100dvw - 32px))!important;max-width:calc(100dvw - 32px)!important;max-height:calc(100dvh - 28px);margin:auto}
+  .modal .modal-frame[data-size="order"]{width:100%!important;height:min(94dvh,960px);max-width:100%;max-height:calc(100dvh - 28px)}
+  .modal .modal-frame[data-size="order"] .modal-body{overflow-y:auto;overflow-x:hidden}
+  .modal .modal-frame[data-size="order"] .order-file-row{grid-template-columns:minmax(0,2fr) minmax(125px,1fr) 94px minmax(106px,.65fr)!important;gap:10px;align-items:center}
+  .modal .modal-frame[data-size="order"] .order-file-product strong{line-height:1.4;overflow-wrap:anywhere}
+  .modal .modal-frame[data-size="order"] .order-file-product small{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.3}
+  .modal .modal-frame[data-size="order"] .order-file-category{overflow:visible}
+  .modal .modal-frame[data-size="order"] .order-file-control select{font-size:12px!important}
+  .modal .modal-frame[data-size="order"] .order-file-builder{width:100%}
+  .modal .modal-frame[data-size="order"] .order-file-context{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .modal .modal-frame[data-size="order"] .order-file-toolbar{grid-template-columns:minmax(0,1fr) auto}
+}
+@media (min-width:761px) and (max-width:1100px){
+  .modal .modal-frame[data-size="order"] .order-file-row{grid-template-columns:minmax(0,1.6fr) minmax(110px,1fr) 84px 100px!important;gap:6px}
+  .modal .modal-frame[data-size="order"] .order-file-context{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .modal .modal-frame[data-size="order"] .delivery-plan{grid-column:1/-1}
+}
+@media(max-width:760px){
+  .v100-order-shortcuts{grid-template-columns:minmax(0,1fr) 44px 44px 44px!important;gap:5px!important}
+  .v100-order-shortcuts :is(.v100-order-share,.v100-order-preview){width:44px;padding:0!important}
+  .v100-order-shortcuts :is(.v100-order-share,.v100-order-preview) span{display:none}
+  .v100-order-shortcuts .primary-action{font-size:12px;line-height:1.2}
+}
+@media(max-width:380px){.v100-order-shortcuts{grid-template-columns:minmax(0,1fr) 40px 40px 40px!important;gap:4px!important}.v100-order-shortcuts :is(.v100-order-share,.v100-order-preview,.v67-order-actions){width:40px;min-width:40px}}
+@media(min-width:761px){.modal-frame[data-size='large']{width:100%!important}.modal:has(.modal-frame[data-size='large']){width:min(960px,calc(100dvw - 32px));margin:auto}.v30-field-grid,.v30-reconcile-fields{grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px}}
+
+/* Recepción de factura: una única lista compacta, legible en escritorio y móvil. */
+.v100-invoice-reception{display:grid;gap:12px;margin-top:14px;min-width:0}
+.v100-invoice-title{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;min-width:0}
+.v100-invoice-title h3{margin:3px 0;font-size:18px}
+.v100-invoice-title p{font-size:12px;line-height:1.5;color:var(--muted);margin:0}
+.v100-counter{flex:none;color:var(--muted);font-size:11px;white-space:nowrap}
+.v100-receive-switch{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--soft)}
+.v100-receive-switch input{width:21px;height:21px;accent-color:var(--primary);flex:none}
+.v100-receive-switch strong,.v100-receive-switch small{display:block;overflow-wrap:anywhere}
+.v100-receive-switch strong{font-size:13px}.v100-receive-switch small{margin-top:3px;font-size:11px;color:var(--muted)}
+.v100-invoice-list{border:1px solid var(--line);border-radius:15px;overflow:hidden;background:var(--card)}
+.v100-invoice-row{display:grid;grid-template-columns:minmax(0,1fr) 96px 44px;grid-template-areas:"identity quantity toggle" "link link link" "create create create" "extra extra extra";align-items:center;gap:8px 12px;padding:14px;border-bottom:1px solid var(--line);min-width:0}
+.v100-invoice-row:last-child{border-bottom:0}
+.v100-line-description{grid-area:identity;min-width:0;display:grid;gap:4px}
+.v100-line-description strong{font-size:14px;line-height:1.38;overflow-wrap:anywhere}
+.v100-line-description small{font-size:11px;line-height:1.4;color:var(--muted);overflow-wrap:anywhere}
+.v100-match-state{color:var(--primary)!important;font-weight:650}
+.v100-extra .v100-match-state{color:var(--warning)!important}
+.v100-quantity{grid-area:quantity;min-width:0}.v100-quantity span{white-space:nowrap}.v100-quantity input{width:100%;min-width:0;text-align:center;font-size:16px;font-weight:750;font-variant-numeric:tabular-nums}
+.v100-invoice-toggle{grid-area:toggle}
+.v100-line-link{grid-area:link;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
+.v100-line-link .field{min-width:0}.v100-line-link select{width:100%;min-width:0}
+.v100-line-link .btn{min-height:42px;align-self:end}
+.v100-new-product{grid-area:create;display:grid;grid-template-columns:minmax(0,2fr) minmax(110px,1fr) 110px auto;gap:8px;align-items:end;padding:12px;border:1px dashed var(--primary);border-radius:12px;background:var(--soft)}
+.v100-new-product[hidden],.v100-invoice-extra[hidden]{display:none!important}
+.v100-new-product .field{min-width:0}.v100-new-product .btn{min-height:42px}
+.v100-invoice-extra{grid-area:extra;min-width:0;padding:12px;border-top:1px solid var(--line);margin-top:4px}
+.v100-invoice-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,155px),1fr));gap:10px;align-items:end}
+.v100-invoice-fields>*{min-width:0}
+.v100-invoice-fields :is(input,select){width:100%;min-width:0}
+.v100-invoice-fields .v38-price-breakdown{grid-column:1/-1}
+.v100-invoice-reception .v38-price-breakdown{font-size:12px}
+@media(min-width:980px){.v100-invoice-row{grid-template-columns:minmax(0,1.3fr) minmax(230px,.9fr) 104px 44px;grid-template-areas:"identity link quantity toggle" "create create create create" "extra extra extra extra";gap:12px}.v100-line-link{grid-template-columns:minmax(0,1fr) auto}.v100-invoice-title p{font-size:13px}}
+@media(max-width:650px){.v100-invoice-title{display:block}.v100-counter{display:block;margin-top:8px}.v100-invoice-row{grid-template-columns:minmax(0,1fr) 88px 42px;gap:8px;padding:11px}.v100-line-description strong{font-size:13px}.v100-line-link{grid-template-columns:1fr}.v100-line-link .btn{justify-self:start}.v100-new-product{grid-template-columns:repeat(2,minmax(0,1fr))}.v100-new-product .field:first-child{grid-column:1/-1}.v100-new-product .btn{grid-column:1/-1}.v100-invoice-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Consistent card spacing and clipping for all dashboard/detail views. */
+.v32-grid,.v32-card,.v30-summary-card,.v30-section,.v30-item-list{min-width:0;max-width:100%}
+.v32-card-head,.v30-summary-top,.v30-section-head{min-width:0;gap:12px}
+.v32-card-head>div,.v30-summary-top>div,.v30-section-head>div{min-width:0;flex:1}
+.v32-card-head :is(h3,p),.v30-summary-top :is(h3,p),.v30-section-head :is(h3,p){overflow-wrap:anywhere}
+.v32-metrics,.v30-metrics{min-width:0;max-width:100%;grid-template-columns:repeat(auto-fit,minmax(min(100%,110px),1fr))}
+.v32-metric,.v30-metric{min-width:0}
+.v32-metric strong,.v30-metric strong{overflow-wrap:anywhere}
+.v30-action-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}
+@media(max-width:560px){.v32-metrics,.v30-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.v100-counter{white-space:normal}}

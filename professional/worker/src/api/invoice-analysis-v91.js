@@ -8,9 +8,9 @@ async function undoDegradedDocumentCharge(env,actor){
   try{await env.DB.prepare(`UPDATE usage_counters SET quantity=MAX(quantity-1,0),updated_at=? WHERE org_id=? AND month_key=? AND metric='ai_documents'`).bind(nowIso(),actor.orgId,monthKey()).run();return true}catch(error){console.warn('invoice_degraded_usage_v91_failed',error?.message||error);return false}
 }
 
-export async function analyzeInvoiceV91(request,env,actor){
+export async function analyzeInvoiceV91(request,env,actor,options={}){
   const attemptTracked=await incrementAttempt(env,actor);
-  const analysis=await analyzeInvoiceV39(request,env,actor);
+  const analysis=await analyzeInvoiceV39(request,env,actor,options);
   let degradedChargeReverted=false;
   if(analysis?.degraded===true)degradedChargeReverted=await undoDegradedDocumentCharge(env,actor);
   return{...analysis,flowVersion:91,resilienceV91:true,usagePolicyV91:'verified-documents-only',attemptTrackedV91:attemptTracked,degradedChargeRevertedV91:analysis?.degraded===true?degradedChargeReverted:undefined};

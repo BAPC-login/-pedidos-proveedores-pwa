@@ -20,11 +20,14 @@ function enhance(){
   if(control.dataset.bound!=='1'){
     control.dataset.bound='1';
     control.addEventListener('change',()=>{
-      for(const input of $$('[data-v67-select]')){
-        if(input.checked===control.checked)continue;
-        input.checked=control.checked;input.dispatchEvent(new Event('change',{bubbles:true}));
-      }
-      syncControl(control,$$('[data-v67-select]'));
+      // Preserve the user's intended state: per-item change handlers also
+      // recalculate the master checkbox while this bulk operation is running.
+      const targetChecked=control.checked;
+      const currentInputs=Array.from(document.querySelectorAll('[data-v67-select]'));
+      const changed=currentInputs.filter(input=>input.checked!==targetChecked);
+      for(const input of changed)input.checked=targetChecked;
+      for(const input of changed)input.dispatchEvent(new Event('change',{bubbles:true}));
+      syncControl(control,currentInputs);
     });
   }
   for(const input of inputs)if(input.dataset.selectAllBound!=='1'){

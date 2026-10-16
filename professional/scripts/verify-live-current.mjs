@@ -16,7 +16,7 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function text(path){
   const join=path.includes('?')?'&':'?';
   const response=await fetch(`${base}${path}${join}current=${Date.now()}-${generation}`,{cache:'no-store',headers:{'Cache-Control':'no-cache, no-store'}});
-  assert.equal(response.ok,true,`live asset ${path} must be readable`);
+  if(!response.ok){const raw=await response.text().catch(()=>'?');throw new Error(`live asset ${path} returned HTTP ${response.status} ${raw.replace(/\s+/g,' ').slice(0,180)}`)}
   return response.text();
 }
 async function json(path){return JSON.parse(await text(path))}
@@ -32,7 +32,7 @@ for(let attempt=1;attempt<=24;attempt++){
   try{
     [liveRelease,health]=await Promise.all([json('/platform/release'),json('/platform/health')]);
     if(liveRelease.release===expectedRelease&&runtimeReady(health))break;
-  }catch{}
+  }catch(error){if(attempt<=3||attempt%6===0)console.warn('live generation probe',attempt,String(error?.message||error).slice(0,300))}
   if(attempt===24)throw new Error(`live current generation did not become ready: release=${liveRelease?.release||'unknown'} expected=${expectedRelease} environment=${health?.environment||'unknown'}`);
   console.log(`waiting for ${expectedEnvironment} current generation ${attempt}/24 · live=${liveRelease?.release||'unknown'} · expected=${expectedRelease}`);
   await sleep(10_000);

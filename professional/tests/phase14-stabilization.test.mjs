@@ -163,7 +163,9 @@ assert.match(aiCanary, /'gemini_http_503'/);
 assert.match(aiCanary, /'analysis_timeout'/);
 assert.match(invoiceAi, /code:'ai_timeout'/);
 assert.match(invoiceAi, /error\?\.name==='AbortError'\|\|Number\(error\?\.code\)===20/);
-assert.match(release, /"release": "2026\.09\.02\.99"/);
-assert.match(release, /"generation": 99/);
+const currentRelease=JSON.parse(release);
+assert.match(currentRelease.release,/^\d{4}\.\d{2}\.\d{2}\.\d+$/,'version release must keep the date-generation format');
+assert.ok(Number.isInteger(currentRelease.generation)&&currentRelease.generation>=99,'current generation must not regress');
+assert.equal(currentRelease.cache,`nuvasto-current-${currentRelease.generation}`,'cache generation must match release');
 
 console.log('Phase 14 stabilization: OK · contract, private salt, backup, health and hand-off verified');

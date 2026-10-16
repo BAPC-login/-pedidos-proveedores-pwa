@@ -1,5 +1,6 @@
 import aiWorker from './index.js';
 import platformWorker from '../../professional/worker/src/router.js';
+import {processInvoiceAnalysisJobs} from '../../professional/worker/src/api/invoice-async-v96.js';
 import { PLATFORM_RELEASE, ARCHITECTURE_GENERATION } from './release.js';
 import {
   INTEGRATION_CONTRACT_VERSION,
@@ -113,6 +114,9 @@ async function platformHealthResponse(request, env, ctx) {
 }
 
 export default {
+  async scheduled(_event,env,ctx){
+    ctx.waitUntil(processInvoiceAnalysisJobs(env,{limit:2}));
+  },
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (isAiRoute(url.pathname)) return aiWorker.fetch(request, env, ctx);
