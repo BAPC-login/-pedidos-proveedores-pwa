@@ -52,7 +52,7 @@ const invoice=await call('/api/invoices',{method:'POST',json:{
 assert.ok(invoice.invoice?.id,'invoice saved');
 assert.ok(!invoice.receptionError,'invoice reception must not return a partial-save error: '+String(invoice.receptionError||''));
 assert.ok(invoice.reception?.id,'invoice-derived reception persisted');
-assert.equal(Number(invoice.extraReceivedCount),1,'extra product must be recorded independently from ordered items');
+assert.equal(Number(invoice.reception?.extraItemCount??invoice.extraReceivedCount),1,'extra product must be recorded independently from ordered items');
 const detail=(await call('/api/orders/'+encodeURIComponent(orderId))).order;
 assert.equal(detail.status,'received','order becomes received with its confirmed quantity');
 assert.equal(Number(detail.items.find(x=>x.productId===ordered.id)?.quantityReceived),1,'invoice accepted physical units normalized to order units');
