@@ -3,6 +3,7 @@ import {authenticate} from './auth.js';
 import {ensureSchema} from './schema.js';
 import {corsHeaders,errorResponse,ok,routeMatch,securityHeaders} from './core.js';
 import {ensureEnterpriseSchemaV41} from './api/schema-v41.js';
+import {createReceptionV13} from './api/reception-v13.js';
 import {getDashboardAnalyticsV41} from './api/analytics-v41.js';
 import {autoReconcileOrder} from './api/order-workflow.js';
 import {createPaymentMethodCanonical,listPaymentMethodsCanonical,listPaymentsCanonical,updatePaymentCanonical,updatePaymentMethodCanonical} from './api/payments.js';
@@ -50,17 +51,63 @@ function decorate(response,request,env){const headers=new Headers(response.heade
 async function prepare(env){await ensureSchema(env);await ensureEnterpriseSchemaV41(env)}
 async function auth(request,env){await prepare(env);return authenticate(request,env)}
 async function platformJson(response){if(!response.ok)return null;return response.clone().json().catch(()=>null)}
-async function quickReceiveFromInvoice(request,env,actor,orderId,body,ctx){
-  const order=await env.DB.prepare('SELECT id,status,revision FROM orders WHERE id=? AND org_id=?').bind(orderId,actor.orgId).first();
+async function quickReceiveFromInvoice(request,env,actor,orderId,body,ctx,invoiceId=''){
+  // Canonical invoice-led receiving. Never receive the entire pending order on
+  // behalf of the user: only accepted/rejected amounts explicitly reviewed on
+  // each invoice line become a receipt. Works for unrequested supplier products.
+  const order=await env.DB.prepare('SELECT id,status,supplier_id FROM orders WHERE id=? AND org_id=?').bind(orderId,actor.orgId).first();
   if(!order)return null;
-  const pending=rows(await env.DB.prepare('SELECT id,quantity_ordered,quantity_received FROM order_items WHERE order_id=? ORDER BY sort_order').bind(orderId).all()).map(item=>({orderItemId:item.id,quantityAccepted:Math.max(0,Number(item.quantity_ordered||0)-Number(item.quantity_received||0)),quantityRejected:0})).filter(item=>item.quantityAccepted>0);
-  if(!pending.length)return{alreadyReceived:true,orderId};
+  if(['received','reconciled','closed','cancelled'].includes(order.status))return{alreadyReceived:true,orderId};
+  const orderItems=rows(await env.DB.prepare('SELECT id,product_id,quantity_ordered,quantity_received,units_per_order_unit FROM order_items WHERE order_id=? ORDER BY sort_order').bind(orderId).all());
+  const byProduct=new Map(orderItems.filter(item=>item.product_id).map(item=>[String(item.product_id),item]));
+  const grouped=new Map();
+  for(const line of Array.isArray(body.lines)?body.lines:[]){
+    const productId=String(line?.productId||'');
+    if(!productId)continue;
+    const physical=Math.max(0,Number(line?.units??line?.totalUnits??((Number(line?.packageQty??line?.invoiceQuantity??0)||0)*(Number(line?.packSize||1)||1)))||0);
+    const accepted=Number(line?.receivedUnits??physical),rejected=Number(line?.rejectedUnits||0);
+    if(!Number.isFinite(accepted)||!Number.isFinite(rejected)||accepted<0||rejected<0||accepted+rejected>physical+0.001)
+      throw new Error('Cantidades de recepción inválidas respecto de la factura');
+    if(accepted<=0&&rejected<=0)continue;
+    const record=grouped.get(productId)||{productId,accepted:0,rejected:0,extra:false,supplierProductId:'',description:'',qualityType:'',qualityNote:'',lotNumber:'',expiresAt:null};
+    record.accepted+=accepted;record.rejected+=rejected;
+    record.extra=record.extra||line?.extraAccepted===true||(!byProduct.has(productId)&&rejected>0);
+    record.supplierProductId=String(line?.supplierProductId||record.supplierProductId||'');
+    record.description=String(line?.sourceDescription||line?.sourceLine||line?.description||record.description||'');
+    record.qualityType=String(line?.qualityType||record.qualityType||'');
+    record.qualityNote=String(line?.qualityNote||record.qualityNote||'');
+    record.lotNumber=String(line?.lotNumber||record.lotNumber||'');
+    record.expiresAt=line?.expiresAt||record.expiresAt||null;
+    grouped.set(productId,record);
+  }
+  const items=[],extraItems=[];
+  for(const record of grouped.values()){
+    const matched=byProduct.get(record.productId);
+    if(matched){
+      const pack=Math.max(.001,Number(matched.units_per_order_unit||1));
+      const remaining=Math.max(0,Number(matched.quantity_ordered||0)-Number(matched.quantity_received||0));
+      const accepted=Number((record.accepted/pack).toFixed(3));
+      const rejected=Number((record.rejected/pack).toFixed(3));
+      if(accepted>remaining+.001&&record.qualityType!=='overage')throw new Error('La recepción supera lo pendiente en el pedido');
+      items.push({orderItemId:matched.id,quantityAccepted:accepted,quantityRejected:rejected,
+        rejectionReason:[record.qualityType,record.qualityNote].filter(Boolean).join(' · '),
+        lotNumber:record.lotNumber,expiresAt:record.expiresAt});
+    }else if(record.extra){
+      extraItems.push({productId:record.productId,supplierProductId:record.supplierProductId,
+        sourceInvoiceId:invoiceId||null,sourceDescription:record.description,
+        quantityAccepted:Number(record.accepted.toFixed(3)),quantityRejected:Number(record.rejected.toFixed(3)),
+        notes:['Producto fuera del pedido',record.qualityType,record.qualityNote].filter(Boolean).join(' · ')});
+    }else throw new Error('Producto no solicitado requiere confirmación explícita del catálogo del proveedor');
+  }
+  if(!items.length&&!extraItems.length)throw new Error('No se confirmaron cantidades para la recepción');
   const headers=new Headers(request.headers);headers.set('Content-Type','application/json');
   const receptionDate=String(body.receptionDate||today());
-  const synthetic=new Request(request.url,{method:'POST',headers,body:JSON.stringify({items:pending,receivedAt:receptionDate,deliveryNoteNumber:String(body.deliveryNoteNumber||''),notes:'Recepción registrada junto con la factura',historicalDateConfirmed:receptionDate<today(),expectedRevision:Number(order.revision||1),quickMode:true})});
-  return createReceptionV41(synthetic,env,actor,orderId,ctx);
+  const synthetic=new Request(request.url,{method:'POST',headers,body:JSON.stringify({
+    items,extraItems,receivedAt:receptionDate,deliveryNoteNumber:String(body.deliveryNoteNumber||''),
+    notes:'Recepción conciliada desde factura '+String(body.invoiceNumber||''),quickMode:true
+  })});
+  return createReceptionV13(synthetic,env,actor,orderId);
 }
-
 export default{async fetch(request,env,ctx){const url=new URL(request.url),method=request.method.toUpperCase(),path=url.pathname,
   supplierTerms=routeMatch(path,'/api/suppliers/:id/payment-terms'),orderReception=routeMatch(path,'/api/orders/:id/receptions'),receptionReturn=routeMatch(path,'/api/receptions/:id/returns'),receptionReport=routeMatch(path,'/api/receptions/:id/difference-report'),payment=routeMatch(path,'/api/finance/payments/:id'),paymentMethod=routeMatch(path,'/api/finance/payment-methods/:id'),paymentDocument=routeMatch(path,'/api/finance/payment-documents/:id'),approval=routeMatch(path,'/api/approvals/:id/resolve'),orderCollaboration=routeMatch(path,'/api/orders/:id/collaboration'),orderComment=routeMatch(path,'/api/orders/:id/comments'),orderConfirmation=routeMatch(path,'/api/orders/:id/supplier-confirmation'),orderSubstitution=routeMatch(path,'/api/orders/:id/substitutions'),notification=routeMatch(path,'/api/notifications-v41/:id'),batchEmit=routeMatch(path,'/api/order-batches/:id/emit');
   try{
@@ -75,9 +122,9 @@ export default{async fetch(request,env,ctx){const url=new URL(request.url),metho
     if(method==='POST'&&path==='/api/invoices'){
       const actor=await auth(request,env),body=await request.clone().json().catch(()=>({})),invoice=await createInvoiceV41(request,env,actor),orderIds=(body.orderIds||[]).map(String).filter(Boolean);let reception=null,receptionError='',paymentResult=null;
       if(body.payment){paymentResult=await createPaymentDocumentFromInvoiceCanonical(env,actor,invoice.id,body.payment,request)}
-      if(body.markReceived&&orderIds.length===1){try{reception=await quickReceiveFromInvoice(request,env,actor,orderIds[0],body,ctx)}catch(error){receptionError=String(error?.message||error)}}
+      if(body.markReceived&&orderIds.length===1){try{reception=await quickReceiveFromInvoice(request,env,actor,orderIds[0],body,ctx,invoice.id)}catch(error){receptionError=String(error?.message||error)}}
       const validation=[];for(const orderId of orderIds)validation.push({orderId,...await autoReconcileOrder(env,actor,orderId)});
-      return decorate(ok({invoice,payment:paymentResult,reception,receptionError,validation},request,env),request,env)
+      return decorate(ok({invoice,payment:paymentResult,reception,receptionError,extraReceivedCount:Number(reception?.extraItemCount||0),receptionSource:reception?.id?'invoice':null,validation},request,env),request,env)
     }
     if(method==='GET'&&path==='/api/finance/payment-methods'){const actor=await auth(request,env);return decorate(ok({methods:await listPaymentMethodsCanonical(env,actor,url)},request,env),request,env)}
     if(method==='POST'&&path==='/api/finance/payment-methods'){const actor=await auth(request,env);return decorate(ok({method:await createPaymentMethodCanonical(request,env,actor)},request,env),request,env)}
