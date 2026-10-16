@@ -34,6 +34,14 @@ await call('/api/products/'+encodeURIComponent(created.id)+'/suppliers',{method:
 const related=(await call('/api/products?'+new URLSearchParams({supplierId:supplier.id}))).products.find(x=>x.id===created.id);
 const extraRelation=related?.suppliers.find(x=>x.supplierId===supplier.id);
 assert.ok(extraRelation?.id,'new product must be linked to supplier before receiving extra');
+// A competing supplier has a previous invoice for the identical product.
+const competitor=(await call('/api/suppliers',{method:'POST',json:{name:'Proveedor QA Comparador '+suffix,legalName:'Comparador QA',paymentTerms:'Contra entrega'}})).supplier;
+assert.ok(competitor?.id,'QA competing supplier created');
+await call('/api/products/'+encodeURIComponent(created.id)+'/suppliers',{method:'POST',json:{supplierId:competitor.id,supplierProductName:newName,orderUnit:'UNIDAD',unitsPerOrderUnit:1,quantityMultiple:1}});
+const benchmark=await call('/api/invoices',{method:'POST',json:{supplierId:competitor.id,locationId:location.id,orderIds:[],documentType:'33',
+  invoiceNumber:'QA-BASE-'+suffix,invoiceDate:today,currency:'CLP',totals:{net:1000,vat:190,total:1190},markReceived:false,
+  aiModel:'qa-price-history',aiConfidence:1,lines:[{productId:created.id,sourceDescription:newName,packageQty:1,invoiceQuantity:1,packSize:1,units:1,totalUnits:1,netLineTotal:1000,grossLineTotal:1190,grossUnitPrice:1190,matchMethod:'qa-history'}]}}); 
+assert.ok(benchmark.invoice?.id,'baseline from another supplier recorded');
 const idempotency='qa-unified-'+suffix;
 const createdBatch=await call('/api/order-batches/v2',{method:'POST',headers:{'Idempotency-Key':idempotency},json:{locationId:location.id,costCenterId:center.id,deliveryMode:'all',deliveryDate:today,notes:'Synthetic DEV unified invoice reception '+suffix,items:[{supplierProductId:relation.id,quantity:1,orderUnit:relation.orderUnit||'UNIDAD',unitsPerOrderUnit:Number(relation.unitsPerOrderUnit||1)}]}});
 const batch=createdBatch.batch||createdBatch;
@@ -53,6 +61,23 @@ assert.ok(invoice.invoice?.id,'invoice saved');
 assert.ok(!invoice.receptionError,'invoice reception must not return a partial-save error: '+String(invoice.receptionError||''));
 assert.ok(invoice.reception?.id,'invoice-derived reception persisted');
 assert.equal(Number(invoice.reception?.extraItemCount??invoice.extraReceivedCount),1,'extra product must be recorded independently from ordered items');
+const impact=(await call('/api/invoices/'+encodeURIComponent(invoice.invoice.id)+'/price-impact')).impact;
+assert.equal(impact.invoiceId,invoice.invoice.id,'price impact belongs to the saved invoice');
+const priceExtra=impact.lines.find(line=>line.productId===created.id);
+assert.ok(priceExtra,'new extra product appears in price report');
+assert.equal(priceExtra.currentPrice,595,'current price per physical unit');
+assert.equal(priceExtra.sameSupplier.previousPrice,0,'no history at same supplier means zero');
+assert.equal(priceExtra.sameSupplier.delta,0,'no supplier history shows zero CLP difference');
+assert.equal(priceExtra.sameSupplier.percent,0,'no supplier history shows zero percent');
+assert.equal(priceExtra.otherSupplier.supplierId,competitor.id,'same product is compared to a different supplier');
+assert.equal(priceExtra.otherSupplier.previousPrice,1190,'previous competing supplier unit price');
+assert.equal(priceExtra.otherSupplier.delta,-595,'cross supplier delta in CLP');
+assert.equal(priceExtra.otherSupplier.percent,-50,'cross supplier difference in percent');
+const ledger=await call('/api/finance/invoice-register?'+new URLSearchParams({supplierId:supplier.id,from:today,to:today,invoiceNumber:number}));
+assert.ok(ledger.invoices.some(item=>item.id===invoice.invoice.id),'invoice is present in finance register');
+assert.ok(ledger.invoices.every(item=>item.supplierId===supplier.id),'supplier filter isolates provider');
+assert.ok(ledger.invoices.every(item=>item.invoiceNumber.includes(number)),'invoice number filter');
+assert.ok(ledger.invoices.every(item=>item.invoiceDate===today),'date range filter');
 const detail=(await call('/api/orders/'+encodeURIComponent(orderId))).order;
 assert.ok(['received','reconciled'].includes(detail.status),'order records reception and may automatically reconcile a balanced invoice');
 assert.equal(Number(detail.items.find(x=>x.productId===ordered.id)?.quantityReceived),1,'invoice accepted physical units normalized to order units');
