@@ -117,6 +117,56 @@ function bindMoney(root=document){
   root.querySelectorAll('[data-v38-money-display]').forEach(display=>{if(display.dataset.bound)return;display.dataset.bound='1';const hidden=display.nextElementSibling;display.addEventListener('focus',()=>{display.value=String(integer(hidden.value));requestAnimationFrame(()=>display.select())});display.addEventListener('input',()=>{hidden.value=String(Math.max(0,integer(display.value)))});display.addEventListener('blur',()=>display.value=money(hidden.value))});
   root.querySelectorAll('[data-v38-line-money]').forEach(display=>{if(display.dataset.bound)return;display.dataset.bound='1';const hidden=display.nextElementSibling;display.addEventListener('focus',()=>{display.value=String(integer(hidden.value));requestAnimationFrame(()=>display.select())});display.addEventListener('input',()=>{hidden.value=String(Math.max(0,integer(display.value)));const row=display.closest('[data-invoice-line]');if(row)row.dataset.printedFinalUnit='';row?.dispatchEvent(new Event('v38:math'))});display.addEventListener('blur',()=>display.value=money(hidden.value))});
 }
+function bindUnifiedInvoiceReception(order,lines){
+  const allowedCreate=['owner','admin','purchaser'].includes(String(state.me?.user?.role||''));
+  const register=$('[name=markReceived]');
+  function syncReceiptState(){
+    const enabled=Boolean(register?.checked);
+    $('[data-invoice-line] [name=accepted],[data-invoice-line] [name=rejected]').forEach(input=>input.disabled=!enabled);
+  }
+  register?.addEventListener('change',syncReceiptState);syncReceiptState();
+  $('[data-invoice-line]').forEach((row,index)=>{
+    const toggle=row.querySelector('[data-v100-invoice-toggle]'),panel=row.querySelector('.v100-invoice-extra');
+    toggle?.addEventListener('click',()=>{const open=toggle.getAttribute('aria-expanded')==='true';toggle.setAttribute('aria-expanded',String(!open));panel.hidden=open;});
+    const createToggle=row.querySelector('[data-v100-create-toggle]'),createPanel=row.querySelector('.v100-new-product');
+    if(!allowedCreate){createToggle.disabled=true;createToggle.title='Requiere permiso de Compras para crear productos';}
+    createToggle?.addEventListener('click',()=>{if(allowedCreate)createPanel.hidden=!createPanel.hidden;});
+    const select=row.querySelector('[name=productId]');
+    select?.addEventListener('change',()=>{
+      const value=select.value,ordered=(order.items||[]).find(item=>String(item.productId)===value);
+      const billed=Number(row.querySelector('[name=packageQty]').value||0)*Number(row.querySelector('[name=packSize]').value||1);
+      const amount=ordered?Math.min(billed/Math.max(.001,Number(ordered.unitsPerOrderUnit||1)),Math.max(0,Number(ordered.quantityOrdered||0)-Number(ordered.quantityReceived||0))):billed;
+      const accepted=row.querySelector('[name=accepted]');
+      if(accepted&&register?.checked)accepted.value=String(Math.round(amount*1000)/1000);
+      row.classList.toggle('v100-extra',!ordered);row.classList.toggle('v100-ordered',Boolean(ordered));
+      const label=row.querySelector('.v100-match-state');if(label)label.textContent=ordered?'Pedido · coincide':value?'Factura · extra del proveedor':'Sin vincular';
+    });
+    row.querySelector('[data-v100-create-save]')?.addEventListener('click',async event=>{
+      const button=event.currentTarget,productName=row.querySelector('[name=newProductName]').value.trim();
+      if(!productName)throw toast('Escribe el nombre del producto','error');
+      const already=(state.cache.products||[]).some(product=>product.name.toLocaleLowerCase('es')===productName.toLocaleLowerCase('es'));
+      if(already){toast('El producto ya existe: selecciónalo del catálogo o vincúlalo desde Productos','error');return}
+      const pack=Number(row.querySelector('[name=newProductPack]').value),unit=row.querySelector('[name=newProductUnit]').value;
+      if(!Number.isFinite(pack)||pack<=0){toast('El formato debe tener unidades válidas','error');return}
+      button.disabled=true;button.textContent='Creando…';
+      try{
+        const created=await api('/api/products',{method:'POST',json:{name:productName,baseUnit:'UNIDAD',contentUnit:'unidad',contentValue:0,costCenterIds:order.costCenterId?[order.costCenterId]:[]}});
+        const productId=created.product?.id;
+        if(!productId)throw new Error('No se pudo confirmar la creación del producto');
+        await api('/api/products/'+encodeURIComponent(productId)+'/suppliers',{method:'POST',json:{supplierId:order.supplierId,supplierProductName:productName,orderUnit:unit,unitsPerOrderUnit:pack,quantityMultiple:1}});
+        const data=await api('/api/products',{fresh:true,timeout:20000});state.cache.products=data.products||[];
+        $('[data-invoice-line] [name=productId]').forEach(other=>{
+          const chosen=other===select?productId:other.value;
+          other.innerHTML=productOptions(order,chosen);other.value=chosen;
+          other.dispatchEvent(new Event('change',{bubbles:false}));
+        });
+        createPanel.hidden=true;toast('Producto creado y vinculado al proveedor');
+      }catch(error){toast(error.message||'No se pudo crear el producto','error')}
+      finally{button.disabled=false;button.textContent='Crear y vincular'}
+    });
+  });
+}
+
 function bindLineMath(nature){
   $$('[data-invoice-line]').forEach(row=>{
     const calculate=()=>{const qty=Number(row.querySelector('[name=packageQty]').value||0),pack=Number(row.querySelector('[name=packSize]').value||1),checkbox=row.querySelector('[name=isFree]'),free=nature==='free'||checkbox.checked,totalDisplay=row.querySelector('[data-v38-line-money]'),totalHidden=row.querySelector('[name=grossLineTotal]'),printed=decimal(row.dataset.printedFinalUnit||0);if(free){totalHidden.value='0';totalDisplay.value=money(0);totalDisplay.disabled=true}else totalDisplay.disabled=false;const units=qty*pack;if(!free&&printed>0&&units>0){totalHidden.value=String(Math.round(printed*units));totalDisplay.value=money(totalHidden.value)}const total=free?0:Number(totalHidden.value||0);row.querySelector('[data-units]').textContent=String(Math.round(units*1000)/1000);row.querySelector('[data-price]').textContent=free?money(0):(printed>0?unitMoney(printed):money(units?Math.round(total/units):0))};
@@ -128,7 +178,7 @@ async function createInvoice(payload){
   const response=await preV36Fetch('/api/invoices',{method:'POST',cache:'no-store',headers:{Authorization:`Bearer ${state.token}`,'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const result=await response.json().catch(()=>({ok:false,error:`HTTP ${response.status}`}));
   if(!response.ok||result.ok===false)throw Object.assign(new Error(result.error||'No se pudo guardar el documento'),{status:response.status,code:result.code,details:result.details});
-  clearResponseCache();state.cache.dashboard=null;state.cache.orders=[];state.cache.invoices=[];return result.invoice||result.result||result;
+  clearResponseCache();state.cache.dashboard=null;state.cache.orders=[];state.cache.invoices=[];return {...(result.invoice||result.result||result),reception:result.reception||null,receptionError:result.receptionError||'',receptionErrorCode:result.receptionErrorCode||''};
 }
 
 async function openReview(analysis,item,{manual=false}={}){
@@ -136,20 +186,55 @@ async function openReview(analysis,item,{manual=false}={}){
   const invoice=analysis.invoice||{},source=Array.isArray(invoice.lines)?invoice.lines:Array.isArray(invoice.items)?invoice.items:[],lines=manual?manualLines(analysis,queue.order,item.kind):reconcileLines(source,queue.order,item.kind),position=queue.index,total=queue.items.length;
   if(!lines.length){showQueueError(Object.assign(new Error('La IA no encontró líneas verificables en este archivo. Reintenta la lectura o usa el ingreso manual.'),{code:'invoice_lines_not_detected'}),item,analysis);return}
   openModal({eyebrow:`DOCUMENTO ${position+1} DE ${total}`,title:`Revisar ${kindLabel(item.kind).toLowerCase()}`,subtitle:manual?'Ingreso manual: confirma únicamente los datos visibles en el documento.':'Confirma este documento de manera independiente antes de continuar con el siguiente.',size:'large',closeOnSuccess:false,body:reviewBody(analysis,lines,queue.order,item,position,total,manual),submitLabel:item.kind==='free'?'Guardar documento sin cargo':'Guardar factura y continuar',onSubmit:async form=>{
-    const rejected=new Set($$('[data-v32-reject-line]:checked').map(input=>Number(input.dataset.v32RejectLine))),rows=$$('[data-invoice-line]');
-    const reviewed=rows.map((row,index)=>{const original=lines[index],packageQty=Number(row.querySelector('[name=packageQty]').value||0),packSize=Number(row.querySelector('[name=packSize]').value||1),units=packageQty*packSize,isFree=item.kind==='free'||row.querySelector('[name=isFree]').checked,grossLineTotal=isFree?0:Number(row.querySelector('[name=grossLineTotal]').value||0),printedFinalUnitPrice=isFree?0:decimal(row.dataset.printedFinalUnit||0),excluded=rejected.has(index);return{...original,productId:row.querySelector('[name=productId]').value,sourceDescription:lineSource(original,index),packageQty,invoiceQuantity:packageQty,packSize,units,totalUnits:units,grossLineTotal,grossUnitPrice:isFree?0:(printedFinalUnitPrice>0?printedFinalUnitPrice:(units?Math.round(grossLineTotal/units):0)),printedFinalUnitPrice,finalUnitPrice:printedFinalUnitPrice||original.finalUnitPrice||0,priceSource:printedFinalUnitPrice>0?'printed-final-unit':original.priceSource,isFree,freeReason:isFree?(row.querySelector('[name=freeReason]').value||'Documento sin cargo'):'',policyAction:excluded?'reject':original.policyAction,rejectedByPolicy:excluded||original.rejectedByPolicy,policyReason:excluded?'Producto no solicitado':original.policyReason,matchMethod:manual?'manual-user-entry':original.matchMethod,confidence:manual?0:Number(original.confidence||0)}});
+    const rejected=new Set(),rows=$('[data-invoice-line]'),shouldReceive=Boolean(form.get('markReceived'))&&canRegisterInvoiceReception(queue.order);
+    const reviewed=rows.map((row,index)=>{
+      const original=lines[index],select=row.querySelector('[name=productId]'),productId=select.value,
+        option=select.selectedOptions?.[0],ordered=(queue.order.items||[]).find(item=>String(item.productId)===String(productId)),
+        packageQty=Number(row.querySelector('[name=packageQty]').value||0),packSize=Number(row.querySelector('[name=packSize]').value||1),
+        units=packageQty*packSize,isFree=item.kind==='free'||row.querySelector('[name=isFree]').checked,
+        grossLineTotal=isFree?0:Number(row.querySelector('[name=grossLineTotal]').value||0),
+        printedFinalUnitPrice=isFree?0:decimal(row.dataset.printedFinalUnit||0),
+        accepted=Number(row.querySelector('[name=accepted]').value||0),rejectedQty=Number(row.querySelector('[name=rejected]').value||0);
+      if([packageQty,packSize,units,accepted,rejectedQty].some(qty=>!Number.isFinite(qty)||qty<0)||packSize<=0)throw new Error('Cantidad inválida en línea '+(index+1));
+      const factor=ordered?Math.max(.001,Number(ordered.unitsPerOrderUnit||1)):1,
+        remaining=ordered?Math.max(0,Number(ordered.quantityOrdered||0)-Number(ordered.quantityReceived||0)):Infinity;
+      if(shouldReceive&&(accepted+rejectedQty)*factor>units+.001)throw new Error('Recibido + rechazado supera lo indicado en factura en línea '+(index+1));
+      if(shouldReceive&&ordered&&accepted>remaining+.001&&row.querySelector('[name=qualityType]').value!=='overage')throw new Error('Se supera lo pendiente del pedido en línea '+(index+1));
+      if(shouldReceive&&!productId&&(accepted>0||rejectedQty>0))throw new Error('Vincula el producto antes de recibir la línea '+(index+1));
+      return {...original,productId,supplierProductId:option?.dataset.relationId||original.supplierProductId||'',
+        sourceDescription:lineSource(original,index),packageQty,invoiceQuantity:packageQty,packSize,units,totalUnits:units,grossLineTotal,
+        grossUnitPrice:isFree?0:(printedFinalUnitPrice>0?printedFinalUnitPrice:(units?Math.round(grossLineTotal/units):0)),
+        printedFinalUnitPrice,finalUnitPrice:printedFinalUnitPrice||original.finalUnitPrice||0,
+        priceSource:printedFinalUnitPrice>0?'printed-final-unit':original.priceSource,isFree,
+        freeReason:isFree?(row.querySelector('[name=freeReason]').value||'Documento sin cargo'):'',
+        extraAccepted:Boolean(productId&&!ordered&&accepted>0),receivedUnits:shouldReceive?Number((accepted*factor).toFixed(3)):0,
+        rejectedUnits:shouldReceive?Number((rejectedQty*factor).toFixed(3)):0,
+        qualityType:row.querySelector('[name=qualityType]').value,
+        qualityNote:row.querySelector('[name=qualityNote]').value,
+        lotNumber:row.querySelector('[name=lotNumber]').value,
+        expiresAt:row.querySelector('[name=expiresAt]').value,
+        rejectedByPolicy:false,policyAction:original.policyAction||'review',matchMethod:manual?'manual-user-entry':original.matchMethod,
+        confidence:manual?0:Number(original.confidence||0)};
+    });
     const linked=reviewed.filter((line,index)=>!rejected.has(index)&&line.productId);
-    if(!linked.length)throw new Error('Vincula al menos una línea no excluida con un producto del pedido.');
+    if(!linked.length)throw new Error('Vincula al menos una línea con un producto del pedido o del catálogo del proveedor.');
     if(!linked.some(line=>Number(line.units||0)>0))throw new Error('Ingresa al menos una cantidad visible del documento antes de guardarlo.');
+    if(shouldReceive&&!reviewed.some(line=>line.receivedUnits>0||line.rejectedUnits>0))throw new Error('Confirma alguna cantidad recibida o desmarca la recepción para guardar solo la factura.');
     const free=item.kind==='free',documentTotal=Number(form.get('total')||0);
     if(!free&&documentTotal<=0)throw new Error('Confirma el total visible de la factura antes de guardarla.');
     if(!free&&linked.some(line=>!line.isFree&&(Number(line.units||0)<=0||Number(line.grossLineTotal||0)<=0)))throw new Error('Cada línea con valor debe tener cantidad y total de línea verificables. Marca como bonificada solo una línea realmente sin cargo.');
-    const payload={supplierId:queue.supplierId,locationId:queue.locationId,orderIds:[queue.orderId],invoiceNumber:String(form.get('invoiceNumber')||'').trim(),invoiceDate:String(form.get('invoiceDate')||'').trim(),currency:'CLP',documentType:free?'SC':form.get('documentType'),documentNature:item.kind,documentFileName:item.file.name,batchSessionId:queue.id,batchPosition:position+1,batchTotal:total,extraItemsDecision:$('#v32ExtraDecision')?.value||'review',totals:{net:free?0:Number(form.get('net')||0),vat:free?0:Number(form.get('vat')||0),additionalTax:free?0:Number(form.get('additionalTax')||0),total:free?0:documentTotal},aiModel:manual?'manual-user-entry':(analysis.model||'nuvasto'),sourceFileId:analysis.sourceFile?.id||'',aiConfidence:manual?0:linked.length/Math.max(1,reviewed.filter((line,index)=>!rejected.has(index)).length),lines:reviewed};
-    const saved=await createInvoice(payload);queue.saved.push({id:saved.id||'',number:payload.invoiceNumber,kind:item.kind,fileName:item.file.name});
+    const payload={supplierId:queue.supplierId,locationId:queue.locationId,orderIds:[queue.orderId],invoiceNumber:String(form.get('invoiceNumber')||'').trim(),invoiceDate:String(form.get('invoiceDate')||'').trim(),currency:'CLP',documentType:free?'SC':form.get('documentType'),documentNature:item.kind,documentFileName:item.file.name,batchSessionId:queue.id,batchPosition:position+1,batchTotal:total,extraItemsDecision:'review',markReceived:shouldReceive,receptionDate:new Date().toISOString().slice(0,10),totals:{net:free?0:Number(form.get('net')||0),vat:free?0:Number(form.get('vat')||0),additionalTax:free?0:Number(form.get('additionalTax')||0),total:free?0:documentTotal},aiModel:manual?'manual-user-entry':(analysis.model||'nuvasto'),sourceFileId:analysis.sourceFile?.id||'',aiConfidence:manual?0:linked.length/Math.max(1,reviewed.filter((line,index)=>!rejected.has(index)).length),lines:reviewed};
+    const saved=await createInvoice(payload);
+    queue.saved.push({id:saved.id||'',number:payload.invoiceNumber,kind:item.kind,fileName:item.file.name});
+    if(shouldReceive){if(saved.receptionError)toast('Factura guardada; recepción pendiente: '+saved.receptionError,'error');else toast('Factura y recepción registradas');}
+    if(saved.reception&&!saved.receptionError){
+      const updated=await api('/api/orders/'+encodeURIComponent(queue.orderId),{fresh:true,timeout:18000}).catch(()=>null);
+      if(updated?.order)queue.order=updated.order;
+    }
     if(queue.index<queue.items.length-1){queue.index++;toast(`Documento ${position+1} de ${total} guardado. Continuando con el siguiente…`);await processCurrent();return saved}
     await finishQueue();return saved;
   }});
-  bindMoney($('#modalBody'));bindLineMath(item.kind);endAnalysisTransition();
+  bindMoney($('#modalBody'));bindLineMath(item.kind);bindUnifiedInvoiceReception(queue.order,lines);endAnalysisTransition();
 }
 
 async function processCurrent(){
