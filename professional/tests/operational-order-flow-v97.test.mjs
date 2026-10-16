@@ -5,6 +5,8 @@ const read=path=>readFileSync(new URL(path,import.meta.url),'utf8');
 const server=read('../worker/src/worker-core.js'),receiving=read('../worker/src/api/reception-v13.js');
 const detail=read('../web/app-order-detail-v30.js'),orders=read('../web/app-orders.js');
 const invoice=read('../web/app-invoice-v30.js'),multi=read('../web/app-multi-invoice.js');
+const master=read('../web/app-master-order.js');
+assert.match(master,/openOrderDetail\(order\.id\)/,'canonical master editor returns to same draft');
 assert.match(server,/const invoiceCount=Number\(invoices\?\.total\|\|0\)/);
 assert.doesNotMatch(server,/if\(!Number\(invoices\?\.total\)\)throw/);
 assert.match(server,/invoicePending:invoiceCount===0/);
