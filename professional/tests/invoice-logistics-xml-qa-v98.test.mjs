@@ -15,6 +15,20 @@ assert.equal(inconsistent.verified,false,'never approve gross unit prices contra
 assert.deepEqual(inconsistent.printedFinalPriceMismatches,[1,2]);
 assert.ok(warnings.some(msg=>msg.includes('precio')||msg.includes('Precio')));
 
+// Explicit document-line freight is the source of truth even when a supplier
+// defaults to another allocation policy. Totals remain verifiable.
+const realRows=[
+  {invoiceQuantity:1,totalUnits:1,netLineTotal:1000,freightLine:250},
+  {invoiceQuantity:1,totalUnits:1,netLineTotal:2000,freightLine:50}
+];
+const charges=reconcileInvoicePricing(realRows,{net:3000,freight:300,vat:627,total:3927},[],
+  {freight:'net_value',other:'net_value',vat:'net_value',additionalTax:'net_value'});
+assert.equal(charges.verified,true,'explicit logistics evidence must not be discarded');
+assert.deepEqual(realRows.map(row=>row.allocatedFreight),[250,50],
+  'printed freight amounts override a contradictory supplier default allocation');
+assert.equal(realRows[0].taxAllocationMethod,'printed-line-component-evidence-v98');
+assert.equal(realRows.reduce((sum,row)=>sum+row.grossLineTotal,0),3927);
+
 const allocationRows=[
   {invoiceQuantity:2,totalUnits:12,netLineTotal:2000,freightLine:200,sourcePrintedFinalUnitPrice:0},
   {invoiceQuantity:1,totalUnits:12,netLineTotal:1000,freightLine:100,sourcePrintedFinalUnitPrice:0}
