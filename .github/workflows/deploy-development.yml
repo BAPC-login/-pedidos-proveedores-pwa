@@ -150,6 +150,16 @@ jobs:
           NUVASTO_E2E_PASSWORD: '${{ secrets.NUVASTO_DEV_E2E_PASSWORD }}'
         run: node tests/development-supplier-profile-e2e-v94.mjs
 
+      - name: Unified invoice reception E2E on isolated DEV
+        id: unified_invoice_e2e
+        if: always() && steps.verify.outcome == 'success' && steps.seed.outputs.configured == 'true'
+        working-directory: professional
+        env:
+          NUVASTO_BASE_URL: 'https://pedidos-pro-ai-dev.botreservasmultilocal.workers.dev'
+          NUVASTO_E2E_EMAIL: 'e2e@nuvasto.dev'
+          NUVASTO_E2E_PASSWORD: '${{ secrets.NUVASTO_DEV_E2E_PASSWORD }}'
+        run: node tests/development-unified-invoice-reception-v100.mjs
+
       - name: Preview real catalog copy without writing
         id: qa_catalog_preview
         if: github.event_name == 'workflow_dispatch' && (inputs.copy_catalog == 'dry_run' || inputs.copy_catalog == 'apply') && steps.seed.outputs.configured == 'true'
@@ -187,7 +197,7 @@ jobs:
         shell: bash
         env: {GH_TOKEN: '${{ github.token }}'}
         run: |
-          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.ip_hash_salt.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.seed.outcome }}" != "failure" ] && [ "${{ steps.e2e.outcome }}" != "failure" ] && [ "${{ steps.branding_e2e.outcome }}" != "failure" ] && [ "${{ steps.supplier_e2e.outcome }}" != "failure" ] && [ "${{ steps.qa_catalog_preview.outcome }}" != "failure" ] && [ "${{ steps.qa_catalog_import.outcome }}" != "failure" ] && [ "${{ steps.ai_canary.outcome }}" != "failure" ]; then
+          if [ "${{ steps.candidate.outcome }}" = "success" ] && [ "${{ steps.deploy.outcome }}" = "success" ] && [ "${{ steps.ip_hash_salt.outcome }}" = "success" ] && [ "${{ steps.verify.outcome }}" = "success" ] && [ "${{ steps.seed.outcome }}" != "failure" ] && [ "${{ steps.e2e.outcome }}" != "failure" ] && [ "${{ steps.branding_e2e.outcome }}" != "failure" ] && [ "${{ steps.supplier_e2e.outcome }}" != "failure" ] && [ "${{ steps.unified_invoice_e2e.outcome }}" != "failure" ] && [ "${{ steps.qa_catalog_preview.outcome }}" != "failure" ] && [ "${{ steps.qa_catalog_import.outcome }}" != "failure" ] && [ "${{ steps.ai_canary.outcome }}" != "failure" ]; then
             state=success
             if [ "${{ steps.seed.outputs.configured }}" = "true" ] && [ "${{ steps.secrets.outputs.configured }}" = "true" ]; then description='Nuvasto DEV · current UI + operación + proveedores + logos + IA OK'; else description='Nuvasto DEV current verificado; cobertura opcional incompleta'; fi
           else

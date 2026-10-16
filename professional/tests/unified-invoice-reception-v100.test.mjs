@@ -37,6 +37,13 @@ assert.match(review,/if\(saved\.receptionError\)/,'saved invoice and failed rece
 assert.match(worker,/receivedUnits\?\?line\?\.units/,'backend uses accepted amount, not all invoiced units');
 assert.match(worker,/rejectedUnits/,'backend persists reported rejections');
 assert.match(worker,/createReceptionV13/,'only canonical reception creates a record');
+const e2e=file('../tests/development-unified-invoice-reception-v100.mjs');
+const workflow=file('../../.github/workflows/deploy-development.yml');
+assert.match(e2e,/^assert.match\(new URL\(base\)\.hostname/m,'destructive E2E is DEV only');
+assert.match(e2e,/markReceived:true/,'E2E checks invoice-driven receiving');
+assert.match(e2e,/receivedUnits:1,rejectedUnits:1/,'E2E checks extra rejects');
+assert.match(e2e,/\/finalize/,'E2E closes received order');
+assert.match(workflow,/Unified invoice reception E2E on isolated DEV/,'QA workflow actually executes new E2E');
 assert.match(worker,/record\.qualityNote/,'incident detail flows into reception notes');
 assert.match(css,/\.modal:has\(\.modal-frame\[data-size="order"\]\)/,'desktop Master Order fits viewport');
 assert.match(css,/\.order-file-product small\{white-space:normal/,'full descriptions visible in desktop');
